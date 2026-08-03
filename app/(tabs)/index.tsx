@@ -1,98 +1,35 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import {useState, useEffect} from 'react'; //useState: store data that triggers re-renders; useEffect: run code on mount
+import {ThemedView} from '@/components/themed-view'; // theme-aware container component
+import {ThemedText} from '@/components/themed-text'; // theme-aware text component
+import {SafeAreaView} from 'react-native-safe-area-context'; 
+import {getHabits} from '@/db/habits'; // fxn that reads all habits from SQLite
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+type Habit = { // reusable shape describing one habit, matching habits table's columns
+  habitId: number;
+  habitName: string;
+  habitNotes: string;
+};
 
-export default function HomeScreen() {
+export default function HomeScreen() { // default export, becomes the "index" tab per Expo router convention
+  const [habits, setHabits] = useState<Habit[]>([]); // habits: current list in state, starts empty; setHabits: how we update it
+
+  useEffect(() => { // runs once, when the component first mounts
+    async function loadHabits(){ // inner async fxn, since useEffect's own callback can't be async
+      const result = await getHabits(); // fetch all habits from SQLite (an async disk operation)
+      setHabits(result); // store fetched habits in state, triggering a re-render to display them
+    }
+    loadHabits(); // call fxn we defined
+  }, []); // empty array: only run this effect once, on mount
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
+    <SafeAreaView>
+      <ThemedView> {/* the screen's outer container */}
+        <ThemedText>Home</ThemedText> {/*Simple, temporary heading untill we buil proper UI */}
+        {habits.map((habit) => (
+          <ThemedText key={habit.habitId}>{habit.habitName}</ThemedText>
+          // key: unique identifier so React can track this item across re-renders; displays habit name
+        ))}
       </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
-
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+    </SafeAreaView>  
   );
 }
-
-const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-  },
-});
