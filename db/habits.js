@@ -17,3 +17,50 @@ export async function addHabit(habitName, habitNotes){
 
   return result.lastInsertRowId;
 } 
+
+export async function getHabits(){
+    const db = await getDatabase();
+     const allHabits = await db.getAllAsync(
+        `SELECT * FROM habits`
+    ); 
+
+    return allHabits;
+}
+
+export async function deleteHabits(habitId){
+    
+    /* WRONG
+
+    const db = await getDatabase();
+     const deleteCompletions = await db.runAsync(
+        `DELETE * FROM completions WHERE habitId = ?`
+    ); 
+
+     const deleteHabits = await db.runAsync(
+        `DELETE * FROM habits WHERE habitId = ?`
+    ); 
+
+    return deleteCompletions;
+    return deleteHabits;
+    */
+
+    /* CORRECT */
+    const db = await getDatabase();
+    await db.runAsync(
+        'DELETE FROM completions WHERE habitId = ?',
+        [habitId]
+    );
+
+    await db.runAsync(
+        'DELETE FROM habits WHERE habitId = ?',
+        [habitId]
+    );
+}
+
+export async function toggleCompletion(completionId, newValue) {
+    const db = await getDatabase();
+    await db.runAsync(
+        'UPDATE completions SET completed = ?, synced = 0 WHERE completionId = ?',
+        [newValue, completionId]
+    );
+}
