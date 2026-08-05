@@ -1,4 +1,4 @@
-import {useEffect} from 'react';
+import {useState, useEffect} from 'react';
 import {AppState} from 'react-native'; //AppState lets us detect when the app becomes active/background/inactive
 
 import {initializeSchema} from '@/db/schema';
@@ -8,6 +8,8 @@ import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated'; 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import {syncCompletions} from '@/sync/syncEngine';
+import {onAuthStateChanged} from 'firebase/auth';
+import {getFirebaseAuth} from '@/services/authInit';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -15,9 +17,19 @@ export const unstable_settings = {
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
+
   useEffect(() => {
     initializeSchema();
   },[]);
+
+  useEffect(() => {
+    const auth = getFirebaseAuth();
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setIsLoggedIn(!!user);
+    })
+    return () => unsubscribe();
+  }, [])
 
   useEffect(() => { //a second, separate effect - this manages an ongoing subscription, not a one-time action
   const subscription = AppState.addEventListener('change', (nextAppState) => {
@@ -40,10 +52,21 @@ export default function RootLayout() {
     return () => clearInterval(intervalId);
   }, []);
 
+  if (isLoggedIn === null) return null; //still checking auth state, let splash screen linger
+
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        {/* old line */}
+        {/*<Stack.Screen name="(tabs)" options={{ headerShown: false }} />*/}
+        
+        {/* new updated */}
+        {isLoggedIn ? (
+          <Stack.Screen name="(tabs)" options={{headerShown: false}} />
+        ) : (
+          <Stack.Screen name="auth" options={{headerShown: false}} />
+        )}
+
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
       </Stack>
       <StatusBar style="auto" />
