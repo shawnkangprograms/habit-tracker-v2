@@ -1,20 +1,23 @@
-import {useState, useEffect} from 'react';
-import {AppState} from 'react-native'; //AppState lets us detect when the app becomes active/background/inactive
+import {useState, useEffect} from 'react'; // hooks for state management and lifecycle side effects (listeners, timers)
+import {AppState} from 'react-native'; //AppState lets us detect when the app enters active/background/inactive state
 
-import {initializeSchema} from '@/db/schema';
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated'; 
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import {syncCompletions} from '@/sync/syncEngine';
-import {onAuthStateChanged} from 'firebase/auth';
-import {getFirebaseAuth} from '@/services/authInit';
+import {initializeSchema} from '@/db/schema'; //import db schema initialization fxn from local db module
+import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native'; // theme definintions & ThemeProvider from react navigation for styling
+import { Stack } from 'expo-router'; //import stack component for stack based screen nav
+import { StatusBar } from 'expo-status-bar'; // for controlling status bar appearance
+import 'react-native-reanimated'; // side-effect import to initialize gesture and animation drivers for react navigation
+import { useColorScheme } from '@/hooks/use-color-scheme'; //custom hook to read user's system dark/light mode
+import {syncCompletions} from '@/sync/syncEngine'; //import data sync utility to keep local storage in sync with remote db
+import {onAuthStateChanged} from 'firebase/auth'; //firebase auth state listener
+import {getFirebaseAuth} from '@/services/authInit'; //helper fxn that returns the active firebase auth instance
 
+// import config obj used by expo router to establish initial route anchoring
 export const unstable_settings = {
+  //Directs Expo Router deep-linking fallbacks to anchor on the '(tabs)' route group
   anchor: '(tabs)',
 };
 
+// Define and export the root layout component for the application
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
@@ -59,13 +62,25 @@ export default function RootLayout() {
       <Stack>
         {/* old line */}
         {/*<Stack.Screen name="(tabs)" options={{ headerShown: false }} />*/}
-        
+
         {/* new updated */}
+        {/*
         {isLoggedIn ? (
           <Stack.Screen name="(tabs)" options={{headerShown: false}} />
         ) : (
           <Stack.Screen name="auth" options={{headerShown: false}} />
         )}
+        */}
+
+        {/* update v2 */}
+        {/* Protected routes: both screens are always declared, but only one is reachable at a time based on login state*/}
+        <Stack.Protected guard={isLoggedIn}>
+          <Stack.Screen name="(tabs)" options={{headerShown: false}} />  
+        </Stack.Protected>  
+
+        <Stack.Protected guard={!isLoggedIn}>
+          <Stack.Screen name="auth" options={{headerShown: false}} />
+        </Stack.Protected>
 
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
       </Stack>
