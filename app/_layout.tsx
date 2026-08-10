@@ -35,7 +35,9 @@ export default function RootLayout() {
   }, [])
 
   useEffect(() => { //a second, separate effect - this manages an ongoing subscription, not a one-time action
-  const subscription = AppState.addEventListener('change', (nextAppState) => {
+    if (!isLoggedIn) return; //don't set up the listener if not logged in
+
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
     //start listening for app state changes; nextAppState tells what state the app changed to
 
     if (nextAppState === 'active') {
@@ -45,15 +47,17 @@ export default function RootLayout() {
   });
     return () => subscription.remove();
     //cleanup fxn: stops listening for app state changes if this component unmounts, preventing duplicate listeners
-  }, []); //empty array: set up this listener once, when the component first mounts  
+  }, [isLoggedIn]); //rerun this effect whenever isLoggedIn changes
 
   useEffect(() => {
+    if (!isLoggedIn) return; //don't start the  timer is not logged in
+
     const intervalId = setInterval(() => {
       syncCompletions(); 
     }, 5*60*1000);
 
     return () => clearInterval(intervalId);
-  }, []);
+  }, [isLoggedIn]); //rerun this effect whenever isLoggedIn changes
 
   if (isLoggedIn === null) return null; //still checking auth state, let splash screen linger
 

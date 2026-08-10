@@ -3,6 +3,7 @@ import {TextInput, TouchableOpacity} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {ThemedText} from '@/components/themed-text';
 import {ThemedView} from '@/components/themed-view';
+import {signUp, signIn} from '@/services/authActions';
 
 export default function AuthScreen() {
 
@@ -39,17 +40,31 @@ export default function AuthScreen() {
         //4. The actual submission (wrapped in try/catch for future API calls)
         try{
             if (isSignUp) {
+            /* Old sign up branch
+
             //sign-up logic will need all the form data
             console.log("Routing to sign up with:", formData);
             // TODO: call backend signUp(formData.email, formData.password, ...)
+            */
+
+            //new sign-up branch
+            await signUp(formData.email, formData.password, formData.firstName, formData.lastName, formData.age);
             
             } else {
+                /* Old sign in branch - submitting only logs to console; no account gets created,
+                no Firestore doc is written, nothing gets written to Firebase at all 
+
                 //sign-in logic only needs email and password
                 console.log("Routing to sign in with:", {
                     email: formData.email,
                     password: formData.password
                 });
                 // TODO: call backend signIn(formData.email, formData.password)
+
+                */
+
+                // new sign in branch
+                await signIn(formData.email, formData.password);
             }
 
         /* 

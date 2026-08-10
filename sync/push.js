@@ -1,10 +1,16 @@
 import {getFirestoreDb} from '@/services/firebaseInit';
+import {getFirebaseAuth} from '@/services/authInit';
 import {doc, getDoc, setDoc} from 'firebase/firestore';
 
 export async function pushCompletion(localRow) { //localRow = one row from the phone's SQLite completions table 
+    const auth = getFirebaseAuth(); //get the auth instance
+    if (!auth.currentUser) return;//safety guard: do nothing if no one's logged in
+
+    const uid = auth.currentUser.uid; //get the currently logged-in user's ID
+    
     const db = getFirestoreDb(); //get (or create) the Firestore connection
-    const docRef = doc(db, 'completions', `${localRow.habitId}_${localRow.date}`);
-    //build a reference to one specific firestore document, uniquely identified by habitId + date
+    const docRef = doc(db, 'completions', uid, 'items', `${localRow.habitId}_${localRow.date}`);
+    //build a reference to one specific firestore document, uniquely identified by user id {uid} + habitId + date
     
     const remoteSnap = await getDoc(docRef); //fetch whatever is currently at that document path (acync real ntw call)
     const remoteData = remoteSnap.exists() ? remoteSnap.data() : null;
