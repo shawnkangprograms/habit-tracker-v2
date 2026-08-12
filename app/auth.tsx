@@ -109,6 +109,7 @@ export default function AuthScreen() {
         <TextInput
             value={formData.password}
             style={inputStyle}
+            secureTextEntry
             onChangeText={(text) => setFormData({ ...formData, password: text})}
         />
 
