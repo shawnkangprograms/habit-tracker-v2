@@ -2,6 +2,10 @@ import {getDatabase} from '@/db/database.js';
 
 export async function addHabit(habitName, habitNotes){
     const db = await getDatabase();
+
+    //temporary console log to catch the SQL error
+    console.log('Running INSERT habits with:', habitName, habitNotes);
+
     const result = await db.runAsync(
   `INSERT INTO habits (habitName, habitNotes) VALUES (?, ?)`,
   [habitName, habitNotes]);
@@ -10,6 +14,10 @@ export async function addHabit(habitName, habitNotes){
   /*'INSERT INTO completions (completed, synced, date) VALUES (?, ?, new Date().toISOString().split('T')[0])'*/
   
   /* right*/
+
+  //temporary console log to catch the SQL error
+  console.log('Running INSERT completions with:', result.lastInsertRowId, new Date().toISOString().split('T')[0]);
+
   await db.runAsync(
     'INSERT INTO completions (habitId, date, completed, synced) VALUES (?, ?, ?, ?)',
     [result.lastInsertRowId, new Date().toISOString().split('T')[0], 0, 0]
@@ -20,6 +28,10 @@ export async function addHabit(habitName, habitNotes){
 
 export async function getHabits(){
     const db = await getDatabase();
+
+    //temporary console log to catch the SQL error
+    console.log('Running SELECT habits');
+
      const allHabits = await db.getAllAsync(
         `SELECT * FROM habits`
     ); 
