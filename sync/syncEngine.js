@@ -22,3 +22,25 @@ export async function syncCompletions() { // the main fxn that runs on every syn
         }
     }    
 }
+
+export async function ensureTodayRows() {
+    const db = await getDatabase();
+    const today = new Date().toISOString().split('T')[0];
+
+    const allHabits = await db.getAllAsync('SELECT * FROM habits');
+
+    for (const habit of allHabits) {
+
+        //check if a completions row exists for each habit
+        const existing = await db.getAllAsync('SELECT * FROM completions WHERE habitId = ? AND date = ?', 
+            [habit.habitId, today]
+        )
+        //if not, insert one
+        if (existing.length === 0) {
+            await db.runAsync(
+                'INSERT INTO completions (habitId, date, completed, synced) VALUES (?, ?, ?, ?)',
+                [habit.habitId, today, 0, 0] 
+            );
+        }
+    }
+}

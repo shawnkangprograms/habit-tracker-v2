@@ -2,7 +2,7 @@ import {useState, useEffect} from 'react';//useState: store data that triggers r
 import {ThemedView} from '@/components/themed-view';// theme-aware container component
 import {ThemedText} from '@/components/themed-text';// theme-aware text component
 import {SafeAreaView} from 'react-native-safe-area-context'; 
-import {getHabits, addHabit} from '@/db/habits';// fxn that reads all habits from SQLite
+import {toggleCompletion, getHabitsWithTodayStatus, addHabit} from '@/db/habits';// fxn that reads all habits from SQLite
 
 import {TextInput, TouchableOpacity} from 'react-native';
 
@@ -10,6 +10,8 @@ type Habit = {// reusable shape describing one habit, matching habits table's co
   habitId: number;
   habitName: string;
   habitNotes: string;
+  completionId: number;
+  completed: number;
 };
 
 export default function HomeScreen() {// default export, becomes the "index" tab per Expo router convention
@@ -28,7 +30,7 @@ export default function HomeScreen() {// default export, becomes the "index" tab
   }, []); // empty array: only run this effect once, on mount
 
   async function loadHabits(){// inner async fxn, since useEffect's own callback can't be async
-      const result = await getHabits();// fetch all habits from SQLite (an async disk operation)
+      const result = await getHabitsWithTodayStatus();// fetch all habits from SQLite (an async disk operation)
       setHabits(result);// store fetched habits in state, triggering a re-render to display them
   }
 
@@ -92,18 +94,32 @@ export default function HomeScreen() {// default export, becomes the "index" tab
           </>
         )}
 
-        {habits.map((habit) => {
+        
+        {
+          //OLD habits.map
 
-          /*
-          //temporary debug log
-          console.log(habit.habitId, habit.habitName);
-          */
-
+        /*habits.map((habit) => {
           return(
           <ThemedText key={habit.habitId}>{habit.habitName}</ThemedText>
           // key: unique identifier so React can track this item across re-renders; displays habit name
         );
         })}
+        */}
+
+          {/* NEW habits.map */}
+          
+        {habits.map((habit) => (
+          <TouchableOpacity
+          key={habit.habitId}
+          onPress={async () => {
+            await toggleCompletion(habit.completionId, 1 - habit.completed);
+            loadHabits();
+          }}>
+            <ThemedText>
+              {habit.completed ? "yes" : "no"}{habit.habitName}
+            </ThemedText>
+          </TouchableOpacity>
+        ))}
       </ThemedView>
     </SafeAreaView>  
   );
