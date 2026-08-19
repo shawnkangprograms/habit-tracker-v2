@@ -89,7 +89,7 @@ export async function getHabitsWithTodayStatus() { //the function shell
     const db = await getDatabase(); //get the connection
 
     const today = new Date().toISOString().split('T')[0];
-
+    
     const result = await db.getAllAsync( 
         //run the query using getAllAsync with JOIN, passing today as the parameter
 

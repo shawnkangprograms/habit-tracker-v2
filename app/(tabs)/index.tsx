@@ -2,9 +2,10 @@ import {useState, useEffect} from 'react';//useState: store data that triggers r
 import {ThemedView} from '@/components/themed-view';// theme-aware container component
 import {ThemedText} from '@/components/themed-text';// theme-aware text component
 import {SafeAreaView} from 'react-native-safe-area-context'; 
-import {toggleCompletion, getHabitsWithTodayStatus, addHabit} from '@/db/habits';// fxn that reads all habits from SQLite
+import {toggleCompletion, getHabitsWithTodayStatus, addHabit, deleteHabits} from '@/db/habits';// fxn that reads all habits from SQLite
 
-import {TextInput, TouchableOpacity} from 'react-native';
+import {Alert, View, TextInput, TouchableOpacity} from 'react-native';
+import {IconSymbol} from '@/components/ui/icon-symbol';
 
 type Habit = {// reusable shape describing one habit, matching habits table's columns
   habitId: number;
@@ -107,10 +108,13 @@ export default function HomeScreen() {// default export, becomes the "index" tab
         */}
 
           {/* NEW habits.map */}
-          
+
         {habits.map((habit) => (
+          <View 
+          key={habit.habitId} 
+          style={{flexDirection:'row', alignItems:'center', justifyContent:'space-between'}}>
+
           <TouchableOpacity
-          key={habit.habitId}
           onPress={async () => {
             await toggleCompletion(habit.completionId, 1 - habit.completed);
             loadHabits();
@@ -119,7 +123,31 @@ export default function HomeScreen() {// default export, becomes the "index" tab
               {habit.completed ? "yes" : "no"}{habit.habitName}
             </ThemedText>
           </TouchableOpacity>
+
+          <TouchableOpacity
+          onPress={() => {
+            Alert.alert(
+              "Delete Habit?",
+              "Are you sure you want to delete this habit? This action is irreversible.",
+              [
+                {text: "Cancel", style: "cancel"},
+                {
+                  text: "Delete",
+                  style: "destructive",
+                  onPress: async () => {
+                    await deleteHabits(habit.habitId);
+                    loadHabits();
+                  }
+                }
+              ]
+            )
+          }}
+          >
+            <IconSymbol name="trash.fill" size={20} color="red" />
+          </TouchableOpacity>
+          </View>
         ))}
+
       </ThemedView>
     </SafeAreaView>  
   );
