@@ -5,7 +5,7 @@ The detailed CRUD + validation rule tables are in the published doc:
 https://claude.ai/artifact/AupM7DJ3Fcw5b746p54JJc
 
 ## Stack and environment
-- Expo SDK 54 (Expo Go compatible), Expo Router, React Native, TypeScript/JS mix
+- Expo SDK 57 (Expo Go compatible), Expo Router, React Native, TypeScript/JS mix
 - Local SQLite (expo-sqlite) is the source of truth; Firebase (Auth + Firestore) for backup/sync
 - Dev on Windows/PowerShell/VS Code. Test devices: iPhone 13 Pro (iOS 26), Itel A60s (Android 12 Go, 32-bit)
 - Folder structure: type-based (/components, /db, /sync, /services); screens live in /app per Expo Router
@@ -59,7 +59,7 @@ Full Figma prototype scope: Sign In/Up, 10-question onboarding, building-profile
 - Weekday habits on unscheduled days: no completion row is created and the habit is not shown on Home. Backfill only creates rows for scheduled days
 - Icons are stable string ids, not emoji. PLACEHOLDER list (to be confirmed): book, water, run, meditate, sleep, food, study, work, music, money, heart, star
 - Per-user data: every habit row carries userId (the Firebase uid) and every read filters by the signed-in user
-- Local database: a one-time dev wipe is acceptable (test data only). From now on schema changes use versioned migrations via PRAGMA user_version, verified against the Expo SDK 54 expo-sqlite docs
+- Local database: a one-time dev wipe is acceptable (test data only). From now on schema changes use versioned migrations via PRAGMA user_version, verified against the Expo SDK 57 expo-sqlite docs
 - Schema setup must be awaited before the first query (initializeSchema is currently not awaited in app/_layout.tsx)
 - Meeting 2 demo scope: habits add / edit / soft-delete with validation, completion toggle, signup with validation and the age gate. Deferred until after Meeting 2: backfill, onboarding, email/password editing, habit sync
 - The habit sync columns (updatedAt, synced, deleted) exist from day one, but the sync work itself is build step 2. That step must also: sync at app launch and right after login, pull data down from Firestore on login (the report promises cross-device preservation), fix the race where a tap during a push is overwritten, and use the same ids as the local keys
