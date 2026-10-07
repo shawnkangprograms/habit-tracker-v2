@@ -6,6 +6,7 @@ https://claude.ai/artifact/AupM7DJ3Fcw5b746p54JJc
 
 ## Stack and environment
 - Expo SDK 57 (Expo Go compatible), Expo Router, React Native, TypeScript/JS mix
+- semver ^7.8.5 is a direct dependency only as a workaround for a Metro resolution failure on react-native-reanimated's nested semver (SDK 57); remove when the cause is understood.
 - Local SQLite (expo-sqlite) is the source of truth; Firebase (Auth + Firestore) for backup/sync
 - Dev on Windows/PowerShell/VS Code. Test devices: iPhone 13 Pro (iOS 26), Itel A60s (Android 12 Go, 32-bit)
 - Folder structure: type-based (/components, /db, /sync, /services); screens live in /app per Expo Router
