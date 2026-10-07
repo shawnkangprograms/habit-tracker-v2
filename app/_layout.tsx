@@ -2,8 +2,7 @@ import {useState, useEffect} from 'react'; // hooks for state management and lif
 import {AppState} from 'react-native'; //AppState lets us detect when the app enters active/background/inactive state
 
 import {initializeSchema} from '@/db/schema'; //import db schema initialization fxn from local db module
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native'; // theme definintions & ThemeProvider from react navigation for styling
-import { Stack } from 'expo-router'; //import stack component for stack based screen nav
+import { DarkTheme, DefaultTheme, ThemeProvider, Stack } from 'expo-router'; // theme definitions & ThemeProvider (since SDK 56 these come from expo-router, not @react-navigation/native) and Stack for stack based screen nav
 import { StatusBar } from 'expo-status-bar'; // for controlling status bar appearance
 import 'react-native-reanimated'; // side-effect import to initialize gesture and animation drivers for react navigation
 import { useColorScheme } from '@/hooks/use-color-scheme'; //custom hook to read user's system dark/light mode
