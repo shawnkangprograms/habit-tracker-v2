@@ -2,14 +2,31 @@ import {useState, useEffect} from 'react'; // hooks for state management and lif
 import {AppState} from 'react-native'; //AppState lets us detect when the app enters active/background/inactive state
 
 import {getDatabase} from '@/db/database'; //opens the local db and runs migrations; resolves once it's ready
-import { DarkTheme, DefaultTheme, ThemeProvider, Stack } from 'expo-router'; // theme definitions & ThemeProvider (since SDK 56 these come from expo-router, not @react-navigation/native) and Stack for stack based screen nav
+import { DarkTheme, ThemeProvider, Stack } from 'expo-router'; // theme definitions & ThemeProvider (since SDK 56 these come from expo-router, not @react-navigation/native) and Stack for stack based screen nav
 import { StatusBar } from 'expo-status-bar'; // for controlling status bar appearance
 import 'react-native-reanimated'; // side-effect import to initialize gesture and animation drivers for react navigation
-import { useColorScheme } from '@/hooks/use-color-scheme'; //custom hook to read user's system dark/light mode
+import {useFonts} from 'expo-font'; //loads font files; returns [loaded, error]
+import {SpaceGrotesk_700Bold} from '@expo-google-fonts/space-grotesk';
+import {Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold} from '@expo-google-fonts/inter';
+import {colors} from '@/constants/theme';
 import {syncCompletions} from '@/sync/syncEngine'; //import data sync utility to keep local storage in sync with remote db
 import {onAuthStateChanged} from 'firebase/auth'; //firebase auth state listener
 import {getFirebaseAuth} from '@/services/authInit'; //helper fxn that returns the active firebase auth instance
 import {ThemedText} from '@/components/themed-text';
+
+// The app is dark-only: navigation colours come from the design tokens
+const navTheme = {
+  ...DarkTheme,
+  colors: {
+    ...DarkTheme.colors,
+    primary: colors.accent,
+    background: colors.background,
+    card: colors.surface,
+    text: colors.text,
+    border: colors.border,
+    notification: colors.accent,
+  },
+};
 
 // Sync is paused until build step 2: sync/push.js still uses the old sticky-true rule.
 const SYNC_ENABLED = false;
@@ -22,7 +39,15 @@ export const unstable_settings = {
 
 // Define and export the root layout component for the application
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
+  // font keys match the family names in constants/theme.ts (fonts)
+  const [fontsLoaded, fontError] = useFonts({
+    SpaceGrotesk_700Bold,
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
+  });
+  const fontsReady = fontsLoaded || !!fontError; //on error, fall back to system fonts so the gate can never hang
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
   const [dbReady, setDbReady] = useState(false);
   const [dbError, setDbError] = useState(false);
@@ -35,6 +60,10 @@ export default function RootLayout() {
         setDbError(true);
       });
   },[]);
+
+  useEffect(() => {
+    if (fontError) console.warn('Font loading failed, using system fonts', fontError);
+  }, [fontError]);
 
   useEffect(() => {
     const auth = getFirebaseAuth();
@@ -71,11 +100,11 @@ export default function RootLayout() {
 
   // all hooks above run before any early return
   if (dbError) return <ThemedText>Couldn&apos;t open local data. Please restart the app.</ThemedText>;
-  if (isLoggedIn === null || !dbReady) return null; //still checking auth state or opening the db, let splash screen linger
+  if (isLoggedIn === null || !dbReady || !fontsReady) return null; //still checking auth state, opening the db or loading fonts, let splash screen linger
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
+    <ThemeProvider value={navTheme}>
+      <Stack screenOptions={{contentStyle: {backgroundColor: colors.background}}}>
         {/* old line */}
         {/*<Stack.Screen name="(tabs)" options={{ headerShown: false }} />*/}
 
@@ -100,7 +129,7 @@ export default function RootLayout() {
 
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
       </Stack>
-      <StatusBar style="auto" />
+      <StatusBar style="light" />
     </ThemeProvider>
   );
 }
