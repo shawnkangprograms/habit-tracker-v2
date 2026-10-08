@@ -13,34 +13,13 @@ export async function syncCompletions() { // the main fxn that runs on every syn
             const finalCompleted = await pushCompletion(row); //push it, resolving any conflict, get back the final value
 
             await db.runAsync( // db.runAsync(sql, [params]) -> parametized query pattern, avoids SQL risk that execAsync alone has
-                `UPDATE completions SET completed = ?, synced = 1 WHERE completionId = ?`,
-                [finalCompleted, row.completionId]
+                `UPDATE completions SET completed = ?, synced = 1 WHERE habitId = ? AND date = ?`,
+                [finalCompleted, row.habitId, row.date]
             ); // update this row locally: correct final value, and mark it as synced
         } catch (err) {
-            console.log('Sync failed for row', row.completionId, err);
+            console.log('Sync failed for row', row.habitId, row.date, err);
             //don't rethrow - just log and let the loop continue to the next row
-        }
-    }    
-}
-
-export async function ensureTodayRows() {
-    const db = await getDatabase();
-    const today = new Date().toISOString().split('T')[0];
-
-    const allHabits = await db.getAllAsync('SELECT * FROM habits');
-
-    for (const habit of allHabits) {
-
-        //check if a completions row exists for each habit
-        const existing = await db.getAllAsync('SELECT * FROM completions WHERE habitId = ? AND date = ?', 
-            [habit.habitId, today]
-        )
-        //if not, insert one
-        if (existing.length === 0) {
-            await db.runAsync(
-                'INSERT INTO completions (habitId, date, completed, synced) VALUES (?, ?, ?, ?)',
-                [habit.habitId, today, 0, 0] 
-            );
         }
     }
 }
+// ensureTodayRows moved to db/completions.js
