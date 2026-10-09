@@ -120,8 +120,9 @@ export default function RootLayout() {
         {/* update v2 */}
         {/* Protected routes: both screens are always declared, but only one is reachable at a time based on login state*/}
         <Stack.Protected guard={isLoggedIn}>
-          <Stack.Screen name="(tabs)" options={{headerShown: false}} />  
-        </Stack.Protected>  
+          <Stack.Screen name="(tabs)" options={{headerShown: false}} />
+          <Stack.Screen name="habit-form" options={{headerShown: false}} />
+        </Stack.Protected>
 
         <Stack.Protected guard={!isLoggedIn}>
           <Stack.Screen name="auth" options={{headerShown: false}} />
