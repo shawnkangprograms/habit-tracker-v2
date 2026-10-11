@@ -135,6 +135,7 @@ export default function RootLayout() {
           <Stack.Screen name="admin/users" options={{headerShown: false}} />
           <Stack.Screen name="admin/catalog" options={{headerShown: false}} />
           <Stack.Screen name="admin/catalog-form" options={{headerShown: false}} />
+          <Stack.Screen name="admin/audit" options={{headerShown: false}} />
         </Stack.Protected>
 
         <Stack.Protected guard={!isLoggedIn}>

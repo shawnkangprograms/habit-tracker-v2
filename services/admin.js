@@ -61,12 +61,14 @@ export async function getAdminOverview() {
     const users = collection(db, 'users');
     const count = async (q) => (await getCountFromServer(q)).data().count;
 
-    const [total, age18to24, age25to34, age35plus, catalogItems] = await withTimeout(Promise.all([
+    const [total, age18to24, age25to34, age35plus, disabledUsers, catalogItems, auditEntries] = await withTimeout(Promise.all([
         count(users),
         count(query(users, where('age', '>=', 18), where('age', '<', 25))),
         count(query(users, where('age', '>=', 25), where('age', '<', 35))),
         count(query(users, where('age', '>=', 35))),
+        count(query(users, where('disabled', '==', true))),
         count(collection(db, 'catalog')),
+        count(collection(db, 'adminLog')),
     ]));
 
     return {
@@ -75,7 +77,9 @@ export async function getAdminOverview() {
         age25to34,
         age35plus,
         noAge: Math.max(0, total - age18to24 - age25to34 - age35plus),
+        disabledUsers,
         catalogItems,
+        auditEntries,
     };
 }
 
