@@ -14,6 +14,7 @@ import {colors, fonts, radii, spacing, ICON_COLORS} from '@/constants/theme';
 import {
   validateFrequency, validateHabitInput, validateHabitName, validateIcon, validateReminderTime,
 } from '@/validation/validators';
+import {StarterIdeas, type StarterIdea} from '@/components/starter-ideas';
 
 const NAME_MAX = 30; // display only; validateHabitName enforces the limit
 
@@ -80,6 +81,16 @@ export default function HabitFormScreen() {
   const toggleDay = (day: WeekdayKey) => {
     setSelectedDays((days) => days.includes(day) ? days.filter((d) => d !== day) : [...days, day]);
     clearError('frequency');
+  };
+
+  // Add mode: a starter idea fills every field (still editable; Save validates as usual)
+  const applyStarter = (idea: StarterIdea) => {
+    setHabitName(idea.habitName);
+    setIcon(idea.icon);
+    setIsWeekdays(idea.frequency.type === 'weekdays');
+    setSelectedDays(idea.frequency.type === 'weekdays' ? idea.frequency.days : []);
+    setReminder(idea.reminderTime ?? '');
+    setErrors({});
   };
 
   const handleSave = async () => {
@@ -150,6 +161,8 @@ export default function HabitFormScreen() {
           </Pressable>
 
           <Text style={styles.title}>{isEdit ? 'Edit habit' : 'New habit'}</Text>
+
+          {!isEdit && <StarterIdeas onPick={applyStarter} />}
 
           {/* HABIT NAME */}
           <View style={styles.section}>
