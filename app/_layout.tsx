@@ -13,6 +13,7 @@ import {syncCompletions} from '@/sync/syncEngine'; //import data sync utility to
 import {onAuthStateChanged} from 'firebase/auth'; //firebase auth state listener
 import {getFirebaseAuth} from '@/services/authInit'; //helper fxn that returns the active firebase auth instance
 import {ThemedText} from '@/components/themed-text';
+import {AdminContext, useAdminCheck} from '@/services/adminContext'; //admins/{uid} check, filled in after first render
 
 // The app is dark-only: navigation colours come from the design tokens
 const navTheme = {
@@ -49,6 +50,8 @@ export default function RootLayout() {
   });
   const fontsReady = fontsLoaded || !!fontError; //on error, fall back to system fonts so the gate can never hang
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
+  const [uid, setUid] = useState<string | null>(null); //signed-in user's id; a new uid re-runs the admin check
+  const admin = useAdminCheck(uid); //not part of the readiness gate below: isAdmin starts false and fills in later
   const [dbReady, setDbReady] = useState(false);
   const [dbError, setDbError] = useState(false);
 
@@ -69,6 +72,7 @@ export default function RootLayout() {
     const auth = getFirebaseAuth();
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setIsLoggedIn(!!user);
+      setUid(user?.uid ?? null);
     })
     return () => unsubscribe();
   }, [])
@@ -103,6 +107,7 @@ export default function RootLayout() {
   if (isLoggedIn === null || !dbReady || !fontsReady) return null; //still checking auth state, opening the db or loading fonts, let splash screen linger
 
   return (
+    <AdminContext.Provider value={admin}>
     <ThemeProvider value={navTheme}>
       <Stack screenOptions={{contentStyle: {backgroundColor: colors.background}}}>
         {/* old line */}
@@ -124,6 +129,14 @@ export default function RootLayout() {
           <Stack.Screen name="habit-form" options={{headerShown: false}} />
         </Stack.Protected>
 
+        {/* admin screens: reachable only while signed in AND the admins/{uid} check said yes; Firestore rules are the real guard */}
+        <Stack.Protected guard={!!isLoggedIn && admin.isAdmin}>
+          <Stack.Screen name="admin/overview" options={{headerShown: false}} />
+          <Stack.Screen name="admin/users" options={{headerShown: false}} />
+          <Stack.Screen name="admin/catalog" options={{headerShown: false}} />
+          <Stack.Screen name="admin/catalog-form" options={{headerShown: false}} />
+        </Stack.Protected>
+
         <Stack.Protected guard={!isLoggedIn}>
           <Stack.Screen name="auth" options={{headerShown: false}} />
         </Stack.Protected>
@@ -132,5 +145,6 @@ export default function RootLayout() {
       </Stack>
       <StatusBar style="light" />
     </ThemeProvider>
+    </AdminContext.Provider>
   );
 }
