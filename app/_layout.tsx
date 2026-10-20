@@ -14,6 +14,7 @@ import {onAuthStateChanged} from 'firebase/auth'; //firebase auth state listener
 import {getFirebaseAuth} from '@/services/authInit'; //helper fxn that returns the active firebase auth instance
 import {ThemedText} from '@/components/themed-text';
 import {AdminContext, useAdminCheck} from '@/services/adminContext'; //admins/{uid} check, filled in after first render
+import {useDisabledCheck} from '@/services/useDisabledCheck'; //signs out a disabled account; never blocks startup
 
 // The app is dark-only: navigation colours come from the design tokens
 const navTheme = {
@@ -52,6 +53,7 @@ export default function RootLayout() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
   const [uid, setUid] = useState<string | null>(null); //signed-in user's id; a new uid re-runs the admin check
   const admin = useAdminCheck(uid); //not part of the readiness gate below: isAdmin starts false and fills in later
+  useDisabledCheck(uid); //on sign-in, launch and foreground; offline or unknown never signs anyone out
   const [dbReady, setDbReady] = useState(false);
   const [dbError, setDbError] = useState(false);
 
@@ -136,6 +138,7 @@ export default function RootLayout() {
           <Stack.Screen name="admin/catalog" options={{headerShown: false}} />
           <Stack.Screen name="admin/catalog-form" options={{headerShown: false}} />
           <Stack.Screen name="admin/audit" options={{headerShown: false}} />
+          <Stack.Screen name="admin/user" options={{headerShown: false}} />
         </Stack.Protected>
 
         <Stack.Protected guard={!isLoggedIn}>

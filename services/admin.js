@@ -1,5 +1,9 @@
-import {collection, doc, getCountFromServer, getDoc, getDocsFromServer, limit, query, where} from 'firebase/firestore';
+import {
+    collection, doc, getCountFromServer, getDoc, getDocFromServer, getDocsFromServer, limit, query, serverTimestamp, where,
+    writeBatch,
+} from 'firebase/firestore';
 import {getFirestoreDb} from '@/services/firebaseInit';
+import {getFirebaseAuth} from '@/services/authInit';
 
 // Admin reads. Every call needs the network; the rules are the real guard, the UI only hides things.
 // Lists use the *FromServer reads: plain getDocs can quietly return cached data while offline.
@@ -83,13 +87,62 @@ export async function getAdminOverview() {
     };
 }
 
-// First USERS_LIMIT users: document id and age only (no emails are stored in users docs)
+// users doc -> {uid, age, disabled}. Only these fields are used; no emails are stored in users docs.
+function toAdminUser(d) {
+    const age = d.get('age');
+    return {uid: d.id, age: typeof age === 'number' ? age : null, disabled: d.get('disabled') === true};
+}
+
+// First USERS_LIMIT users, in document-id order
 export async function getAdminUsers() {
     const snap = await withTimeout(getDocsFromServer(query(collection(getFirestoreDb(), 'users'), limit(USERS_LIMIT))));
-    return snap.docs.map((d) => {
-        const age = d.get('age');
-        return {uid: d.id, age: typeof age === 'number' ? age : null};
+    return snap.docs.map(toAdminUser);
+}
+
+// One user, or null if the users doc doesn't exist
+export async function getAdminUser(uid) {
+    const snap = await withTimeout(getDocFromServer(doc(getFirestoreDb(), 'users', uid)));
+    return snap.exists() ? toAdminUser(snap) : null;
+}
+
+// Sets users/{uid}.disabled and writes the adminLog entry in one batch.
+// Online only: a server read first, so nothing is queued offline. The rules allow admins to change
+// only this field, and never on themselves; the UI hides the button for the admin's own uid.
+export async function setUserDisabled(uid, disabled) {
+    const db = getFirestoreDb();
+    const adminUid = getFirebaseAuth().currentUser?.uid;
+    if (!adminUid) throw codedError('unauthenticated', 'Not signed in');
+    if (adminUid === uid) throw codedError('permission-denied', "Admins can't change their own status");
+
+    const ref = doc(db, 'users', uid);
+    const snap = await withTimeout(getDocFromServer(ref));
+    if (!snap.exists()) throw codedError('not-found', 'User not found');
+
+    const batch = writeBatch(db);
+    batch.update(ref, {disabled});
+    batch.set(doc(collection(db, 'adminLog')), {
+        adminUid,
+        action: disabled ? 'disable' : 'enable',
+        targetType: 'user',
+        targetId: uid,
+        targetName: uid.slice(0, 8), // short uid; never an email
+        at: serverTimestamp(),
     });
+    try {
+        // the write was sent; a timeout here means it is queued and may still finish once back online
+        await withTimeout(batch.commit(), 'commit-unconfirmed');
+    } finally {
+        bumpAdminDataVersion(); // Users list and Overview reload on return
+    }
+}
+
+// Friendly message for a failed Disable/Enable
+export function describeUserWriteError(err) {
+    if (err?.code === 'commit-unconfirmed') return "Couldn't confirm the change. It will finish when you're back online.";
+    if (isNetworkError(err)) return "You're offline. Changes need an internet connection.";
+    if (err?.code === 'permission-denied') return "You don't have permission to change this user.";
+    if (err?.code === 'not-found') return 'This user no longer exists.';
+    return 'Something went wrong. Please try again.';
 }
 
 // Friendly message for the admin screens' error panel
