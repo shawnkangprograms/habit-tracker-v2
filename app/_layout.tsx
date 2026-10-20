@@ -9,7 +9,8 @@ import {useFonts} from 'expo-font'; //loads font files; returns [loaded, error]
 import {SpaceGrotesk_700Bold} from '@expo-google-fonts/space-grotesk';
 import {Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold} from '@expo-google-fonts/inter';
 import {colors} from '@/constants/theme';
-import {syncCompletions} from '@/sync/syncEngine'; //import data sync utility to keep local storage in sync with remote db
+import {notifyLocalChange, requestSync, startSync, stopSync} from '@/sync/syncEngine'; //push engine: local changes -> Firestore
+import {onLocalChange} from '@/db/localChanges'; //committed user changes, so sync can push soon after
 import {onAuthStateChanged} from 'firebase/auth'; //firebase auth state listener
 import {getFirebaseAuth} from '@/services/authInit'; //helper fxn that returns the active firebase auth instance
 import {ThemedText} from '@/components/themed-text';
@@ -30,8 +31,9 @@ const navTheme = {
   },
 };
 
-// Sync is paused until build step 2: sync/push.js still uses the old sticky-true rule.
-const SYNC_ENABLED = false;
+// Kill switch for cloud sync (build stage 3: push only). false = no sync at all.
+const SYNC_ENABLED = true;
+const SYNC_INTERVAL_MS = 5 * 60 * 1000;
 
 // import config obj used by expo router to establish initial route anchoring
 export const unstable_settings = {
@@ -79,30 +81,26 @@ export default function RootLayout() {
     return () => unsubscribe();
   }, [])
 
-  useEffect(() => { //a second, separate effect - this manages an ongoing subscription, not a one-time action
-    if (!SYNC_ENABLED || !isLoggedIn) return; //don't set up the listener if sync is paused or not logged in
-
-    const subscription = AppState.addEventListener('change', (nextAppState) => {
-    //start listening for app state changes; nextAppState tells what state the app changed to
-
-    if (nextAppState === 'active') {
-      //only react when the app has just come to foreground (not background/inactive)
-      syncCompletions(); //trigger a sync attempt
-    }
-  });
-    return () => subscription.remove();
-    //cleanup fxn: stops listening for app state changes if this component unmounts, preventing duplicate listeners
-  }, [isLoggedIn]); //rerun this effect whenever isLoggedIn changes
-
+  // Sync for the signed-in user: one effect keyed on uid owns every trigger. Sign-in (or launch with a
+  // saved session) starts it with an immediate push; sign-out or a different uid tears everything down
+  // first, so strict-mode double effects or a fast sign-out/sign-in can't leave a second timer or listener.
   useEffect(() => {
-    if (!SYNC_ENABLED || !isLoggedIn) return; //don't start the timer if sync is paused or not logged in
+    if (!SYNC_ENABLED || !uid) return;
 
-    const intervalId = setInterval(() => {
-      syncCompletions(); 
-    }, 5*60*1000);
+    startSync(uid);
+    const unsubscribeLocal = onLocalChange(notifyLocalChange); //push ~3 s after the last committed change
+    const appStateSub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') requestSync(); //back in the foreground
+    });
+    const intervalId = setInterval(() => { requestSync(); }, SYNC_INTERVAL_MS);
 
-    return () => clearInterval(intervalId);
-  }, [isLoggedIn]); //rerun this effect whenever isLoggedIn changes
+    return () => {
+      clearInterval(intervalId);
+      appStateSub.remove();
+      unsubscribeLocal();
+      stopSync(); //a running cycle ends at its next check
+    };
+  }, [uid]);
 
   // all hooks above run before any early return
   if (dbError) return <ThemedText>Couldn&apos;t open local data. Please restart the app.</ThemedText>;

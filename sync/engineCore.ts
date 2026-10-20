@@ -375,12 +375,13 @@ export function createSyncEngine(options: SyncEngineOptions) {
       // local, so initialPullDone is known even when offline
       if (cursors) {
         state = await cursors.load(uid);
+        check(); // every cursor save starts right after a check, so none can start after stop()
         if (resetRequested) {
           resetRequested = false;
           state = {...state, habitsCursor: null, completionsCursor: null};
           await cursors.save(uid, state);
+          check();
         }
-        check();
         setStatus({initialPullDone: state.initialPullDone});
       }
 
@@ -400,6 +401,7 @@ export function createSyncEngine(options: SyncEngineOptions) {
           pulledToEnd = true;
           if (!state.initialPullDone) {
             state = {...state, initialPullDone: true};
+            check();
             try {
               await cursors.save(uid, state);
             } catch {

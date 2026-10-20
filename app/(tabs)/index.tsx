@@ -7,6 +7,7 @@ import * as Haptics from 'expo-haptics';
 import {getHabit, getHabitsWithTodayStatus} from '@/db/habits';// habit reads in SQLite
 import {toggleCompletion} from '@/db/completions';// today's completion toggle
 import {getGamificationStats} from '@/db/gamification';// XP, level and streak, derived from local rows
+import {onRemoteChange} from '@/db/remoteChanges';// data pulled from another device changed local rows
 import {getFirebaseAuth} from '@/services/authInit';// to read the signed-in user's id
 import {getLocalDateString} from '@/utils/dates';
 import type {GamificationStats} from '@/utils/gamification';
@@ -80,9 +81,12 @@ export default function HomeScreen() {// default export, becomes the "index" tab
   const userId = user?.uid;
   const firstName = user?.displayName?.trim().split(/\s+/)[0];// only if auth already has a displayName
 
+  const habitsRequest = useRef(0);// id of the newest list load; an older one finishing later is ignored
+
   // useCallback keeps the same fxn between renders, so the focus effect below doesn't rerun on every render
   const loadHabits = useCallback(async () => {
       if (!userId) return;// no signed-in user: nothing to load
+      const request = ++habitsRequest.current;
       const rows = (await getHabitsWithTodayStatus(userId)) as Habit[];// active habits scheduled today, for this user
 
       // Weekday habits need their days for the subtitle. Fetched before setHabits so the list renders once, complete.
@@ -96,6 +100,7 @@ export default function HomeScreen() {// default export, becomes the "index" tab
         }
       }));
 
+      if (request !== habitsRequest.current) return;// a newer load started meanwhile (e.g. several pulled pages)
       setHabits(result);// store fetched habits in state, triggering a re-render to display them
       setLoaded(true);
   }, [userId]);
@@ -129,6 +134,13 @@ export default function HomeScreen() {// default export, becomes the "index" tab
   useFocusEffect(useCallback(() => {// runs every time Home gains focus, so adds/edits/deletes from the form show immediately
     loadHabits();
     loadStats();// in parallel; the list never waits for stats
+
+    // while focused, data pulled from another device reloads Home in place: state updates only
+    // (same keys, no remount, loaded stays true), so the list doesn't flicker or lose its scroll position
+    return onRemoteChange(() => {
+      loadHabits();
+      loadStats();
+    });
   }, [loadHabits, loadStats]));
 
   const removeFloat = useCallback((habitId: string, key: number) => {

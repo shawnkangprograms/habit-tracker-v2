@@ -1,25 +1,75 @@
-import {getDatabase} from '@/db/database'; // call the cached SQLite connection
-import {pushCompletion} from './push'; // the per-row push+conflict resolve fxn 
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {createSyncEngine} from '@/sync/engineCore';
+import {createCursorStore} from '@/sync/cursorStore';
+import {firestoreRemote} from '@/sync/firestoreRemote';
+import * as store from '@/db/sync';
+import {emitRemoteChange} from '@/db/remoteChanges';
+import {getFirebaseAuth} from '@/services/authInit';
 
-export async function syncCompletions() { // the main fxn that runs on every sync trigger
-    const db = await getDatabase(); // get the local SQLite connection
+// The app's sync engine: the engine core (sync/engineCore.ts) on the real SQLite store (db/sync.js),
+// Firestore (sync/firestoreRemote.js), pull cursors in AsyncStorage (per uid, kept across sign-outs)
+// and the signed-in user. Each cycle pulls, then pushes. app/_layout.tsx starts it on sign-in and
+// stops it on sign-out; triggers live there.
 
-    const unsyncedRows = await db.getAllAsync(
-        `SELECT * FROM completions WHERE synced = 0`
-    ); // fetch every local row that hasn't been pushed yet
+const engine = createSyncEngine({
+    getUid: () => getFirebaseAuth().currentUser?.uid ?? null,
+    store,
+    remote: firestoreRemote,
+    cursors: createCursorStore(AsyncStorage),
+    onRemoteChange: emitRemoteChange, // Home reloads while focused
+});
 
-    for (const row of unsyncedRows) { //loops through each unsynced row sequentially - not all at once in parallel
-        try {
-            const finalCompleted = await pushCompletion(row); //push it, resolving any conflict, get back the final value
+let activeUid = null;
 
-            await db.runAsync( // db.runAsync(sql, [params]) -> parametized query pattern, avoids SQL risk that execAsync alone has
-                `UPDATE completions SET completed = ?, synced = 1 WHERE habitId = ? AND date = ?`,
-                [finalCompleted, row.habitId, row.date]
-            ); // update this row locally: correct final value, and mark it as synced
-        } catch (err) {
-            console.log('Sync failed for row', row.habitId, row.date, err);
-            //don't rethrow - just log and let the loop continue to the next row
+// Dev only: one line per finished cycle, counts and error kinds (never habit names or doc contents)
+if (__DEV__) {
+    let previous = engine.getStatus().state;
+    engine.subscribe((s) => {
+        if (previous === 'syncing' && s.state !== 'syncing') {
+            const pull = `pulled ${s.pullCounts.received} (invalid ${s.pullCounts.invalid}, changed ${s.pullCounts.changed})`;
+            console.log(
+                `Sync: ${s.state}, ${pull}, pullError ${s.pullError ?? 'none'}, pending ${s.pendingCount}, ` +
+                `rejected ${s.rejectedCount}, error ${s.lastErrorKind ?? 'none'}, restored ${s.initialPullDone}`
+            );
         }
-    }
+        previous = s.state;
+    });
 }
-// ensureTodayRows moved to db/completions.js
+
+// Signed in: start (or restart for a different uid) and run a cycle now
+export function startSync(uid) {
+    if (activeUid === uid) return;
+    if (activeUid !== null) engine.stop();
+    activeUid = uid;
+    engine.start();
+    void engine.requestSync();
+}
+
+// Signed out: any running cycle ends at its next check (no cursor save can start after this);
+// status and push backoff are cleared. The per-uid pull cursors in AsyncStorage are kept.
+export function stopSync() {
+    activeUid = null;
+    engine.stop();
+}
+
+export function requestSync() {
+    return engine.requestSync();
+}
+
+// "Re-sync everything" (for Settings later): re-pull all of this user's docs from the start
+export function requestFullSync() {
+    return engine.forceFullPull();
+}
+
+// A committed local change: push shortly after the last one (debounced in the engine)
+export function notifyLocalChange() {
+    engine.notifyLocalChange();
+}
+
+export function getSyncStatus() {
+    return engine.getStatus();
+}
+
+export function subscribeSyncStatus(listener) {
+    return engine.subscribe(listener);
+}
