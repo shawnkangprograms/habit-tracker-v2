@@ -10,13 +10,21 @@
 
 export function createWriteQueue() {
     let tail = Promise.resolve();
+    let pending = 0; // tasks queued or running
 
     // The caller gets the task's own result or error; a failed task never breaks the chain.
-    return function enqueue(task) {
-        const run = tail.then(() => task());
+    function enqueue(task) {
+        pending += 1;
+        const run = tail.then(() => task()).finally(() => {
+            pending -= 1;
+        });
         tail = run.catch(() => {});
         return run;
-    };
+    }
+
+    // Number of tasks queued or running (tests use it to check no network call happens inside a write)
+    enqueue.pendingCount = () => pending;
+    return enqueue;
 }
 
 // The app's single queue
