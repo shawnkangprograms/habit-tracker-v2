@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 
 import type {WeekdayKey} from '@/constants/habits';
 import {
-  computeGamification, computeStreaks, countPerfectDays, isScheduledOn, levelFromXp,
+  computeGamification, computeStreaks, countPerfectDays, diffStats, isScheduledOn, levelFromXp,
   type GamiCompletion, type GamiHabit,
 } from '../utils/gamification.ts';
 
@@ -255,6 +255,44 @@ describe('level', () => {
       assert.equal(levelFromXp(start).level, level);
       if (start > 0) assert.equal(levelFromXp(start - 1).level, level - 1);
     }
+  });
+});
+
+describe('diffStats', () => {
+  const snap = (level: number, badges: number[], perfectDays: number) => ({level, badges, perfectDays});
+
+  test('nothing changed', () => {
+    assert.deepEqual(diffStats(snap(2, [3], 1), snap(2, [3], 1)),
+      {levelUp: false, newLevel: 2, newBadges: [], perfectDay: false});
+  });
+
+  test('level up', () => {
+    const e = diffStats(snap(1, [], 0), snap(2, [], 0));
+    assert.equal(e.levelUp, true);
+    assert.equal(e.newLevel, 2);
+  });
+
+  test('two badges unlocked by one tap', () => {
+    assert.deepEqual(diffStats(snap(3, [3], 0), snap(3, [3, 7, 14], 0)).newBadges, [7, 14]);
+  });
+
+  test('a perfect day landing', () => {
+    assert.equal(diffStats(snap(1, [], 2), snap(1, [], 3)).perfectDay, true);
+  });
+
+  test('un-checking gives no events', () => {
+    assert.deepEqual(diffStats(snap(3, [3, 7], 4), snap(2, [3], 3)),
+      {levelUp: false, newLevel: 2, newBadges: [], perfectDay: false});
+  });
+
+  test('from real snapshots: the tap that completes a third day', () => {
+    const habits = [daily('a', '2026-10-19')];
+    const twoDays = octDays(19, 20).map((d) => done('a', d));
+    const before = computeGamification(habits, twoDays, '2026-10-21');
+    const after = computeGamification(habits, [...twoDays, done('a', '2026-10-21')], '2026-10-21');
+    assert.equal(after.totalXp - before.totalXp, 10 + 20 + 25); // completion + perfect day + 3-day milestone
+    // 60 XP -> 115 XP: both inside level 2 (50..149)
+    assert.deepEqual(diffStats(before, after), {levelUp: false, newLevel: 2, newBadges: [3], perfectDay: true});
   });
 });
 

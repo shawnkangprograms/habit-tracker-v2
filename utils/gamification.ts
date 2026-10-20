@@ -194,6 +194,23 @@ export function levelFromXp(totalXp: number): {
   return {level, xpIntoLevel, xpForNextLevel, progress: xpIntoLevel / xpForNextLevel};
 }
 
+// ---------- Events between two snapshots ----------
+
+export type StatsEvents = {levelUp: boolean; newLevel: number; newBadges: number[]; perfectDay: boolean};
+
+// What happened between two stats snapshots (e.g. before and after a tap). Un-checking yields no events.
+export function diffStats(
+  before: Pick<GamificationStats, 'level' | 'badges' | 'perfectDays'>,
+  after: Pick<GamificationStats, 'level' | 'badges' | 'perfectDays'>,
+): StatsEvents {
+  return {
+    levelUp: after.level > before.level,
+    newLevel: after.level,
+    newBadges: after.badges.filter((b) => !before.badges.includes(b)),
+    perfectDay: after.perfectDays > before.perfectDays,
+  };
+}
+
 // ---------- Everything together ----------
 
 export type GamificationStats = {

@@ -1,15 +1,22 @@
-import {useState, useCallback} from 'react';//useState: store data that triggers re-renders; useCallback: stable fxn for useFocusEffect
+import {useState, useCallback, useRef} from 'react';//useState: store data that triggers re-renders; useCallback: stable fxn for useFocusEffect
 import {router, useFocusEffect} from 'expo-router';// navigation to the Add/Edit form; run code whenever Home gains focus
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Alert, Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import * as Haptics from 'expo-haptics';
 import {getHabit, getHabitsWithTodayStatus} from '@/db/habits';// habit reads in SQLite
 import {toggleCompletion} from '@/db/completions';// today's completion toggle
+import {getGamificationStats} from '@/db/gamification';// XP, level and streak, derived from local rows
 import {getFirebaseAuth} from '@/services/authInit';// to read the signed-in user's id
 import {getLocalDateString} from '@/utils/dates';
+import type {GamificationStats} from '@/utils/gamification';
 import {colors, fonts, radii, spacing, ICON_COLORS} from '@/constants/theme';
 import {HabitIcon} from '@/constants/habitIcons';
 import type {IconId, WeekdayKey} from '@/constants/habits';
+import {StatsCard} from '@/components/stats-card';
+import {HabitCheck} from '@/components/habit-check';
+import {XpFloat} from '@/components/xp-float';
+import {useReduceMotion} from '@/hooks/use-reduce-motion';
 
 type Habit = {// one row from getHabitsWithTodayStatus: an active habit scheduled today, with today's status
   habitId: string;
@@ -20,6 +27,18 @@ type Habit = {// one row from getHabitsWithTodayStatus: an active habit schedule
   completed: number;
   days?: WeekdayKey[];// only for weekday habits; undefined if the lookup failed
 };
+
+type StatsSnapshot = {date: string; stats: GamificationStats};// stats plus the local date they were computed for
+type Float = {key: number; amount: number};// one "+N XP" label
+
+// one light haptic when a habit is completed (Android: the haptics API the SDK 57 docs recommend over the vibrator)
+function completionHaptic() {
+  if (process.env.EXPO_OS === 'android') {
+    Haptics.performAndroidHapticsAsync(Haptics.AndroidHaptics.Confirm).catch(() => {});
+  } else {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+  }
+}
 
 const DAY_ORDER: WeekdayKey[] = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];// display order, Monday first
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -81,9 +100,76 @@ export default function HomeScreen() {// default export, becomes the "index" tab
       setLoaded(true);
   }, [userId]);
 
+  const [stats, setStats] = useState<StatsSnapshot | null>(null);// null = not loaded or failed: the header card is hidden
+  const statsRef = useRef<StatsSnapshot | null>(null);// the same snapshot, readable at tap time
+  const statsRequest = useRef(0);// id of the newest stats load; older responses are ignored
+  const statsSettled = useRef(0);// id of the newest load that has finished
+  const inFlight = useRef(new Set<string>());// habitIds whose toggle is still running
+  const [floats, setFloats] = useState<Record<string, Float>>({});// "+N XP" labels by habitId
+  const reduceMotion = useReduceMotion();
+
+  // Never throws. Resolves to the new snapshot, or null if it failed or a newer load replaced it.
+  const loadStats = useCallback(async (): Promise<StatsSnapshot | null> => {
+    if (!userId) return null;
+    const request = ++statsRequest.current;
+    const date = getLocalDateString();
+    let snapshot: StatsSnapshot | null = null;
+    try {
+      snapshot = {date, stats: (await getGamificationStats(userId)) as GamificationStats};
+    } catch (err) {
+      console.log('Stats load failed', err);// the card hides; the habit list keeps working
+    }
+    if (request !== statsRequest.current) return null;// stale
+    statsSettled.current = request;
+    statsRef.current = snapshot;
+    setStats(snapshot);
+    return snapshot;
+  }, [userId]);
+
   useFocusEffect(useCallback(() => {// runs every time Home gains focus, so adds/edits/deletes from the form show immediately
     loadHabits();
-  }, [loadHabits]));
+    loadStats();// in parallel; the list never waits for stats
+  }, [loadHabits, loadStats]));
+
+  const removeFloat = useCallback((habitId: string, key: number) => {
+    setFloats((f) => {
+      if (f[habitId]?.key !== key) return f;// a newer label replaced it
+      const rest = {...f};
+      delete rest[habitId];
+      return rest;
+    });
+  }, []);
+
+  const handleToggle = async (habit: Habit) => {
+    if (!userId || inFlight.current.has(habit.habitId)) return;// ignore a second tap while this habit's toggle runs
+    inFlight.current.add(habit.habitId);
+    const completing = habit.completed === 0;
+    // "before" only counts if no stats load was still running at tap time
+    const before = statsSettled.current === statsRequest.current ? statsRef.current : null;
+    try {
+      let saved = false;
+      try {
+        await toggleCompletion(userId, habit.habitId, completing);
+        saved = true;
+      } catch (err) {
+        Alert.alert(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
+      }
+      if (saved) {
+        if (completing) completionHaptic();
+        // not awaited: stats never slow the toggle or the list refresh
+        loadStats().then((after) => {
+          if (!completing || reduceMotion || !before || !after || before.date !== after.date) return;
+          const gained = after.stats.totalXp - before.stats.totalXp;// the real change, incl. perfect-day/milestone bonuses
+          if (gained > 0) setFloats((f) => ({...f, [habit.habitId]: {key: Date.now(), amount: gained}}));
+        });
+      }
+      await loadHabits();
+    } finally {
+      inFlight.current.delete(habit.habitId);
+    }
+  };
+
+  const doneToday = habits.filter((h) => h.completed === 1).length;// Home lists exactly the habits scheduled today
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
@@ -94,6 +180,18 @@ export default function HomeScreen() {// default export, becomes the "index" tab
           <Text style={styles.date}>{formatToday()}</Text>
           <Text style={styles.hello}>{firstName ? `${greeting()}, ${firstName}` : greeting()}</Text>
         </View>
+
+        {stats && loaded && (
+          <StatsCard
+            level={stats.stats.level}
+            xpIntoLevel={stats.stats.xpIntoLevel}
+            xpForNextLevel={stats.stats.xpForNextLevel}
+            progress={stats.stats.progress}
+            currentStreak={stats.stats.currentStreak}
+            doneToday={doneToday}
+            scheduledToday={habits.length}
+          />
+        )}
 
         <Text style={styles.title}>Today.</Text>
 
@@ -121,22 +219,20 @@ export default function HomeScreen() {// default export, becomes the "index" tab
                   <Text style={styles.subtitle} numberOfLines={1}>{subtitle(habit)}</Text>
                 </View>
 
-                <Pressable
-                  hitSlop={12}
-                  accessibilityRole="checkbox"
-                  accessibilityState={{checked: done}}
-                  accessibilityLabel={`Mark ${habit.habitName} as ${done ? 'not done' : 'done'}`}
-                  style={[styles.check, done && styles.checkDone]}
-                  onPress={async () => {
-                    try {
-                      await toggleCompletion(userId, habit.habitId, habit.completed === 0);
-                    } catch (err) {
-                      Alert.alert(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
-                    }
-                    loadHabits();
-                  }}>
-                  {done && <MaterialCommunityIcons name="check" size={17} color={colors.white} />}
-                </Pressable>
+                <HabitCheck
+                  done={done}
+                  habitName={habit.habitName}
+                  reduceMotion={reduceMotion}
+                  onPress={() => handleToggle(habit)}
+                />
+
+                {floats[habit.habitId] && (
+                  <XpFloat
+                    key={floats[habit.habitId].key}
+                    amount={floats[habit.habitId].amount}
+                    onDone={() => removeFloat(habit.habitId, floats[habit.habitId].key)}
+                  />
+                )}
               </Pressable>
             );
           })}
@@ -182,16 +278,6 @@ const styles = StyleSheet.create({
   name: {fontFamily: fonts.title, fontSize: 14, color: colors.text},
   subtitle: {fontFamily: fonts.regular, fontSize: 10, color: colors.muted},
   doneContent: {opacity: 0.55},
-  check: {
-    width: 28,
-    height: 28,
-    borderRadius: radii.pill,
-    borderWidth: 2,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkDone: {backgroundColor: colors.green, borderColor: colors.green},
   addRow: {
     flexDirection: 'row',
     alignItems: 'center',
