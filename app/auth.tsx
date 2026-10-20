@@ -1,4 +1,4 @@
-import {useRef, useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import {
   ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
   type KeyboardTypeOptions,
@@ -6,17 +6,23 @@ import {
 import {SafeAreaView} from 'react-native-safe-area-context';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
-import {signUp, signIn} from '@/services/authActions';
+import {resetPassword, signUp, signIn} from '@/services/authActions';
 import {colors, fonts, radii, spacing} from '@/constants/theme';
 import {validateAge, validateConfirmPassword, validateEmail, validatePassword} from '@/validation/validators';
 
 type Field = 'email' | 'password' | 'confirmPassword' | 'age';
 type FieldErrors = Partial<Record<Field, string>>;
+type Mode = 'signUp' | 'signIn' | 'reset';
+
+const RESEND_COOLDOWN_MS = 30 * 1000; // limits repeat reset emails
+
+function authErrorCode(err: unknown): string {
+  return typeof err === 'object' && err !== null && 'code' in err ? String(err.code) : '';
+}
 
 // Firebase error codes -> messages for the user. Raw Firebase text is never shown.
 function friendlyAuthError(err: unknown): string {
-  const code = typeof err === 'object' && err !== null && 'code' in err ? String(err.code) : '';
-  switch (code) {
+  switch (authErrorCode(err)) {
     case 'auth/email-already-in-use':
       return 'An account with this email already exists. Try signing in.';
     case 'auth/invalid-credential':
@@ -76,7 +82,8 @@ function AuthInput(props: {
 }
 
 export default function AuthScreen() {
-  const [isSignUp, setIsSignUp] = useState(true); // true = Sign Up, false = Sign In
+  const [mode, setMode] = useState<Mode>('signUp');
+  const isSignUp = mode === 'signUp';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -85,21 +92,70 @@ export default function AuthScreen() {
   const [submitError, setSubmitError] = useState('');
   const [submitting, setSubmitting] = useState(false); // drives the button's loading state
   const submittingRef = useRef(false); // a ref, not state, so a second tap in the same frame is ignored
+  const [resetSent, setResetSent] = useState(false); // shows the reset confirmation
+  const [resendAvailableAt, setResendAvailableAt] = useState(0); // ms timestamp; the reset button is disabled until then
+  const [now, setNow] = useState(() => Date.now());
+  const secondsLeft = Math.max(0, Math.ceil((resendAvailableAt - now) / 1000));
+  const coolingDown = secondsLeft > 0;
+
+  // ticks the resend countdown; the interval is cleared when it ends or the screen unmounts
+  useEffect(() => {
+    if (resendAvailableAt <= Date.now()) return;
+    const id = setInterval(() => {
+      const t = Date.now();
+      setNow(t);
+      if (t >= resendAvailableAt) clearInterval(id);
+    }, 1000);
+    return () => clearInterval(id);
+  }, [resendAvailableAt]);
 
   // typing in a field clears that field's message and the Firebase message above the button
   const edit = (field: Field, setter: (text: string) => void) => (text: string) => {
     setter(text);
     setErrors((e) => ({...e, [field]: undefined}));
     setSubmitError('');
+    setResetSent(false);
   };
 
-  const switchMode = () => {
+  // the email is kept across modes; everything else is cleared
+  const goToMode = (next: Mode) => {
     if (submittingRef.current) return;
-    setIsSignUp((s) => !s);
+    setMode(next);
     setPassword('');
     setConfirmPassword('');
     setErrors({});
     setSubmitError('');
+    setResetSent(false);
+  };
+
+  const handleReset = async () => {
+    if (submittingRef.current || coolingDown) return; // ignore extra taps while sending or during the countdown
+    setSubmitError('');
+    setResetSent(false);
+
+    const emailResult = validateEmail(email);
+    setErrors({email: emailResult.valid ? undefined : emailResult.error});
+    if (!emailResult.valid) return;
+
+    submittingRef.current = true;
+    setSubmitting(true);
+    try {
+      await resetPassword(emailResult.value);
+      // the same confirmation whether or not an account exists
+      setResetSent(true);
+      const t = Date.now();
+      setNow(t);
+      setResendAvailableAt(t + RESEND_COOLDOWN_MS);
+    } catch (err) {
+      if (authErrorCode(err) === 'auth/invalid-email') {
+        setErrors({email: friendlyAuthError(err)});
+      } else {
+        setSubmitError(friendlyAuthError(err)); // network, too-many-requests or the generic message; no countdown
+      }
+    } finally {
+      submittingRef.current = false;
+      setSubmitting(false);
+    }
   };
 
   const handleSubmit = async () => {
@@ -135,7 +191,7 @@ export default function AuthScreen() {
       }
       // on success onAuthStateChanged in app/_layout.tsx swaps this screen for the tabs
     } catch (err) {
-      if (typeof err === 'object' && err !== null && 'code' in err && err.code === 'profile-write-failed') {
+      if (authErrorCode(err) === 'profile-write-failed') {
         // this screen has usually unmounted by now (sign-in swapped it for the tabs), so the message goes in an Alert
         Alert.alert("Couldn't create your account", 'Please check your internet connection and try again.');
       }
@@ -145,6 +201,12 @@ export default function AuthScreen() {
       setSubmitting(false);
     }
   };
+
+  const isReset = mode === 'reset';
+  const buttonDisabled = submitting || (isReset && coolingDown);
+  const buttonLabel = isReset
+    ? (coolingDown ? `Resend in ${secondsLeft}s` : 'Send reset link')
+    : (isSignUp ? 'Create Account' : 'Sign In');
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
@@ -160,6 +222,13 @@ export default function AuthScreen() {
             <Text style={styles.tagline}>BUILD HABITS. BECOME LEGENDARY.</Text>
           </View>
 
+          {isReset && (
+            <View style={styles.resetIntro}>
+              <Text style={styles.resetTitle}>Reset your password</Text>
+              <Text style={styles.resetBody}>Enter your account email and we&apos;ll send you a reset link.</Text>
+            </View>
+          )}
+
           <AuthInput
             icon="email-outline"
             value={email}
@@ -170,16 +239,28 @@ export default function AuthScreen() {
             textContentType="emailAddress"
             editable={!submitting}
           />
-          <AuthInput
-            icon="lock-outline"
-            value={password}
-            onChangeText={edit('password', setPassword)}
-            placeholder="Password"
-            error={errors.password}
-            secure
-            textContentType={isSignUp ? 'newPassword' : 'password'}
-            editable={!submitting}
-          />
+          {!isReset && (
+            <AuthInput
+              icon="lock-outline"
+              value={password}
+              onChangeText={edit('password', setPassword)}
+              placeholder="Password"
+              error={errors.password}
+              secure
+              textContentType={isSignUp ? 'newPassword' : 'password'}
+              editable={!submitting}
+            />
+          )}
+          {mode === 'signIn' && (
+            <Pressable
+              style={styles.forgotRow}
+              onPress={() => goToMode('reset')}
+              disabled={submitting}
+              hitSlop={8}
+              accessibilityRole="button">
+              <Text style={styles.forgotText}>Forgot password?</Text>
+            </Pressable>
+          )}
           {isSignUp && (
             <>
               <AuthInput
@@ -205,25 +286,40 @@ export default function AuthScreen() {
             </>
           )}
 
+          {isReset && resetSent ? (
+            <Text style={styles.confirmText}>
+              If an account exists for that email, we&apos;ve sent a reset link. Check your spam folder too.
+            </Text>
+          ) : null}
           {submitError ? <Text style={styles.submitError}>{submitError}</Text> : null}
 
           <Pressable
-            style={({pressed}) => [styles.primaryButton, (pressed || submitting) && styles.pressed]}
-            onPress={handleSubmit}
-            disabled={submitting}
+            style={({pressed}) => [styles.primaryButton, (pressed || buttonDisabled) && styles.pressed]}
+            onPress={isReset ? handleReset : handleSubmit}
+            disabled={buttonDisabled}
             accessibilityRole="button"
-            accessibilityState={{busy: submitting, disabled: submitting}}>
+            accessibilityState={{busy: submitting, disabled: buttonDisabled}}>
             {submitting
               ? <ActivityIndicator color={colors.white} />
-              : <Text style={styles.primaryText}>{isSignUp ? 'Create Account' : 'Sign In'}</Text>}
+              : <Text style={styles.primaryText}>{buttonLabel}</Text>}
           </Pressable>
 
-          <Pressable style={styles.switchRow} onPress={switchMode} hitSlop={8} accessibilityRole="button">
-            <Text style={styles.switchText}>
-              {isSignUp ? 'Already have an account?  ' : 'New to HabitQuest?  '}
-              <Text style={styles.switchAction}>{isSignUp ? 'Sign in' : 'Create an account'}</Text>
-            </Text>
-          </Pressable>
+          {isReset ? (
+            <Pressable style={styles.switchRow} onPress={() => goToMode('signIn')} hitSlop={8} accessibilityRole="button">
+              <Text style={[styles.switchText, styles.switchAction]}>Back to sign in</Text>
+            </Pressable>
+          ) : (
+            <Pressable
+              style={styles.switchRow}
+              onPress={() => goToMode(isSignUp ? 'signIn' : 'signUp')}
+              hitSlop={8}
+              accessibilityRole="button">
+              <Text style={styles.switchText}>
+                {isSignUp ? 'Already have an account?  ' : 'New to HabitQuest?  '}
+                <Text style={styles.switchAction}>{isSignUp ? 'Sign in' : 'Create an account'}</Text>
+              </Text>
+            </Pressable>
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -263,6 +359,12 @@ const styles = StyleSheet.create({
   inputInner: {flex: 1, height: '100%', fontFamily: fonts.regular, fontSize: 14, color: colors.text},
   errorText: {fontFamily: fonts.medium, fontSize: 12, color: colors.error, marginTop: spacing.sm, marginLeft: 20},
   submitError: {fontFamily: fonts.medium, fontSize: 13, color: colors.error, textAlign: 'center', marginTop: spacing.xs},
+  confirmText: {fontFamily: fonts.medium, fontSize: 13, color: colors.green, textAlign: 'center', marginTop: spacing.xs},
+  forgotRow: {alignSelf: 'flex-end', marginRight: 20, marginBottom: spacing.md},
+  forgotText: {fontFamily: fonts.medium, fontSize: 13, color: colors.muted},
+  resetIntro: {alignItems: 'center', marginBottom: spacing.lg},
+  resetTitle: {fontFamily: fonts.title, fontSize: 20, color: colors.text},
+  resetBody: {fontFamily: fonts.regular, fontSize: 13, color: colors.muted, textAlign: 'center', marginTop: spacing.sm},
   primaryButton: {
     height: 56,
     borderRadius: radii.pill,

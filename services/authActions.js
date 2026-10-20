@@ -1,7 +1,9 @@
 import {doc, serverTimestamp, setDoc} from 'firebase/firestore';
 import {getFirestoreDb} from '@/services/firebaseInit';
 
-import {createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut as firebaseSignOut} from 'firebase/auth';
+import {
+    createUserWithEmailAndPassword, sendPasswordResetEmail, signInWithEmailAndPassword, signOut as firebaseSignOut,
+} from 'firebase/auth';
 import {getFirebaseAuth} from '@/services/authInit';
 
 
@@ -29,6 +31,18 @@ export async function signUp(email, password, age){
 export async function signIn(email, password){
     const auth = getFirebaseAuth();
     await signInWithEmailAndPassword(auth, email, password);
+}
+
+// Never reveals whether the email is registered: user-not-found counts as sent.
+// (Projects with email-enumeration protection never return that code anyway.)
+export async function resetPassword(email){
+    const auth = getFirebaseAuth();
+    try {
+        await sendPasswordResetEmail(auth, email);
+    } catch (err) {
+        if (err?.code === 'auth/user-not-found') return;
+        throw err;
+    }
 }
 
 export async function signOut(){
