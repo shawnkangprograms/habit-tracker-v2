@@ -1,6 +1,6 @@
 import {useRef, useState} from 'react';
 import {
-  ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
+  ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
   type KeyboardTypeOptions,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
@@ -129,13 +129,16 @@ export default function AuthScreen() {
     setSubmitting(true);
     try {
       if (isSignUp && ageValue !== null) {
-        // names are empty strings until authActions drops them (setDoc rejects undefined fields)
-        await signUp(emailResult.value, passwordResult.value, '', '', ageValue);
+        await signUp(emailResult.value, passwordResult.value, ageValue);
       } else {
         await signIn(emailResult.value, passwordResult.value);
       }
       // on success onAuthStateChanged in app/_layout.tsx swaps this screen for the tabs
     } catch (err) {
+      if (typeof err === 'object' && err !== null && 'code' in err && err.code === 'profile-write-failed') {
+        // this screen has usually unmounted by now (sign-in swapped it for the tabs), so the message goes in an Alert
+        Alert.alert("Couldn't create your account", 'Please check your internet connection and try again.');
+      }
       setSubmitError(friendlyAuthError(err));
     } finally {
       submittingRef.current = false;

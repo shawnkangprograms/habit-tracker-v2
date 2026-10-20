@@ -1,20 +1,29 @@
-import {doc, setDoc} from 'firebase/firestore';
+import {doc, serverTimestamp, setDoc} from 'firebase/firestore';
 import {getFirestoreDb} from '@/services/firebaseInit';
 
 import {createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut as firebaseSignOut} from 'firebase/auth';
 import {getFirebaseAuth} from '@/services/authInit';
 
 
-export async function signUp(email, password, firstName, lastName, age){
+export async function signUp(email, password, age){
 
     const auth = getFirebaseAuth();
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    
+
     const uid = userCredential.user.uid;
 
     const db = getFirestoreDb();
     const userDocRef = doc(db, 'users', uid);
-    await setDoc(userDocRef, {firstName, lastName, age});
+    try {
+        await setDoc(userDocRef, {age, createdAt: serverTimestamp()});
+    } catch (cause) {
+        // roll back: no account may exist without its users doc (age). The sign-in is seconds old, so no reauth is needed
+        await userCredential.user.delete().catch(() => {});
+        const err = new Error('Could not create the user profile');
+        err.code = 'profile-write-failed';
+        err.cause = cause;
+        throw err;
+    }
 }
 
 export async function signIn(email, password){
