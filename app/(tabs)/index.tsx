@@ -1,13 +1,14 @@
 import {useState, useCallback, useRef} from 'react';//useState: store data that triggers re-renders; useCallback: stable fxn for useFocusEffect
 import {router, useFocusEffect} from 'expo-router';// navigation to the Add/Edit form; run code whenever Home gains focus
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {Alert, Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
+import {Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View} from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import * as Haptics from 'expo-haptics';
 import {getHabit, getHabitsWithTodayStatus} from '@/db/habits';// habit reads in SQLite
 import {toggleCompletion} from '@/db/completions';// today's completion toggle
 import {getGamificationStats} from '@/db/gamification';// XP, level and streak, derived from local rows
 import {onRemoteChange} from '@/db/remoteChanges';// data pulled from another device changed local rows
+import {requestSync} from '@/sync/syncEngine';// pull + push now (does nothing while sync is stopped)
 import {getFirebaseAuth} from '@/services/authInit';// to read the signed-in user's id
 import {getLocalDateString} from '@/utils/dates';
 import type {GamificationStats} from '@/utils/gamification';
@@ -28,6 +29,11 @@ type Habit = {// one row from getHabitsWithTodayStatus: an active habit schedule
   completed: number;
   days?: WeekdayKey[];// only for weekday habits; undefined if the lookup failed
 };
+
+// Home asks for a sync on focus at most this often, so switching tabs quickly doesn't hammer Firestore.
+// Starts at load time: sign-in/launch already runs a cycle, so the first focus doesn't add another.
+const FOCUS_SYNC_MIN_INTERVAL_MS = 30 * 1000;
+let lastFocusSyncAt = Date.now();
 
 type StatsSnapshot = {date: string; stats: GamificationStats};// stats plus the local date they were computed for
 type Float = {key: number; amount: number};// one "+N XP" label
@@ -134,6 +140,10 @@ export default function HomeScreen() {// default export, becomes the "index" tab
   useFocusEffect(useCallback(() => {// runs every time Home gains focus, so adds/edits/deletes from the form show immediately
     loadHabits();
     loadStats();// in parallel; the list never waits for stats
+    if (Date.now() - lastFocusSyncAt >= FOCUS_SYNC_MIN_INTERVAL_MS) {
+      lastFocusSyncAt = Date.now();
+      requestSync();// changes from another device arrive through onRemoteChange below
+    }
 
     // while focused, data pulled from another device reloads Home in place: state updates only
     // (same keys, no remount, loaded stays true), so the list doesn't flicker or lose its scroll position
@@ -181,12 +191,36 @@ export default function HomeScreen() {// default export, becomes the "index" tab
     }
   };
 
+  // Pull-to-refresh: sync now, then reload from SQLite. requestSync never rejects; offline or a failed
+  // sync just ends the spinner (sync fails silently). The reload also picks up a new day after midnight.
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    lastFocusSyncAt = Date.now();
+    requestSync()
+      .finally(() => {
+        setRefreshing(false);
+        loadHabits();
+        loadStats();
+      });
+  }, [loadHabits, loadStats]);
+
   const doneToday = habits.filter((h) => h.completed === 1).length;// Home lists exactly the habits scheduled today
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       {/* the tab bar sits below the scene and handles the bottom inset itself */}
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.accent}// iOS spinner
+            colors={[colors.accent]}// Android spinner
+            progressBackgroundColor={colors.surface}// Android spinner background
+          />
+        }>
 
         <View style={styles.greeting}>
           <Text style={styles.date}>{formatToday()}</Text>
