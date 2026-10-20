@@ -13,6 +13,11 @@ import type {IconId, WeekdayKey} from '@/constants/habits';
 
 export const BATCH_LIMIT = 450; // Firestore allows 500 writes per batch; headroom for safety
 
+// Version of the remote-doc parsing rules (docToHabit / docToCompletion and the validators behind them).
+// Bump it whenever parsing accepts something new (e.g. new icons): the pull cursors then reset and every
+// phone re-reads all docs once, so docs it skipped as invalid before are picked up.
+export const PARSER_VERSION = 1;
+
 const DAY_ORDER: WeekdayKey[] = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']; // stored order in docs
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;

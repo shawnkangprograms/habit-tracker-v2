@@ -1,29 +1,39 @@
-// Push engine (build stage 3): pure logic, every dependency passed in, so Node's test runner can drive it
-// with a fake Firestore. sync/syncEngine.js connects the real pieces (Firestore, db/sync.js, auth, triggers).
+// Sync engine (build stages 3-4): pure logic, every dependency passed in, so Node's test runner can drive
+// it with a fake Firestore. sync/syncEngine.js connects the real pieces (Firestore, db/sync.js, auth, triggers).
 //
 // One cycle:
-//   probe (is Firestore reachable?) -> dirty habits -> batches -> mark synced -> the same for completions.
+//   probe (is Firestore reachable?) -> PULL habits, then completions -> PUSH habits, then completions.
 // Rules:
 // - One cycle at a time. A request during a cycle runs exactly one more cycle afterwards.
-// - The uid is captured at the start and re-checked before every batch and after every network await;
-//   if it changed, or stop() was called, the cycle ends at once and nothing more is marked or written.
+// - The uid is captured at the start and re-checked before every batch/page and after every network
+//   await; if it changed, or stop() was called, the cycle ends at once and nothing more is applied,
+//   saved, marked or written.
 // - Network calls never happen inside a queued SQLite task: dirty rows are plain reads, Firestore is
-//   called outside the queue, and only the mark-synced writes are queued, after the network call.
+//   called outside the queue, and only the apply / mark-synced writes are queued, after the network call.
+// - Pull: pages ordered by (serverUpdatedAt, doc id); each page is parsed (invalid docs skipped and
+//   counted), applied in one queued SQLite transaction, and only THEN is the cursor saved. A habits pull
+//   that fails skips the completions pull (foreign keys).
 // - Transient failures (offline, timeout, auth, unknown) end the cycle; rows stay unsynced for next time.
-//   Permanent rejections (rules) retry that batch one doc at a time; docs still rejected are skipped
-//   with a per-doc backoff (in memory), which resets when the row's updatedAt changes.
+//   A PERMANENT pull failure (rules, missing index) is recorded as pullError and the push still runs,
+//   so local changes keep being backed up. Permanent push rejections retry that batch one doc at a time;
+//   docs still rejected are skipped with a per-doc backoff (in memory), reset when updatedAt changes.
 
-import {chunk, completionDocId, completionToDoc, habitToDoc, isPushable} from '@/sync/merge';
+import {chunk, completionDocId, completionToDoc, docToCompletion, docToHabit, habitToDoc, isPushable} from '@/sync/merge';
 import type {CompletionDoc, HabitDoc, LocalCompletion, LocalHabit} from '@/sync/merge';
+import type {CursorState, PullCursor} from '@/sync/cursorStore';
 
 export type HabitItem = {habitId: string; doc: HabitDoc};
 export type CompletionItem = {docId: string; doc: CompletionDoc};
+export type PullCollection = 'habits' | 'completions';
+export type RemoteDoc = {id: string; data: unknown; cursor: PullCursor}; // data without serverUpdatedAt
 
 export type SyncStore = {
   getDirtyHabits(uid: string): Promise<LocalHabit[]>;
   getDirtyCompletions(uid: string): Promise<LocalCompletion[]>;
   markHabitSynced(uid: string, habitId: string, pushedUpdatedAt: number): Promise<boolean>;
   markCompletionSynced(uid: string, habitId: string, date: string, pushedUpdatedAt: number): Promise<boolean>;
+  applyRemoteHabits(uid: string, habits: LocalHabit[]): Promise<{written: number}>;
+  applyRemoteCompletions(uid: string, completions: LocalCompletion[]): Promise<{applied: number}>;
 };
 
 // The Firestore side. Each write call is one batch; the adapter adds serverUpdatedAt.
@@ -31,6 +41,13 @@ export type SyncRemote = {
   probe(uid: string): Promise<void>;
   writeHabits(uid: string, items: HabitItem[]): Promise<void>;
   writeCompletions(uid: string, items: CompletionItem[]): Promise<void>;
+  // up to pageSize docs after `after` (null = from the start), ordered by (serverUpdatedAt, doc id)
+  pullPage(uid: string, collection: PullCollection, after: PullCursor | null, pageSize: number): Promise<{docs: RemoteDoc[]}>;
+};
+
+export type SyncCursors = {
+  load(uid: string): Promise<CursorState>;
+  save(uid: string, state: CursorState): Promise<void>;
 };
 
 export type ErrorKind = 'offline' | 'timeout' | 'auth' | 'rejected' | 'unknown';
@@ -39,31 +56,50 @@ export type SyncStatus = {
   state: 'off' | 'idle' | 'syncing' | 'offline';
   lastSuccessAt: number | null; // last cycle that ended without a transient failure
   lastAttemptAt: number | null;
+  lastPullAt: number | null; // last time both collections were pulled to the end
+  initialPullDone: boolean;
   pendingCount: number; // unsynced user rows after the last cycle (system rows excluded)
   lastErrorKind: ErrorKind | null;
+  pullError: ErrorKind | null; // why the last pull stopped early, if it did (push may still have run)
   rejectedCount: number; // docs the rules rejected and that are waiting in backoff
+  pullCounts: {received: number; invalid: number; changed: number}; // last cycle (dev log)
 };
 
 export type SyncEngineOptions = {
   getUid: () => string | null;
   store: SyncStore;
   remote: SyncRemote;
+  cursors?: SyncCursors; // without cursors the engine is push-only (build stage 3)
+  onRemoteChange?: () => void; // a pulled page changed local data
   now?: () => number; // for backoff and status times
   timeoutMs?: number; // per network call
   debounceMs?: number; // push after the last local change
+  pageSize?: number; // docs per pull page
 };
 
 export const BACKOFF_MS = [5 * 60_000, 15 * 60_000, 60 * 60_000, 6 * 60 * 60_000];
+export const PULL_PAGE_SIZE = 500;
 
 const PERMANENT_CODES = ['permission-denied', 'invalid-argument', 'failed-precondition'];
 
 const INITIAL_STATUS: SyncStatus = {
-  state: 'off', lastSuccessAt: null, lastAttemptAt: null, pendingCount: 0, lastErrorKind: null, rejectedCount: 0,
+  state: 'off', lastSuccessAt: null, lastAttemptAt: null, lastPullAt: null, initialPullDone: false,
+  pendingCount: 0, lastErrorKind: null, pullError: null, rejectedCount: 0,
+  pullCounts: {received: 0, invalid: 0, changed: 0},
 };
 
 class Aborted extends Error {}
 
 class CycleStop extends Error {
+  kind: ErrorKind;
+  constructor(kind: ErrorKind) {
+    super(kind);
+    this.kind = kind;
+  }
+}
+
+// The pull stopped early, but the push may still run
+class PullStop extends Error {
   kind: ErrorKind;
   constructor(kind: ErrorKind) {
     super(kind);
@@ -97,10 +133,11 @@ type Pending<T> = {key: string; updatedAt: number; item: T; mark: () => Promise<
 type Rejection = {updatedAt: number; failures: number; skipUntil: number};
 
 export function createSyncEngine(options: SyncEngineOptions) {
-  const {getUid, store, remote} = options;
+  const {getUid, store, remote, cursors} = options;
   const now = options.now ?? Date.now;
   const timeoutMs = options.timeoutMs ?? 15_000;
   const debounceMs = options.debounceMs ?? 3_000;
+  const pageSize = options.pageSize ?? PULL_PAGE_SIZE;
 
   let status: SyncStatus = {...INITIAL_STATUS};
   const listeners = new Set<(s: SyncStatus) => void>();
@@ -108,6 +145,7 @@ export function createSyncEngine(options: SyncEngineOptions) {
   let generation = 0; // bumped by start/stop, so a cycle from before can't continue
   let running: Promise<void> | null = null;
   let rerun = false;
+  let resetRequested = false; // full re-pull at the start of the next cycle
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
   const rejected = new Map<string, Map<string, Rejection>>(); // uid -> doc key -> backoff
 
@@ -122,6 +160,8 @@ export function createSyncEngine(options: SyncEngineOptions) {
       }
     }
   }
+
+  // ---------- Push: backoff for rejected docs ----------
 
   function rejectionsFor(uid: string): Map<string, Rejection> {
     let map = rejected.get(uid);
@@ -157,6 +197,77 @@ export function createSyncEngine(options: SyncEngineOptions) {
     const map = rejectionsFor(uid);
     for (const key of [...map.keys()]) if (!dirtyKeys.has(key)) map.delete(key);
   }
+
+  // ---------- Pull ----------
+
+  type PullCounts = SyncStatus['pullCounts'];
+
+  // Pulls one collection to its end, page by page. Returns the updated cursor state.
+  async function pullCollection(
+    uid: string,
+    collection: PullCollection,
+    state: CursorState,
+    counts: PullCounts,
+    check: () => void,
+  ): Promise<CursorState> {
+    const cursorKey = collection === 'habits' ? 'habitsCursor' : 'completionsCursor';
+    const cursorStore = cursors!; // pull only runs when cursors were given
+    let current = state;
+
+    for (;;) {
+      check();
+      let page: {docs: RemoteDoc[]};
+      try {
+        page = await withTimeout(remote.pullPage(uid, collection, current[cursorKey], pageSize), timeoutMs);
+      } catch (err) {
+        check(); // a sign-out wins over any error
+        const kind = classifyError(err);
+        if (kind === 'permanent') throw new PullStop('rejected');
+        throw new CycleStop(kind);
+      }
+      check();
+      if (page.docs.length === 0) return current;
+      counts.received += page.docs.length;
+
+      // apply in one queued transaction; only then move the cursor
+      let changed = 0;
+      try {
+        if (collection === 'habits') {
+          const parsed = page.docs.map((d) => docToHabit(d.id, d.data)).filter((h): h is LocalHabit => h !== null);
+          counts.invalid += page.docs.length - parsed.length;
+          if (parsed.length > 0) changed = (await store.applyRemoteHabits(uid, parsed)).written;
+        } else {
+          const parsed = page.docs.map((d) => docToCompletion(d.id, d.data)).filter((c): c is LocalCompletion => c !== null);
+          counts.invalid += page.docs.length - parsed.length;
+          if (parsed.length > 0) changed = (await store.applyRemoteCompletions(uid, parsed)).applied;
+        }
+      } catch (err) {
+        if (err instanceof Aborted) throw err;
+        throw new PullStop('unknown'); // a local apply failure: the cursor stays, the push still runs
+      }
+      check();
+
+      current = {...current, [cursorKey]: page.docs[page.docs.length - 1].cursor};
+      try {
+        await cursorStore.save(uid, current);
+      } catch {
+        // not saved: the page is re-read next cycle, which is harmless
+      }
+      check();
+
+      if (changed > 0) {
+        counts.changed += changed;
+        try {
+          options.onRemoteChange?.();
+        } catch {
+          // a listener can never break sync
+        }
+      }
+      if (page.docs.length < pageSize) return current;
+    }
+  }
+
+  // ---------- Push ----------
 
   async function pushPhase<T>(
     uid: string,
@@ -206,22 +317,73 @@ export function createSyncEngine(options: SyncEngineOptions) {
     }
   }
 
+  async function push(uid: string, check: () => void) {
+    const habits = await store.getDirtyHabits(uid);
+    check();
+    const completions = (await store.getDirtyCompletions(uid)).filter((c) => isPushable(c.updatedAt));
+    check();
+
+    const habitKey = (habitId: string) => `h:${habitId}`;
+    const completionKey = (c: LocalCompletion) => `c:${completionDocId(c.habitId, c.date)}`;
+    pruneRejections(uid, new Set([...habits.map((h) => habitKey(h.habitId)), ...completions.map(completionKey)]));
+
+    const habitPendings: Pending<HabitItem>[] = habits
+      .filter((h) => !inBackoff(uid, habitKey(h.habitId), h.updatedAt))
+      .map((h) => ({
+        key: habitKey(h.habitId),
+        updatedAt: h.updatedAt,
+        item: {habitId: h.habitId, doc: habitToDoc(h)},
+        mark: () => store.markHabitSynced(uid, h.habitId, h.updatedAt),
+      }));
+    const completionPendings: Pending<CompletionItem>[] = completions
+      .filter((c) => !inBackoff(uid, completionKey(c), c.updatedAt))
+      .map((c) => ({
+        key: completionKey(c),
+        updatedAt: c.updatedAt,
+        item: {docId: completionDocId(c.habitId, c.date), doc: completionToDoc(c)},
+        mark: () => store.markCompletionSynced(uid, c.habitId, c.date, c.updatedAt),
+      }));
+
+    // habits before completions
+    await pushPhase(uid, habitPendings, (u, items) => remote.writeHabits(u, items), check);
+    await pushPhase(uid, completionPendings, (u, items) => remote.writeCompletions(u, items), check);
+  }
+
   async function countPending(uid: string): Promise<number> {
     const [habits, completions] = await Promise.all([store.getDirtyHabits(uid), store.getDirtyCompletions(uid)]);
     return habits.length + completions.filter((c) => isPushable(c.updatedAt)).length;
   }
 
+  // ---------- Cycle ----------
+
   async function runCycle() {
     const uid = getUid();
     if (!uid) return;
     const myGeneration = generation;
+    const isCurrent = () => !stopped && generation === myGeneration && getUid() === uid;
     const check = () => {
-      if (stopped || generation !== myGeneration || getUid() !== uid) throw new Aborted();
+      if (!isCurrent()) throw new Aborted();
     };
 
+    const counts: PullCounts = {received: 0, invalid: 0, changed: 0};
     setStatus({state: 'syncing', lastAttemptAt: now()});
     let failure: ErrorKind | null = null;
+    let pullError: ErrorKind | null = null;
+    let pulledToEnd = false;
+    let state: CursorState | null = null;
     try {
+      // local, so initialPullDone is known even when offline
+      if (cursors) {
+        state = await cursors.load(uid);
+        if (resetRequested) {
+          resetRequested = false;
+          state = {...state, habitsCursor: null, completionsCursor: null};
+          await cursors.save(uid, state);
+        }
+        check();
+        setStatus({initialPullDone: state.initialPullDone});
+      }
+
       try {
         await withTimeout(remote.probe(uid), timeoutMs);
       } catch {
@@ -230,35 +392,29 @@ export function createSyncEngine(options: SyncEngineOptions) {
       }
       check();
 
-      const habits = await store.getDirtyHabits(uid);
-      check();
-      const completions = (await store.getDirtyCompletions(uid)).filter((c) => isPushable(c.updatedAt));
-      check();
+      // PULL: habits fully before completions
+      if (cursors && state) {
+        try {
+          state = await pullCollection(uid, 'habits', state, counts, check);
+          state = await pullCollection(uid, 'completions', state, counts, check);
+          pulledToEnd = true;
+          if (!state.initialPullDone) {
+            state = {...state, initialPullDone: true};
+            try {
+              await cursors.save(uid, state);
+            } catch {
+              // retried at the end of the next full pull
+            }
+            check();
+          }
+        } catch (err) {
+          if (!(err instanceof PullStop)) throw err;
+          pullError = err.kind; // permanent: skip the rest of the pull, still push
+        }
+      }
 
-      const habitKey = (habitId: string) => `h:${habitId}`;
-      const completionKey = (c: LocalCompletion) => `c:${completionDocId(c.habitId, c.date)}`;
-      pruneRejections(uid, new Set([...habits.map((h) => habitKey(h.habitId)), ...completions.map(completionKey)]));
-
-      const habitPendings: Pending<HabitItem>[] = habits
-        .filter((h) => !inBackoff(uid, habitKey(h.habitId), h.updatedAt))
-        .map((h) => ({
-          key: habitKey(h.habitId),
-          updatedAt: h.updatedAt,
-          item: {habitId: h.habitId, doc: habitToDoc(h)},
-          mark: () => store.markHabitSynced(uid, h.habitId, h.updatedAt),
-        }));
-      const completionPendings: Pending<CompletionItem>[] = completions
-        .filter((c) => !inBackoff(uid, completionKey(c), c.updatedAt))
-        .map((c) => ({
-          key: completionKey(c),
-          updatedAt: c.updatedAt,
-          item: {docId: completionDocId(c.habitId, c.date), doc: completionToDoc(c)},
-          mark: () => store.markCompletionSynced(uid, c.habitId, c.date, c.updatedAt),
-        }));
-
-      // habits before completions
-      await pushPhase(uid, habitPendings, (u, items) => remote.writeHabits(u, items), check);
-      await pushPhase(uid, completionPendings, (u, items) => remote.writeCompletions(u, items), check);
+      // PUSH
+      await push(uid, check);
     } catch (err) {
       if (err instanceof Aborted) {
         setStatus({state: stopped ? 'off' : 'idle'});
@@ -273,16 +429,24 @@ export function createSyncEngine(options: SyncEngineOptions) {
     } catch {
       // keep the previous count
     }
-    if (stopped || generation !== myGeneration || getUid() !== uid) return;
+    if (!isCurrent()) return;
 
     const rejectedCount = rejectionsFor(uid).size;
+    const pullPatch = {
+      pullCounts: counts,
+      pullError,
+      initialPullDone: state?.initialPullDone ?? status.initialPullDone,
+      ...(pulledToEnd ? {lastPullAt: now()} : {}),
+    };
     if (failure === null) {
       setStatus({
+        ...pullPatch,
         state: 'idle', lastSuccessAt: now(), pendingCount, rejectedCount,
-        lastErrorKind: rejectedCount > 0 ? 'rejected' : null,
+        lastErrorKind: rejectedCount > 0 ? 'rejected' : pullError,
       });
     } else {
       setStatus({
+        ...pullPatch,
         state: failure === 'offline' || failure === 'timeout' ? 'offline' : 'idle',
         pendingCount, rejectedCount, lastErrorKind: failure,
       });
@@ -309,6 +473,14 @@ export function createSyncEngine(options: SyncEngineOptions) {
     return running;
   }
 
+  // "Re-sync everything": the next cycle clears this user's pull cursors and re-pulls all docs.
+  // Applied at the start of a cycle, so a cycle already running can't save an old cursor over it.
+  function forceFullPull(): Promise<void> {
+    if (stopped) return Promise.resolve();
+    resetRequested = true;
+    return requestSync();
+  }
+
   // A user change was committed locally: push debounceMs after the LAST change
   function notifyLocalChange() {
     if (stopped) return;
@@ -330,6 +502,7 @@ export function createSyncEngine(options: SyncEngineOptions) {
     stopped = true;
     generation += 1;
     rerun = false;
+    resetRequested = false;
     if (debounceTimer) clearTimeout(debounceTimer);
     debounceTimer = null;
     rejected.clear();
@@ -340,8 +513,9 @@ export function createSyncEngine(options: SyncEngineOptions) {
     start,
     stop,
     requestSync,
+    forceFullPull,
     notifyLocalChange,
-    getStatus: (): SyncStatus => ({...status}),
+    getStatus: (): SyncStatus => ({...status, pullCounts: {...status.pullCounts}}),
     subscribe(listener: (s: SyncStatus) => void) {
       listeners.add(listener);
       return () => {
