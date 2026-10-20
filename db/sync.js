@@ -1,8 +1,9 @@
 import {getDatabase} from '@/db/database';
+import {enqueueWrite} from '@/db/writeQueue';
 import * as core from '@/db/syncCore';
 
 // SQLite side of sync for the app: the functions in db/syncCore.js on the app's database connection.
-// Not called by anything yet (sync engine: build stage 3).
+// Writes go through the write queue; they never emit local-change events (sync must not trigger itself).
 
 export async function getDirtyHabits(uid) {
     return core.getDirtyHabits(await getDatabase(), uid);
@@ -12,18 +13,18 @@ export async function getDirtyCompletions(uid) {
     return core.getDirtyCompletions(await getDatabase(), uid);
 }
 
-export async function markHabitSynced(uid, habitId, pushedUpdatedAt) {
-    return core.markHabitSynced(await getDatabase(), uid, habitId, pushedUpdatedAt);
+export function markHabitSynced(uid, habitId, pushedUpdatedAt) {
+    return enqueueWrite(async () => core.markHabitSynced(await getDatabase(), uid, habitId, pushedUpdatedAt));
 }
 
-export async function markCompletionSynced(uid, habitId, date, pushedUpdatedAt) {
-    return core.markCompletionSynced(await getDatabase(), uid, habitId, date, pushedUpdatedAt);
+export function markCompletionSynced(uid, habitId, date, pushedUpdatedAt) {
+    return enqueueWrite(async () => core.markCompletionSynced(await getDatabase(), uid, habitId, date, pushedUpdatedAt));
 }
 
-export async function applyRemoteHabits(uid, remoteHabits) {
-    return core.applyRemoteHabits(await getDatabase(), uid, remoteHabits);
+export function applyRemoteHabits(uid, remoteHabits) {
+    return enqueueWrite(async () => core.applyRemoteHabits(await getDatabase(), uid, remoteHabits));
 }
 
-export async function applyRemoteCompletions(uid, remoteCompletions) {
-    return core.applyRemoteCompletions(await getDatabase(), uid, remoteCompletions);
+export function applyRemoteCompletions(uid, remoteCompletions) {
+    return enqueueWrite(async () => core.applyRemoteCompletions(await getDatabase(), uid, remoteCompletions));
 }

@@ -1,5 +1,7 @@
 import * as Crypto from 'expo-crypto';
 import {getDatabase} from '@/db/database';
+import {enqueueWrite} from '@/db/writeQueue';
+import {emitLocalChange} from '@/db/localChanges';
 import {ensureTodayRows, requireUserId, SCHEDULED_ON_DAY_SQL} from '@/db/completions';
 import {getLocalDateString, getLocalWeekdayKey} from '@/utils/dates';
 import {validateHabitInput} from '@/validation/validators';
@@ -22,18 +24,21 @@ export async function addHabit(userId, input) {
     requireUserId(userId);
     const habit = validateOrThrow(input);
     const habitId = Crypto.randomUUID();
-    const now = Date.now();
-    const db = await getDatabase();
 
-    await db.withTransactionAsync(async () => {
-        await db.runAsync(
-            `INSERT INTO habits
-                (habitId, userId, habitName, icon, frequencyType, reminderTime, source, createdAt, updatedAt, deleted, synced)
-            VALUES (?, ?, ?, ?, ?, ?, 'user', ?, ?, 0, 0)`,
-            [habitId, userId, habit.habitName, habit.icon, habit.frequency.type, habit.reminderTime, now, now]
-        );
-        await insertHabitDays(db, habitId, habit.frequency);
+    await enqueueWrite(async () => {
+        const now = Date.now();
+        const db = await getDatabase();
+        await db.withTransactionAsync(async () => {
+            await db.runAsync(
+                `INSERT INTO habits
+                    (habitId, userId, habitName, icon, frequencyType, reminderTime, source, createdAt, updatedAt, deleted, synced)
+                VALUES (?, ?, ?, ?, ?, ?, 'user', ?, ?, 0, 0)`,
+                [habitId, userId, habit.habitName, habit.icon, habit.frequency.type, habit.reminderTime, now, now]
+            );
+            await insertHabitDays(db, habitId, habit.frequency);
+        });
     });
+    emitLocalChange(); // only after the write has committed
 
     return habitId;
 }
@@ -81,32 +86,38 @@ export async function getHabitsWithTodayStatus(userId) {
 export async function updateHabit(userId, habitId, input) {
     requireUserId(userId);
     const habit = validateOrThrow(input);
-    const db = await getDatabase();
 
-    await db.withTransactionAsync(async () => {
-        const result = await db.runAsync(
-            `UPDATE habits
-            SET habitName = ?, icon = ?, frequencyType = ?, reminderTime = ?, updatedAt = ?, synced = 0
-            WHERE habitId = ? AND userId = ? AND deleted = 0`,
-            [habit.habitName, habit.icon, habit.frequency.type, habit.reminderTime, Date.now(), habitId, userId]
-        );
-        if (result.changes === 0) throw new Error('This habit no longer exists.');
+    await enqueueWrite(async () => {
+        const db = await getDatabase();
+        await db.withTransactionAsync(async () => {
+            const result = await db.runAsync(
+                `UPDATE habits
+                SET habitName = ?, icon = ?, frequencyType = ?, reminderTime = ?, updatedAt = ?, synced = 0
+                WHERE habitId = ? AND userId = ? AND deleted = 0`,
+                [habit.habitName, habit.icon, habit.frequency.type, habit.reminderTime, Date.now(), habitId, userId]
+            );
+            if (result.changes === 0) throw new Error('This habit no longer exists.');
 
-        // habitDays are attribute rows of the habit; their sync rides on the habit's updatedAt/synced.
-        await db.runAsync('DELETE FROM habitDays WHERE habitId = ?', [habitId]);
-        await insertHabitDays(db, habitId, habit.frequency);
+            // habitDays are attribute rows of the habit; their sync rides on the habit's updatedAt/synced.
+            await db.runAsync('DELETE FROM habitDays WHERE habitId = ?', [habitId]);
+            await insertHabitDays(db, habitId, habit.frequency);
+        });
     });
+    emitLocalChange(); // only after the write has committed
 }
 
 // User action: soft delete. habitDays and completions are kept.
 export async function softDeleteHabit(userId, habitId) {
     requireUserId(userId);
-    const db = await getDatabase();
 
-    const result = await db.runAsync(
-        `UPDATE habits SET deleted = 1, updatedAt = ?, synced = 0
-        WHERE habitId = ? AND userId = ? AND deleted = 0`,
-        [Date.now(), habitId, userId]
-    );
-    if (result.changes === 0) throw new Error('This habit no longer exists.');
+    await enqueueWrite(async () => {
+        const db = await getDatabase();
+        const result = await db.runAsync(
+            `UPDATE habits SET deleted = 1, updatedAt = ?, synced = 0
+            WHERE habitId = ? AND userId = ? AND deleted = 0`,
+            [Date.now(), habitId, userId]
+        );
+        if (result.changes === 0) throw new Error('This habit no longer exists.');
+    });
+    emitLocalChange(); // only after the write has committed
 }
