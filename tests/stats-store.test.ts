@@ -31,7 +31,7 @@ function deferred<T>() {
 
 async function loadAndPublish(userId: string, stats: GamificationStats, date = TODAY) {
   const load = store.beginLoad(userId, date, async () => stats);
-  store.publish(await load.promise, load.gen);
+  return store.publish(await load.promise, load);
 }
 
 describe('stats store: freshness', () => {
@@ -52,7 +52,7 @@ describe('stats store: freshness', () => {
     const early = store.beginLoad(userId, TODAY, () => gate.promise);
     emitLocalChange();// arrives while the read is running
     gate.resolve(withStreak(3));
-    store.publish(await early.promise, early.gen);
+    store.publish(await early.promise, early);
     assert.equal(store.getEntry()?.stats.currentStreak, 3);// the data is shown...
     assert.equal(store.needsLoad(userId, TODAY), true);// ...but it is not fresh
 
@@ -69,7 +69,7 @@ describe('stats store: freshness', () => {
       const loads: Promise<void>[] = [];
       const off = subscribe(() => {
         const load = store.beginLoad(userId, TODAY, async () => withStreak(2));
-        loads.push(load.promise.then((e) => store.publish(e, load.gen)));
+        loads.push(load.promise.then((e) => { store.publish(e, load); }));
       });
       try {
         emit();
@@ -115,11 +115,11 @@ describe('stats store: snapshots and notifications', () => {
     emitLocalChange();
     await loadAndPublish(userId, withStreak(7));// started later, finished first
     gate.resolve(withStreak(6));
-    store.publish(await older.promise, older.gen);
+    assert.equal(store.publish(await older.promise, older).accepted, false);
     assert.equal(store.getEntry()?.stats.currentStreak, 7);
 
     const shown = store.getEntry();
-    store.publish({userId: 'intruder', date: TODAY, stats: withStreak(99)}, Number.MAX_SAFE_INTEGER);
+    store.publish({userId: 'intruder', date: TODAY, stats: withStreak(99)}, {gen: Number.MAX_SAFE_INTEGER, remoteGen: 0});
     assert.equal(store.getEntry(), shown);
   });
 
@@ -161,7 +161,7 @@ describe('stats store: loadShared (Profile)', () => {
     let calls = 0;
     const profile = store.loadShared(userId, TODAY, async () => { calls += 1; return withStreak(9); });
     gate.resolve(withStreak(4));
-    store.publish(await home.promise, home.gen);
+    store.publish(await home.promise, home);
     const result = await profile;
     assert.equal(result.source, 'joined');
     assert.equal(calls, 0);
@@ -202,5 +202,66 @@ describe('stats store: loadShared (Profile)', () => {
     } finally {
       console.log = original;
     }
+  });
+});
+
+describe('stats store: comparable publishes (celebrations never react to sync)', () => {
+  test('local changes only: comparable, and previous is the entry it replaced', async () => {
+    const userId = freshUser();
+    await loadAndPublish(userId, withStreak(1));
+    const before = store.getEntry();
+    emitLocalChange();// the user's own tick
+    const result = await loadAndPublish(userId, withStreak(2));
+    assert.deepEqual([result.accepted, result.comparable], [true, true]);
+    assert.equal(result.previous, before);
+  });
+
+  test('a remote change between the two loads: not comparable', async () => {
+    const userId = freshUser();
+    await loadAndPublish(userId, withStreak(1));
+    emitRemoteChange();
+    emitLocalChange();
+    const result = await loadAndPublish(userId, withStreak(2));
+    assert.equal(result.accepted, true);
+    assert.equal(result.comparable, false);
+  });
+
+  test('a remote change between a load\'s start and its publish: not comparable', async () => {
+    const userId = freshUser();
+    await loadAndPublish(userId, withStreak(1));
+    emitLocalChange();
+    const gate = deferred<GamificationStats>();
+    const load = store.beginLoad(userId, TODAY, () => gate.promise);
+    emitRemoteChange();// lands while the read is running
+    gate.resolve(withStreak(2));
+    const result = store.publish(await load.promise, load);
+    assert.equal(result.comparable, false);
+
+    // the next local-only load is still not comparable: the shown entry may hold remote data that
+    // arrived after its own start. The one after that is.
+    emitLocalChange();
+    assert.equal((await loadAndPublish(userId, withStreak(3))).comparable, false);
+    emitLocalChange();
+    assert.equal((await loadAndPublish(userId, withStreak(4))).comparable, true);
+  });
+
+  test('the previous entry\'s load saw a remote change before it published: not comparable', async () => {
+    const userId = freshUser();
+    const gate = deferred<GamificationStats>();
+    const first = store.beginLoad(userId, TODAY, () => gate.promise);
+    emitRemoteChange();
+    gate.resolve(withStreak(1));
+    store.publish(await first.promise, first);
+    emitLocalChange();
+    assert.equal((await loadAndPublish(userId, withStreak(2))).comparable, false);
+  });
+
+  test('no previous entry, another day, or a rejected publish: not comparable', async () => {
+    const userId = freshUser();
+    assert.equal((await loadAndPublish(userId, withStreak(1))).comparable, false);// store was empty
+    emitLocalChange();
+    assert.equal((await loadAndPublish(userId, withStreak(1), '2026-10-22')).comparable, false);// after midnight
+    const rejected = store.publish({userId: 'intruder', date: TODAY, stats: BASE}, {gen: 0, remoteGen: 0});
+    assert.deepEqual(rejected, {accepted: false, previous: null, comparable: false});
   });
 });

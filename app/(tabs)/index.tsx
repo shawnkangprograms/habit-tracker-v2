@@ -23,6 +23,8 @@ import {StatsCard} from '@/components/stats-card';
 import {HabitCheck} from '@/components/habit-check';
 import {XpFloat} from '@/components/xp-float';
 import {useReduceMotion} from '@/hooks/use-reduce-motion';
+import {useCelebrations, type TickStats} from '@/hooks/use-celebrations';// overlays, banner and toasts after a tick
+import {CelebrationLayer} from '@/components/celebration-layer';
 
 type Habit = {// one row from getHabitsWithTodayStatus: an active habit scheduled today, with today's status
   habitId: string;
@@ -56,6 +58,12 @@ function completionHaptic() {
   } else {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
   }
+}
+
+// The time of a tap. Only ever called from the toggle handler; a plain function so the React Compiler lint
+// doesn't mistake the handler's clock read for one during render.
+function tapTime(): number {
+  return Date.now();
 }
 
 const DAY_ORDER: WeekdayKey[] = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];// display order, Monday first
@@ -103,8 +111,9 @@ export default function HomeScreen() {// default export, becomes the "index" tab
   const focusedAt = useRef(0);// dev timing: when Home last gained focus
 
   // useCallback keeps the same fxn between renders, so the focus effect below doesn't rerun on every render
-  const loadHabits = useCallback(async (reason: LoadReason = 'focus') => {
-      if (!userId) return;// no signed-in user: nothing to load
+  // Resolves to the rows it loaded, or null if there is no user or a newer load replaced it
+  const loadHabits = useCallback(async (reason: LoadReason = 'focus'): Promise<Habit[] | null> => {
+      if (!userId) return null;// no signed-in user: nothing to load
       const request = ++habitsRequest.current;
       const startedAt = performance.now();
 
@@ -119,7 +128,7 @@ export default function HomeScreen() {// default export, becomes the "index" tab
         return days ? {...habit, days} : habit;
       });
 
-      if (request !== habitsRequest.current) return;// a newer load started meanwhile (e.g. several pulled pages)
+      if (request !== habitsRequest.current) return null;// a newer load started meanwhile (e.g. several pulled pages)
       const unchanged = isDeepEqual(shownHabits.current, result);
       if (!unchanged) {
         shownHabits.current = result;
@@ -127,6 +136,7 @@ export default function HomeScreen() {// default export, becomes the "index" tab
       }
       setLoaded(true);// no re-render once it is already true
       perfLog(`${reason} habits ${result.length} rows in ${Math.round(performance.now() - startedAt)} ms (${unchanged ? 'unchanged, no render' : 'changed'})`);
+      return result;
   }, [userId]);
 
   const [stats, setStats] = useState<StatsSnapshot | null>(null);// null = not loaded or failed: the header card is hidden
@@ -136,9 +146,12 @@ export default function HomeScreen() {// default export, becomes the "index" tab
   const inFlight = useRef(new Set<string>());// habitIds whose toggle is still running
   const [floats, setFloats] = useState<Record<string, Float>>({});// "+N XP" labels by habitId
   const reduceMotion = useReduceMotion();
+  const celebration = useCelebrations(userId);
+  const {onTick} = celebration;
 
-  // Never throws. Resolves to the new snapshot, or null if it failed or a newer load replaced it.
-  const loadStats = useCallback(async (reason: LoadReason = 'focus'): Promise<StatsSnapshot | null> => {
+  // Never throws. Resolves to the new snapshot (null if it failed) with what the store publish replaced,
+  // or to null if a newer load replaced this one.
+  const loadStats = useCallback(async (reason: LoadReason = 'focus'): Promise<TickStats | null> => {
     if (!userId) return null;
     const request = ++statsRequest.current;
     const startedAt = performance.now();
@@ -148,7 +161,7 @@ export default function HomeScreen() {// default export, becomes the "index" tab
     const loaded = await load.promise;// null if it failed: the card hides; the habit list keeps working
     const snapshot: StatsSnapshot | null = loaded ? {date, stats: loaded.stats} : null;
     if (request !== statsRequest.current) return null;// stale
-    publishStats(loaded, load.gen);// for Profile and the tab icon; a no-op if nothing changed
+    const published = publishStats(loaded, load);// for Profile and the tab icon; a no-op if nothing changed
     statsSettled.current = request;
     const unchanged = isDeepEqual(statsRef.current, snapshot);// every field, incl. streaks and badges
     if (!unchanged) {
@@ -156,7 +169,7 @@ export default function HomeScreen() {// default export, becomes the "index" tab
       setStats(snapshot);
     }
     perfLog(`${reason} stats in ${Math.round(performance.now() - startedAt)} ms (${unchanged ? 'unchanged, no render' : 'changed'})`);
-    return snapshot;
+    return {snapshot, published};
   }, [userId]);
 
   // Remote-change reloads, coalesced: one runs at a time, and changes arriving meanwhile cause one more run
@@ -221,6 +234,7 @@ export default function HomeScreen() {// default export, becomes the "index" tab
     if (!userId || inFlight.current.has(habit.habitId)) return;// ignore a second tap while this habit's toggle runs
     inFlight.current.add(habit.habitId);
     const completing = habit.completed === 0;
+    const tickedAt = tapTime();// for "earlier than usual"
     // "before" only counts if no stats load was still running at tap time
     const before = statsSettled.current === statsRequest.current ? statsRef.current : null;
     try {
@@ -231,16 +245,22 @@ export default function HomeScreen() {// default export, becomes the "index" tab
       } catch (err) {
         Alert.alert(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
       }
+      let statsDone: Promise<TickStats | null> | null = null;
       if (saved) {
         if (completing) completionHaptic();
         // not awaited: stats never slow the toggle or the list refresh
-        loadStats('toggle').then((after) => {
+        statsDone = loadStats('toggle');
+        statsDone.then((result) => {
+          const after = result?.snapshot;
           if (!completing || reduceMotion || !before || !after || before.date !== after.date) return;
           const gained = after.stats.totalXp - before.stats.totalXp;// the real change, incl. perfect-day/milestone bonuses
           if (gained > 0) setFloats((f) => ({...f, [habit.habitId]: {key: Date.now(), amount: gained}}));
         });
       }
-      await loadHabits('toggle');
+      const rows = await loadHabits('toggle');
+      // Celebrations and messages: only for the user's own completing tick, after the list has updated.
+      // They reuse the stats load above and the rows just loaded; nothing else is read except the early check.
+      if (completing && statsDone && rows) onTick({habitId: habit.habitId, tickedAt, rows, stats: statsDone});
     } finally {
       inFlight.current.delete(habit.habitId);
     }
@@ -345,6 +365,9 @@ export default function HomeScreen() {// default export, becomes the "index" tab
         </View>
 
       </ScrollView>
+
+      {/* one at a time: level-up / milestone overlay, perfect-day banner (top) or toast (bottom) */}
+      <CelebrationLayer item={celebration.current} reduceMotion={reduceMotion} onDismiss={celebration.dismiss} />
     </SafeAreaView>
   );
 }

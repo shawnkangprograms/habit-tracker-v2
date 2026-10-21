@@ -16,12 +16,20 @@ import {onRemoteChange} from '@/db/remoteChanges';
 
 export type StatsEntry = {userId: string; date: string; stats: GamificationStats};// date: the local day it was computed for
 export type SharedLoadResult = {entry: StatsEntry | null; source: 'reused' | 'joined' | 'loaded'};
+export type LoadTicket = {gen: number; remoteGen: number};// counters captured when a load STARTS
+
+// What a publish replaced. `comparable` says the difference between `previous` and the new entry can only
+// come from local changes (the user's own actions): same user, same day, and no remote change from the
+// start of the previous entry's load until this publish. Celebrations use it to never react to sync.
+export type PublishResult = {accepted: boolean; previous: StatsEntry | null; comparable: boolean};
 
 let currentUser: string | null = null;
 let entry: StatsEntry | null = null;
 let gen = 0;// bumped by every local or remote change
+let remoteGen = 0;// bumped by remote changes only
 let publishedGen = -1;// gen at which the shown entry's load started; the entry is fresh while this equals gen
-let inFlight: {userId: string; gen: number; promise: Promise<StatsEntry | null>} | null = null;
+let publishedRemoteGen = -1;// remoteGen at which the shown entry's load started
+let inFlight: (LoadTicket & {userId: string; promise: Promise<StatsEntry | null>}) | null = null;
 const listeners = new Set<() => void>();
 
 function notify() {
@@ -32,8 +40,13 @@ export function markStale(): void {
   gen += 1;
 }
 
+function markRemoteChange(): void {
+  remoteGen += 1;
+  markStale();
+}
+
 onLocalChange(markStale);
-onRemoteChange(markStale);
+onRemoteChange(markRemoteChange);
 
 // Same object until publish actually changes something (useSyncExternalStore needs a stable snapshot)
 export function getEntry(): StatsEntry | null {
@@ -54,6 +67,7 @@ export function reset(userId: string | null): void {
   currentUser = userId;
   if (inFlight && inFlight.userId !== userId) inFlight = null;
   publishedGen = -1;
+  publishedRemoteGen = -1;
   if (entry !== null) {
     entry = null;
     notify();
@@ -66,14 +80,15 @@ export function needsLoad(userId: string, today: string): boolean {
   return entry === null || entry.userId !== userId || entry.date !== today || publishedGen !== gen;
 }
 
-// Starts a load: records gen BEFORE reading, so a change during the read leaves the result stale.
+// Starts a load: records the counters BEFORE reading, so a change during the read leaves the result stale.
 // Never rejects: resolves to null if the loader failed.
 export function beginLoad(
   userId: string,
   date: string,
   loader: () => Promise<GamificationStats>,
-): {gen: number; promise: Promise<StatsEntry | null>} {
+): LoadTicket & {promise: Promise<StatsEntry | null>} {
   const startedGen = gen;
+  const startedRemoteGen = remoteGen;
   const promise = loader().then(
     (stats): StatsEntry => ({userId, date, stats}),
     (err: unknown) => {
@@ -81,23 +96,33 @@ export function beginLoad(
       return null;
     },
   );
-  const record = {userId, gen: startedGen, promise};
+  const record = {userId, gen: startedGen, remoteGen: startedRemoteGen, promise};
   inFlight = record;
   promise.finally(() => {
     if (inFlight === record) inFlight = null;
   });
-  return {gen: startedGen, promise};
+  return {gen: startedGen, remoteGen: startedRemoteGen, promise};
 }
+
+const REJECTED: PublishResult = {accepted: false, previous: null, comparable: false};
 
 // Ignored for another user, or if a load that started later has already published.
 // Notifies only if the stats really changed.
-export function publish(next: StatsEntry | null, startedGen: number): void {
-  if (!next || next.userId !== currentUser || startedGen < publishedGen) return;
-  publishedGen = startedGen;
+export function publish(next: StatsEntry | null, load: LoadTicket): PublishResult {
+  if (!next || next.userId !== currentUser || load.gen < publishedGen) return REJECTED;
+  const previous = entry;
+  const comparable = previous !== null
+    && previous.userId === next.userId
+    && previous.date === next.date
+    && publishedRemoteGen === load.remoteGen// no remote change between the two loads' starts...
+    && remoteGen === load.remoteGen;// ...nor during this load
+  publishedGen = load.gen;
+  publishedRemoteGen = load.remoteGen;
   if (!isDeepEqual(entry, next)) {
     entry = next;
     notify();
   }
+  return {accepted: true, previous, comparable};
 }
 
 // Profile's path: reuse a fresh entry, else join a running load that started after the last change,
@@ -110,10 +135,10 @@ export async function loadShared(
   if (!needsLoad(userId, today)) return {entry, source: 'reused'};
   if (inFlight && inFlight.userId === userId && inFlight.gen === gen) {
     const joined = inFlight;
-    publish(await joined.promise, joined.gen);// the starter publishes too; the second publish is a no-op
+    publish(await joined.promise, joined);// the starter publishes too; the second publish is a no-op
     return {entry: currentUser === userId ? entry : null, source: 'joined'};
   }
   const load = beginLoad(userId, today, loader);
-  publish(await load.promise, load.gen);
+  publish(await load.promise, load);
   return {entry: currentUser === userId ? entry : null, source: 'loaded'};
 }
