@@ -1,48 +1,21 @@
 import {collection, getDocs, limit, orderBy, query} from 'firebase/firestore';
 import {getFirestoreDb} from '@/services/firebaseInit';
 import {getFirebaseAuth} from '@/services/authInit';
-import {validateHabitInput} from '@/validation/validators';
+import {getSyncStatus} from '@/sync/syncEngine';
+import {createStarterIdeasLoader} from '@/utils/starterIdeas';
 
-// Starter ideas for the New habit screen, from the admin-managed "catalog" collection.
-// Best effort: any failure (offline, timeout, permission) returns [] and the form works as before.
+// Starter ideas for the New habit screen, from the admin-managed "catalog" collection, with three built-in
+// starters when the catalog is unavailable or empty (utils/starterIdeas.ts). Best effort, never throws.
 
-const FETCH_LIMIT = 50; // headroom so a few invalid docs can't leave fewer than SHOW_LIMIT
-const SHOW_LIMIT = 12;
-const TIMEOUT_MS = 5000;
+const FETCH_LIMIT = 50; // headroom so a few invalid docs can't leave fewer than the number shown
 
-// Resolves to null if the read takes too long; the read itself is not cancelled, its result is ignored
-function withTimeout(promise) {
-    let timer;
-    const timeout = new Promise((resolve) => { timer = setTimeout(() => resolve(null), TIMEOUT_MS); });
-    return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
-}
-
-// Never throws. Returns up to SHOW_LIMIT valid ideas {id, habitName, icon, frequency, reminderTime}, sorted by name.
-export async function getStarterIdeas() {
-    try {
-        if (!getFirebaseAuth().currentUser) return []; // the rules only allow signed-in reads
-
+export const getStarterIdeas = createStarterIdeasLoader({
+    isSignedIn: () => !!getFirebaseAuth().currentUser,
+    // read-only use of the sync status: if the last cycle found the phone offline, don't wait 5 s for Firestore
+    isOffline: () => getSyncStatus().state === 'offline',
+    fetchCatalog: async () => {
         const q = query(collection(getFirestoreDb(), 'catalog'), orderBy('name'), limit(FETCH_LIMIT));
-        const snap = await withTimeout(getDocs(q));
-        if (!snap) return [];
-
-        const ideas = [];
-        for (const d of snap.docs) {
-            const data = d.data();
-            // same validators and allowed icon list as the form; invalid docs are skipped
-            const result = validateHabitInput({
-                habitName: data.name,
-                icon: data.icon,
-                frequency: data.frequency,
-                reminderTime: data.reminderTime ?? null,
-            });
-            if (result.valid) ideas.push({id: d.id, ...result.value});
-        }
-
-        return ideas
-            .sort((a, b) => a.habitName.localeCompare(b.habitName, undefined, {sensitivity: 'base'}))
-            .slice(0, SHOW_LIMIT);
-    } catch {
-        return [];
-    }
-}
+        const snap = await getDocs(q);
+        return snap.docs.map((d) => ({id: d.id, data: d.data()}));
+    },
+});

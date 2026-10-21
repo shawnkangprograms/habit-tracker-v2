@@ -29,6 +29,9 @@ import {ReminderPrompt} from '@/components/reminder-prompt';// one-time "gentle 
 import {getNotificationPrefs, notificationPrefsLoaded, useNotificationPrefs} from '@/services/notificationPrefs';
 import {shouldShowSoftPrompt} from '@/utils/notificationPrefs';
 import {notificationsAvailable} from '@/services/notifications';
+import {EmptyHomeCard} from '@/components/empty-home-card';// first-run card when there are no active habits
+import {useFirstPull} from '@/hooks/use-first-pull';
+import {activeHabitCount, homeEmptyState} from '@/utils/homeEmptyState';
 
 type Habit = {// one row from getHabitsWithTodayStatus: an active habit scheduled today, with today's status
   habitId: string;
@@ -105,6 +108,8 @@ function subtitle(habit: Habit): string {
 export default function HomeScreen() {// default export, becomes the "index" tab per Expo router convention
   const [habits, setHabits] = useState<Habit[]>([]);// habits: current list in state, starts empty; setHabits: how we update it
   const [loaded, setLoaded] = useState(false);// false until the first load finishes, so the empty state doesn't flash
+  const [activeCount, setActiveCount] = useState<number | null>(null);// all active habits; null = unknown
+  const firstPull = useFirstPull();
 
   const user = getFirebaseAuth().currentUser;// this screen is only reachable while signed in
   const userId = user?.uid;
@@ -123,10 +128,11 @@ export default function HomeScreen() {// default export, becomes the "index" tab
 
       // Weekday habits need their days for the subtitle: one read for all of them, before setHabits so the list
       // renders once, complete. If that read fails, the subtitles fall back to "Specific days".
-      const [rows, daysByHabit] = await Promise.all([
+      const [rows, daysOrNull] = await Promise.all([
         getHabitsWithTodayStatus(userId) as Promise<Habit[]>,// active habits scheduled today, for this user
-        (getActiveHabitDays(userId) as Promise<Record<string, WeekdayKey[]>>).catch(() => ({} as Record<string, WeekdayKey[]>)),
+        (getActiveHabitDays(userId) as Promise<Record<string, WeekdayKey[]>>).catch(() => null),
       ]);
+      const daysByHabit = daysOrNull ?? {};
       const result = rows.map((habit) => {
         const days = habit.frequencyType === 'weekdays' ? daysByHabit[habit.habitId] : undefined;
         return days ? {...habit, days} : habit;
@@ -138,6 +144,8 @@ export default function HomeScreen() {// default export, becomes the "index" tab
         shownHabits.current = result;
         setHabits(result);// store fetched habits in state, triggering a re-render to display them
       }
+      // all active habits (not just today's), from the same two reads, for the first-run empty state
+      setActiveCount(activeHabitCount(rows.map((h) => h.habitId), daysOrNull ? Object.keys(daysOrNull) : null));
       setLoaded(true);// no re-render once it is already true
       perfLog(`${reason} habits ${result.length} rows in ${Math.round(performance.now() - startedAt)} ms (${unchanged ? 'unchanged, no render' : 'changed'})`);
       return result;
@@ -293,6 +301,12 @@ export default function HomeScreen() {// default export, becomes the "index" tab
   }, [loadHabits, loadStats]);
 
   const doneToday = habits.filter((h) => h.completed === 1).length;// Home lists exactly the habits scheduled today
+  const emptyState = homeEmptyState({
+    habitCount: activeCount ?? 0,
+    loading: !loaded || activeCount === null,// unknown count: show nothing rather than a false empty state
+    firstPullDone: firstPull.firstPullDone,
+    waitOver: firstPull.waitOver,
+  });
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
@@ -330,8 +344,12 @@ export default function HomeScreen() {// default export, becomes the "index" tab
 
         <Text style={styles.title}>Today.</Text>
 
-        {loaded && habits.length === 0 && (
-          <Text style={styles.empty}>No habits yet. Tap Add a habit to start.</Text>
+        {emptyState === 'checking' && (
+          // a returning user on a new phone has no local habits until the first pull finishes
+          <Text style={styles.empty} accessibilityLiveRegion="polite">Checking for your habits...</Text>
+        )}
+        {emptyState === 'empty' && (
+          <EmptyHomeCard reduceMotion={reduceMotion} onPick={() => router.push('/habit-form')} />
         )}
 
         <View style={styles.list}>
@@ -372,10 +390,13 @@ export default function HomeScreen() {// default export, becomes the "index" tab
             );
           })}
 
-          <Pressable style={styles.addRow} onPress={() => router.push('/habit-form')}>
-            <MaterialCommunityIcons name="plus" size={20} color={colors.accent} />
-            <Text style={styles.addText}>Add a habit</Text>
-          </Pressable>
+          {/* hidden while the first-run card shows, so there is one clear action */}
+          {emptyState !== 'empty' && (
+            <Pressable style={styles.addRow} onPress={() => router.push('/habit-form')}>
+              <MaterialCommunityIcons name="plus" size={20} color={colors.accent} />
+              <Text style={styles.addText}>Add a habit</Text>
+            </Pressable>
+          )}
         </View>
 
       </ScrollView>

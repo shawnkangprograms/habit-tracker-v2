@@ -3,12 +3,12 @@ import {Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
 import {getStarterIdeas} from '@/services/catalogSuggestions';
 import {HabitIcon} from '@/constants/habitIcons';
 import {colors, fonts, radii, spacing, ICON_COLORS} from '@/constants/theme';
-import type {HabitInput} from '@/validation/validators';
+import type {StarterIdea} from '@/utils/starterIdeas';
 
-export type StarterIdea = HabitInput & {id: string}; // already validated by getStarterIdeas
+export type {StarterIdea} from '@/utils/starterIdeas'; // already validated by getStarterIdeas
 
-// "Starter ideas" chips for the New habit screen. Fetches once on mount; renders nothing
-// while loading, on any failure, or when there are no valid ideas.
+// "Starter ideas" chips for the New habit screen. Fetches once on mount; renders nothing while loading.
+// Never empty after that: the catalog, or three built-in starters when it is unavailable.
 export function StarterIdeas({onPick}: {onPick: (idea: StarterIdea) => void}) {
   const [ideas, setIdeas] = useState<StarterIdea[]>([]);
 
