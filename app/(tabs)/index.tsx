@@ -25,6 +25,10 @@ import {XpFloat} from '@/components/xp-float';
 import {useReduceMotion} from '@/hooks/use-reduce-motion';
 import {useCelebrations, type TickStats} from '@/hooks/use-celebrations';// overlays, banner and toasts after a tick
 import {CelebrationLayer} from '@/components/celebration-layer';
+import {ReminderPrompt} from '@/components/reminder-prompt';// one-time "gentle evening reminder?" card
+import {getNotificationPrefs, notificationPrefsLoaded, useNotificationPrefs} from '@/services/notificationPrefs';
+import {shouldShowSoftPrompt} from '@/utils/notificationPrefs';
+import {notificationsAvailable} from '@/services/notifications';
 
 type Habit = {// one row from getHabitsWithTodayStatus: an active habit scheduled today, with today's status
   habitId: string;
@@ -148,6 +152,9 @@ export default function HomeScreen() {// default export, becomes the "index" tab
   const reduceMotion = useReduceMotion();
   const celebration = useCelebrations(userId);
   const {onTick} = celebration;
+  useNotificationPrefs();// loads the saved settings, so the soft prompt below knows whether it was answered
+  const [reminderPrompt, setReminderPrompt] = useState(false);
+  const closeReminderPrompt = useCallback(() => setReminderPrompt(false), []);
 
   // Never throws. Resolves to the new snapshot (null if it failed) with what the store publish replaced,
   // or to null if a newer load replaced this one.
@@ -248,6 +255,11 @@ export default function HomeScreen() {// default export, becomes the "index" tab
       let statsDone: Promise<TickStats | null> | null = null;
       if (saved) {
         if (completing) completionHaptic();
+        // soft prompt: the first completing tick after this shipped, if never answered and the nudge is off
+        // (never when this app binary has no notifications module)
+        if (completing && notificationPrefsLoaded() && shouldShowSoftPrompt(getNotificationPrefs()) && notificationsAvailable()) {
+          setReminderPrompt(true);
+        }
         // not awaited: stats never slow the toggle or the list refresh
         statsDone = loadStats('toggle');
         statsDone.then((result) => {
@@ -313,6 +325,8 @@ export default function HomeScreen() {// default export, becomes the "index" tab
             scheduledToday={habits.length}
           />
         )}
+
+        {reminderPrompt && <ReminderPrompt onClose={closeReminderPrompt} />}
 
         <Text style={styles.title}>Today.</Text>
 

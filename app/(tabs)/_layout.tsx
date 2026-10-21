@@ -1,10 +1,17 @@
+import { useEffect } from 'react';
 import { Tabs } from 'expo-router';
+import { startNotificationScheduler } from '@/services/notificationScheduler';
+import { useNotificationTapOpensHome } from '@/services/notifications';
 import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { StreakTabIcon } from '@/components/streak-tab-icon';
 import { colors, fonts } from '@/constants/theme';
 
 export default function TabLayout() {
+  // Local notifications for the signed-in user: keep the schedule current, and open Home on a tap
+  useEffect(() => startNotificationScheduler(), []);
+  useNotificationTapOpensHome();
+
   return (
     <Tabs
       screenOptions={{
