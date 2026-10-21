@@ -16,6 +16,10 @@ import {getFirebaseAuth} from '@/services/authInit'; //helper fxn that returns t
 import {ThemedText} from '@/components/themed-text';
 import {AdminContext, useAdminCheck} from '@/services/adminContext'; //admins/{uid} check, filled in after first render
 import {useDisabledCheck} from '@/services/useDisabledCheck'; //signs out a disabled account; never blocks startup
+import * as SystemUI from 'expo-system-ui'; //root view background, behind every screen
+
+// Root view background behind every screen: dark, so nothing white shows during Android transitions
+SystemUI.setBackgroundColorAsync(colors.background).catch(() => {});
 
 // The app is dark-only: navigation colours come from the design tokens
 const navTheme = {

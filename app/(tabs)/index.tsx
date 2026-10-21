@@ -1,16 +1,19 @@
-import {useState, useCallback, useRef} from 'react';//useState: store data that triggers re-renders; useCallback: stable fxn for useFocusEffect
-import {router, useFocusEffect} from 'expo-router';// navigation to the Add/Edit form; run code whenever Home gains focus
+import {useState, useCallback, useEffect, useRef} from 'react';//useState: store data that triggers re-renders; useCallback: stable fxn for useFocusEffect
+import {router, useFocusEffect, useNavigation} from 'expo-router';// navigation to the Add/Edit form; run code whenever Home gains focus
+import type {NativeStackNavigationProp} from 'expo-router/native-stack';
+import type {ParamListBase} from 'expo-router/react-navigation';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View} from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import * as Haptics from 'expo-haptics';
-import {getHabit, getHabitsWithTodayStatus} from '@/db/habits';// habit reads in SQLite
+import {getActiveHabitDays, getHabitsWithTodayStatus} from '@/db/habits';// habit reads in SQLite
 import {toggleCompletion} from '@/db/completions';// today's completion toggle
 import {getGamificationStats} from '@/db/gamification';// XP, level and streak, derived from local rows
 import {onRemoteChange} from '@/db/remoteChanges';// data pulled from another device changed local rows
 import {requestSync} from '@/sync/syncEngine';// pull + push now (does nothing while sync is stopped)
 import {getFirebaseAuth} from '@/services/authInit';// to read the signed-in user's id
 import {getLocalDateString} from '@/utils/dates';
+import {isDeepEqual} from '@/utils/equality';// skip a re-render when a reload returned what is already shown
 import type {GamificationStats} from '@/utils/gamification';
 import {colors, fonts, radii, spacing, ICON_COLORS} from '@/constants/theme';
 import {HabitIcon} from '@/constants/habitIcons';
@@ -37,6 +40,13 @@ let lastFocusSyncAt = Date.now();
 
 type StatsSnapshot = {date: string; stats: GamificationStats};// stats plus the local date they were computed for
 type Float = {key: number; amount: number};// one "+N XP" label
+type LoadReason = 'focus' | 'remote' | 'toggle' | 'refresh';// only for the dev timing log
+
+// Dev only: one line per Home load, counts and milliseconds (never habit names)
+// TODO: remove or reduce these timing logs (and the transitionEnd listener below) before the release build
+function perfLog(message: string) {
+  if (__DEV__) console.log(`Home perf: ${message}`);
+}
 
 // one light haptic when a habit is completed (Android: the haptics API the SDK 57 docs recommend over the vibrator)
 function completionHaptic() {
@@ -88,27 +98,34 @@ export default function HomeScreen() {// default export, becomes the "index" tab
   const firstName = user?.displayName?.trim().split(/\s+/)[0];// only if auth already has a displayName
 
   const habitsRequest = useRef(0);// id of the newest list load; an older one finishing later is ignored
+  const shownHabits = useRef<Habit[]>([]);// the list currently in state, to skip identical reloads
+  const focusedAt = useRef(0);// dev timing: when Home last gained focus
 
   // useCallback keeps the same fxn between renders, so the focus effect below doesn't rerun on every render
-  const loadHabits = useCallback(async () => {
+  const loadHabits = useCallback(async (reason: LoadReason = 'focus') => {
       if (!userId) return;// no signed-in user: nothing to load
       const request = ++habitsRequest.current;
-      const rows = (await getHabitsWithTodayStatus(userId)) as Habit[];// active habits scheduled today, for this user
+      const startedAt = performance.now();
 
-      // Weekday habits need their days for the subtitle. Fetched before setHabits so the list renders once, complete.
-      const result = await Promise.all(rows.map(async (habit) => {
-        if (habit.frequencyType !== 'weekdays') return habit;
-        try {
-          const full = await getHabit(userId, habit.habitId);
-          return full?.frequency.type === 'weekdays' ? {...habit, days: full.frequency.days as WeekdayKey[]} : habit;
-        } catch {
-          return habit;// lookup failed: subtitle falls back to "Specific days"
-        }
-      }));
+      // Weekday habits need their days for the subtitle: one read for all of them, before setHabits so the list
+      // renders once, complete. If that read fails, the subtitles fall back to "Specific days".
+      const [rows, daysByHabit] = await Promise.all([
+        getHabitsWithTodayStatus(userId) as Promise<Habit[]>,// active habits scheduled today, for this user
+        (getActiveHabitDays(userId) as Promise<Record<string, WeekdayKey[]>>).catch(() => ({} as Record<string, WeekdayKey[]>)),
+      ]);
+      const result = rows.map((habit) => {
+        const days = habit.frequencyType === 'weekdays' ? daysByHabit[habit.habitId] : undefined;
+        return days ? {...habit, days} : habit;
+      });
 
       if (request !== habitsRequest.current) return;// a newer load started meanwhile (e.g. several pulled pages)
-      setHabits(result);// store fetched habits in state, triggering a re-render to display them
-      setLoaded(true);
+      const unchanged = isDeepEqual(shownHabits.current, result);
+      if (!unchanged) {
+        shownHabits.current = result;
+        setHabits(result);// store fetched habits in state, triggering a re-render to display them
+      }
+      setLoaded(true);// no re-render once it is already true
+      perfLog(`${reason} habits ${result.length} rows in ${Math.round(performance.now() - startedAt)} ms (${unchanged ? 'unchanged, no render' : 'changed'})`);
   }, [userId]);
 
   const [stats, setStats] = useState<StatsSnapshot | null>(null);// null = not loaded or failed: the header card is hidden
@@ -120,9 +137,10 @@ export default function HomeScreen() {// default export, becomes the "index" tab
   const reduceMotion = useReduceMotion();
 
   // Never throws. Resolves to the new snapshot, or null if it failed or a newer load replaced it.
-  const loadStats = useCallback(async (): Promise<StatsSnapshot | null> => {
+  const loadStats = useCallback(async (reason: LoadReason = 'focus'): Promise<StatsSnapshot | null> => {
     if (!userId) return null;
     const request = ++statsRequest.current;
+    const startedAt = performance.now();
     const date = getLocalDateString();
     let snapshot: StatsSnapshot | null = null;
     try {
@@ -132,12 +150,40 @@ export default function HomeScreen() {// default export, becomes the "index" tab
     }
     if (request !== statsRequest.current) return null;// stale
     statsSettled.current = request;
-    statsRef.current = snapshot;
-    setStats(snapshot);
+    const unchanged = isDeepEqual(statsRef.current, snapshot);// every field, incl. streaks and badges
+    if (!unchanged) {
+      statsRef.current = snapshot;
+      setStats(snapshot);
+    }
+    perfLog(`${reason} stats in ${Math.round(performance.now() - startedAt)} ms (${unchanged ? 'unchanged, no render' : 'changed'})`);
     return snapshot;
   }, [userId]);
 
+  // Remote-change reloads, coalesced: one runs at a time, and changes arriving meanwhile cause one more run
+  // after it (not one per pulled page). The stale-response guards in loadHabits/loadStats still apply.
+  const remoteReload = useRef({running: false, again: false});
+  const reloadForRemote = useCallback(async () => {
+    const state = remoteReload.current;
+    if (state.running) {
+      state.again = true;
+      return;
+    }
+    state.running = true;
+    try {
+      do {
+        state.again = false;
+        await Promise.all([
+          loadHabits('remote').catch((err: unknown) => console.log('Home reload failed', err)),
+          loadStats('remote'),
+        ]);
+      } while (state.again);
+    } finally {
+      state.running = false;
+    }
+  }, [loadHabits, loadStats]);
+
   useFocusEffect(useCallback(() => {// runs every time Home gains focus, so adds/edits/deletes from the form show immediately
+    focusedAt.current = performance.now();
     loadHabits();
     loadStats();// in parallel; the list never waits for stats
     if (Date.now() - lastFocusSyncAt >= FOCUS_SYNC_MIN_INTERVAL_MS) {
@@ -147,11 +193,20 @@ export default function HomeScreen() {// default export, becomes the "index" tab
 
     // while focused, data pulled from another device reloads Home in place: state updates only
     // (same keys, no remount, loaded stays true), so the list doesn't flicker or lose its scroll position
-    return onRemoteChange(() => {
-      loadHabits();
-      loadStats();
+    return onRemoteChange(reloadForRemote);
+  }, [loadHabits, loadStats, reloadForRemote]));
+
+  // Dev timing: when the stack's back animation to the tabs finishes, relative to Home's focus,
+  // to see whether the focus loads above overlap the animation
+  const navigation = useNavigation();
+  useEffect(() => {
+    if (!__DEV__) return;
+    const stack = navigation.getParent<NativeStackNavigationProp<ParamListBase>>();
+    return stack?.addListener('transitionEnd', (e) => {
+      if (e.data.closing) return;// only when the tabs become visible again
+      perfLog(`stack transition ended ${Math.round(performance.now() - focusedAt.current)} ms after focus`);
     });
-  }, [loadHabits, loadStats]));
+  }, [navigation]);
 
   const removeFloat = useCallback((habitId: string, key: number) => {
     setFloats((f) => {
@@ -179,13 +234,13 @@ export default function HomeScreen() {// default export, becomes the "index" tab
       if (saved) {
         if (completing) completionHaptic();
         // not awaited: stats never slow the toggle or the list refresh
-        loadStats().then((after) => {
+        loadStats('toggle').then((after) => {
           if (!completing || reduceMotion || !before || !after || before.date !== after.date) return;
           const gained = after.stats.totalXp - before.stats.totalXp;// the real change, incl. perfect-day/milestone bonuses
           if (gained > 0) setFloats((f) => ({...f, [habit.habitId]: {key: Date.now(), amount: gained}}));
         });
       }
-      await loadHabits();
+      await loadHabits('toggle');
     } finally {
       inFlight.current.delete(habit.habitId);
     }
@@ -200,8 +255,8 @@ export default function HomeScreen() {// default export, becomes the "index" tab
     requestSync()
       .finally(() => {
         setRefreshing(false);
-        loadHabits();
-        loadStats();
+        loadHabits('refresh');
+        loadStats('refresh');
       });
   }, [loadHabits, loadStats]);
 

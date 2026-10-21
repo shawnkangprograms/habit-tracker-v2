@@ -3,6 +3,7 @@ import {getDatabase} from '@/db/database';
 import {enqueueWrite} from '@/db/writeQueue';
 import {emitLocalChange} from '@/db/localChanges';
 import {ensureTodayRows, requireUserId, SCHEDULED_ON_DAY_SQL} from '@/db/completions';
+import * as core from '@/db/habitsCore';
 import {getLocalDateString, getLocalWeekdayKey} from '@/utils/dates';
 import {validateHabitInput} from '@/validation/validators';
 
@@ -80,6 +81,12 @@ export async function getHabitsWithTodayStatus(userId) {
         ORDER BY h.createdAt`,
         [today, userId, weekdayKey]
     );
+}
+
+// Home list subtitles: {habitId: days sorted Mon..Sun} for every active weekday habit, in one read.
+export async function getActiveHabitDays(userId) {
+    requireUserId(userId);
+    return core.getActiveHabitDays(await getDatabase(), userId);
 }
 
 // User action: full edit. Completion rows are never changed, so past history keeps its old frequency.
