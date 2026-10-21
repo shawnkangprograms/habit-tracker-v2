@@ -1,6 +1,7 @@
 import { Tabs } from 'expo-router';
 import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { StreakTabIcon } from '@/components/streak-tab-icon';
 import { colors, fonts } from '@/constants/theme';
 
 export default function TabLayout() {
@@ -30,6 +31,14 @@ export default function TabLayout() {
         options={{
           title: 'Summary',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="chart.bar.fill" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Profile',
+          // the icon reads the shared stats store itself, so a streak change never re-renders the navigator
+          tabBarIcon: ({ color }) => <StreakTabIcon color={color} />,
         }}
       />
       <Tabs.Screen

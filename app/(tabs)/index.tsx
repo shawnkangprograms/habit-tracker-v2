@@ -9,6 +9,7 @@ import * as Haptics from 'expo-haptics';
 import {getActiveHabitDays, getHabitsWithTodayStatus} from '@/db/habits';// habit reads in SQLite
 import {toggleCompletion} from '@/db/completions';// today's completion toggle
 import {getGamificationStats} from '@/db/gamification';// XP, level and streak, derived from local rows
+import {beginLoad as beginStatsLoad, publish as publishStats} from '@/services/statsStore';// shared with Profile and the tab icon
 import {onRemoteChange} from '@/db/remoteChanges';// data pulled from another device changed local rows
 import {requestSync} from '@/sync/syncEngine';// pull + push now (does nothing while sync is stopped)
 import {getFirebaseAuth} from '@/services/authInit';// to read the signed-in user's id
@@ -142,13 +143,12 @@ export default function HomeScreen() {// default export, becomes the "index" tab
     const request = ++statsRequest.current;
     const startedAt = performance.now();
     const date = getLocalDateString();
-    let snapshot: StatsSnapshot | null = null;
-    try {
-      snapshot = {date, stats: (await getGamificationStats(userId)) as GamificationStats};
-    } catch (err) {
-      console.log('Stats load failed', err);// the card hides; the habit list keeps working
-    }
+    // through the shared store, so Profile can join this load and reuse the result (never rejects)
+    const load = beginStatsLoad(userId, date, () => getGamificationStats(userId) as Promise<GamificationStats>);
+    const loaded = await load.promise;// null if it failed: the card hides; the habit list keeps working
+    const snapshot: StatsSnapshot | null = loaded ? {date, stats: loaded.stats} : null;
     if (request !== statsRequest.current) return null;// stale
+    publishStats(loaded, load.gen);// for Profile and the tab icon; a no-op if nothing changed
     statsSettled.current = request;
     const unchanged = isDeepEqual(statsRef.current, snapshot);// every field, incl. streaks and badges
     if (!unchanged) {

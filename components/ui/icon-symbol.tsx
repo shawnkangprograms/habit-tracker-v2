@@ -22,6 +22,7 @@ const MAPPING = {
   'chart.bar.fill': 'bar-chart',
   'gearshape.fill': 'settings',
   'trash.fill': 'delete',
+  'flame.fill': 'local-fire-department',
 } as IconMapping;
 
 /**

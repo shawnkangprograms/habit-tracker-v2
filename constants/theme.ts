@@ -20,6 +20,18 @@ export const colors = {
   white: '#ffffff', // primary button text
 } as const;
 
+// Streak medal materials (Profile shelf): light/base/dark make the body gradient, dark is also the ribbon.
+// Locked medals use `locked`, with colors.muted for the lock and text.
+export const medalTiers = {
+  bronze: {light: '#e3a774', base: '#c47f45', dark: '#7a4a22'},
+  silver: {light: '#e6e9ee', base: '#b8bcc4', dark: '#6d727c'},
+  gold: {light: '#f7d76a', base: '#e6b422', dark: '#8f6a0c'},
+  emerald: {light: '#6fe0b0', base: '#2bb57f', dark: '#11603f'},
+  ruby: {light: '#f27493', base: '#d1335b', dark: '#7d1430'},
+  blaze: {light: '#ffb062', base: colors.accent, dark: '#9c3a06', glow: colors.accent}, // 100 days: static glow
+  locked: {light: '#4f4840', base: '#3d3832', dark: '#2a2621'},
+} as const;
+
 export const radii = {
   pill: 999, // inputs and buttons
   habitCard: 14,

@@ -17,6 +17,7 @@ import {ThemedText} from '@/components/themed-text';
 import {AdminContext, useAdminCheck} from '@/services/adminContext'; //admins/{uid} check, filled in after first render
 import {useDisabledCheck} from '@/services/useDisabledCheck'; //signs out a disabled account; never blocks startup
 import * as SystemUI from 'expo-system-ui'; //root view background, behind every screen
+import {reset as resetStatsStore} from '@/services/statsStore'; //shared stats for Profile and its tab icon
 
 // Root view background behind every screen: dark, so nothing white shows during Android transitions
 SystemUI.setBackgroundColorAsync(colors.background).catch(() => {});
@@ -79,6 +80,7 @@ export default function RootLayout() {
   useEffect(() => {
     const auth = getFirebaseAuth();
     const unsubscribe = onAuthStateChanged(auth, (user) => {
+      resetStatsStore(user?.uid ?? null); //before any screen renders for this user, so no one sees another account's streak
       setIsLoggedIn(!!user);
       setUid(user?.uid ?? null);
     })

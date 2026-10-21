@@ -5,6 +5,38 @@ import Animated, {ReduceMotion, useAnimatedStyle, useSharedValue, withTiming} fr
 import {ProgressRing} from '@/components/progress-ring';
 import {colors, fonts, radii, spacing} from '@/constants/theme';
 
+// Round level badge; also used on Profile at a larger size
+export function LevelBadge(props: {level: number; size?: number}) {
+  const size = props.size ?? 46;
+  return (
+    <View
+      style={[styles.levelBadge, {width: size, height: size}]}
+      accessibilityLabel={`Level ${props.level}`}>
+      <Text style={[styles.levelNumber, {fontSize: Math.round(size * 0.39)}]}>{props.level}</Text>
+    </View>
+  );
+}
+
+// XP bar toward the next level, animated (jumps under the system reduce-motion setting), with "x / y XP" below
+export function XpBar(props: {progress: number; xpIntoLevel: number; xpForNextLevel: number}) {
+  const barProgress = useSharedValue(props.progress);
+
+  useEffect(() => {
+    barProgress.value = withTiming(props.progress, {duration: 400, reduceMotion: ReduceMotion.System});
+  }, [props.progress, barProgress]);
+
+  const fillStyle = useAnimatedStyle(() => ({width: `${Math.min(1, Math.max(0, barProgress.value)) * 100}%`}));
+
+  return (
+    <>
+      <View style={styles.barTrack}>
+        <Animated.View style={[styles.barFill, fillStyle]} />
+      </View>
+      <Text style={styles.xpText}>{props.xpIntoLevel} / {props.xpForNextLevel} XP</Text>
+    </>
+  );
+}
+
 // Home header: level badge, XP bar toward the next level, current streak, and today's ring.
 export function StatsCard(props: {
   level: number;
@@ -15,22 +47,12 @@ export function StatsCard(props: {
   doneToday: number;
   scheduledToday: number;
 }) {
-  const barProgress = useSharedValue(props.progress);
-
-  useEffect(() => {
-    barProgress.value = withTiming(props.progress, {duration: 400, reduceMotion: ReduceMotion.System});
-  }, [props.progress, barProgress]);
-
-  const fillStyle = useAnimatedStyle(() => ({width: `${Math.min(1, Math.max(0, barProgress.value)) * 100}%`}));
-
   const restDay = props.scheduledToday === 0;
   const streakLabel = `${props.currentStreak} day${props.currentStreak === 1 ? '' : 's'}`;
 
   return (
     <View style={styles.card}>
-      <View style={styles.levelBadge} accessibilityLabel={`Level ${props.level}`}>
-        <Text style={styles.levelNumber}>{props.level}</Text>
-      </View>
+      <LevelBadge level={props.level} />
 
       <View style={styles.middle}>
         <View style={styles.row}>
@@ -40,10 +62,7 @@ export function StatsCard(props: {
             <Text style={styles.streakText}>{streakLabel}</Text>
           </View>
         </View>
-        <View style={styles.barTrack}>
-          <Animated.View style={[styles.barFill, fillStyle]} />
-        </View>
-        <Text style={styles.xpText}>{props.xpIntoLevel} / {props.xpForNextLevel} XP</Text>
+        <XpBar progress={props.progress} xpIntoLevel={props.xpIntoLevel} xpForNextLevel={props.xpForNextLevel} />
       </View>
 
       <View accessibilityLabel={restDay ? 'Rest day' : `${props.doneToday} of ${props.scheduledToday} habits done today`}>
@@ -73,8 +92,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   levelBadge: {
-    width: 46,
-    height: 46,
     borderRadius: radii.pill,
     borderWidth: 2,
     borderColor: colors.accent,
@@ -82,7 +99,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  levelNumber: {fontFamily: fonts.title, fontSize: 18, color: colors.text},
+  levelNumber: {fontFamily: fonts.title, color: colors.text},
   middle: {flex: 1, gap: 5},
   row: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'},
   levelText: {fontFamily: fonts.title, fontSize: 14, color: colors.text},
