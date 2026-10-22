@@ -1,0 +1,146 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn() &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    // ---------- HabitQuest sync helpers (per-user habits and completions) ----------
+
+    function syncIsOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    // updatedAt: client time in ms, positive, at most one day ahead of server time.
+    // serverUpdatedAt: must be the server's own timestamp (serverTimestamp()).
+    function syncTimesOk(d) {
+      return d.updatedAt is int
+        && d.updatedAt > 0
+        && d.updatedAt <= request.time.toMillis() + 86400000
+        && d.serverUpdatedAt == request.time;
+    }
+
+    // Safety net only: the app validators enforce the exact limits (name 30, icon list).
+    // alarm and remindBeforeMin are optional so a phone on an older build keeps syncing.
+    function syncValidHabit(habitId) {
+      let d = request.resource.data;
+      let fields = ['habitName', 'icon', 'frequencyType', 'days', 'reminderTime', 'source',
+                    'createdAt', 'updatedAt', 'serverUpdatedAt', 'deleted'];
+      return habitId.matches('[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')
+        && d.keys().hasOnly(fields.concat(['alarm', 'remindBeforeMin']))
+        && d.keys().hasAll(fields)
+        && d.habitName is string && d.habitName.size() >= 1 && d.habitName.size() <= 60
+        && d.icon is string && d.icon.size() >= 1 && d.icon.size() <= 32
+        && d.frequencyType in ['daily', 'weekdays']
+        && d.days is list
+        && d.days.toSet().hasOnly(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'])
+        && d.days.toSet().size() == d.days.size()
+        && ((d.frequencyType == 'daily' && d.days.size() == 0)
+            || (d.frequencyType == 'weekdays' && d.days.size() >= 1))
+        && (d.reminderTime == null
+            || (d.reminderTime is string && d.reminderTime.matches('([01][0-9]|2[0-3]):[0-5][0-9]')))
+        && d.get('alarm', false) is bool
+        && d.get('remindBeforeMin', 0) is int
+        && d.get('remindBeforeMin', 0) in [0, 5, 10, 15, 30, 60]
+        && d.source in ['user', 'ai_suggested']
+        && d.createdAt is int && d.createdAt > 0
+        && d.deleted is bool
+        && syncTimesOk(d);
+    }
+
+    function syncValidCompletion(completionId) {
+      let d = request.resource.data;
+      let fields = ['habitId', 'date', 'completed', 'updatedAt', 'serverUpdatedAt'];
+      return d.keys().hasOnly(fields) && d.keys().hasAll(fields)
+        && d.habitId is string
+        && d.date is string && d.date.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}')
+        && completionId == d.habitId + '_' + d.date
+        && d.completed is int && d.completed in [0, 1]
+        && syncTimesOk(d);
+    }
+
+    // Admin flag: readable by that user only, writable from the console only.
+    match /admins/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    match /users/{userId} {
+      allow read: if signedIn() && (request.auth.uid == userId || isAdmin());
+
+      allow create: if signedIn() && request.auth.uid == userId
+        && request.resource.data.keys().hasOnly(['firstName', 'lastName', 'age', 'createdAt'])
+        && (!('createdAt' in request.resource.data) || request.resource.data.createdAt == request.time)
+        && request.resource.data.age is number
+        && request.resource.data.age >= 18
+        && request.resource.data.age <= 99;
+
+      allow update: if signedIn() && request.auth.uid == userId
+        && request.resource.data.keys().hasOnly(['firstName', 'lastName', 'age', 'disabled', 'createdAt'])
+        && request.resource.data.get('disabled', false) == resource.data.get('disabled', false)
+        && request.resource.data.get('createdAt', null) == resource.data.get('createdAt', null)
+        && request.resource.data.age is number
+        && request.resource.data.age >= 18
+        && request.resource.data.age <= 99;
+
+      // Admins can change only the disabled flag, and never on themselves.
+      allow update: if isAdmin() && userId != request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['disabled'])
+        && request.resource.data.disabled is bool;
+
+      allow delete: if false;
+    }
+
+    // Synced habits: owner only. Deletes are soft (tombstones), so hard delete is refused.
+    match /users/{uid}/habits/{habitId} {
+      allow read: if syncIsOwner(uid);
+      allow create: if syncIsOwner(uid) && syncValidHabit(habitId);
+      allow update: if syncIsOwner(uid) && syncValidHabit(habitId)
+        && request.resource.data.updatedAt >= resource.data.updatedAt
+        && request.resource.data.createdAt == resource.data.createdAt
+        && !(resource.data.deleted == true && request.resource.data.deleted == false);
+      allow delete: if false;
+    }
+
+    // Synced completions: owner only.
+    match /users/{uid}/completions/{completionId} {
+      allow read: if syncIsOwner(uid);
+      allow create: if syncIsOwner(uid) && syncValidCompletion(completionId);
+      allow update: if syncIsOwner(uid) && syncValidCompletion(completionId)
+        && request.resource.data.updatedAt >= resource.data.updatedAt;
+      allow delete: if false;
+    }
+
+    // Old completions path (kept until sync cleanup, stage 6).
+    match /completions/{userId}/items/{itemId} {
+      allow read, write: if request.auth != null &&
+        request.auth.uid == userId;
+    }
+
+    // Starter-habit catalog: anyone signed in can read; only admins write.
+    match /catalog/{itemId} {
+      allow read: if signedIn();
+      allow create, update: if isAdmin()
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 1
+        && request.resource.data.name.size() <= 30
+        && request.resource.data.icon is string
+        && request.resource.data.frequency is map;
+      allow delete: if isAdmin();
+    }
+
+    // Admin audit log: append-only.
+    match /adminLog/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin() && request.resource.data.adminUid == request.auth.uid;
+      allow update, delete: if false;
+    }
+  }
+}
