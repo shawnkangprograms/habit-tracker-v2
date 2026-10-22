@@ -16,11 +16,3 @@ export function homeEmptyState(input: {
   if (input.loading || input.habitCount > 0) return 'hidden';
   return input.firstPullDone || input.waitOver ? 'empty' : 'checking';
 }
-
-// Active habits from what Home already loads, with no extra read: today's rows contain every daily habit
-// (and the weekday habits due today); the weekday-days map has every active weekday habit.
-// null when the weekday read failed and today's list is empty: the count is unknown then.
-export function activeHabitCount(todayHabitIds: string[], weekdayHabitIds: string[] | null): number | null {
-  if (weekdayHabitIds === null) return todayHabitIds.length > 0 ? todayHabitIds.length : null;
-  return new Set([...todayHabitIds, ...weekdayHabitIds]).size;
-}

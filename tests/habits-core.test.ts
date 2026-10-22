@@ -26,16 +26,24 @@ async function seedHabit(db: TestDb, seed: HabitSeed) {
   for (const day of h.days) await db.runAsync('INSERT INTO habitDays (habitId, day) VALUES (?, ?)', [h.habitId, day]);
 }
 
-describe('getActiveHabitDays', () => {
-  test('weekday habits get their days sorted Mon..Sun; daily habits get no entry', async () => {
+// habitId -> days, from the rows getActiveHabitsWithDays returns
+async function daysById(db: TestDb, userId: string) {
+  const rows = await core.getActiveHabitsWithDays(db, userId);
+  return Object.fromEntries(rows.map((r: {habitId: string; days: string[]}) => [r.habitId, r.days]));
+}
+
+describe('getActiveHabitsWithDays', () => {
+  test('every active habit in one read: weekday days sorted Mon..Sun, daily habits get []', async () => {
     const db = await createTestDatabase();
     await seedHabit(db, {habitId: H1});
     await seedHabit(db, {habitId: H2, frequencyType: 'weekdays', days: ['sun', 'fri', 'mon', 'wed']});
     await seedHabit(db, {habitId: H3, frequencyType: 'weekdays', days: ['sat']});
 
-    const days = await core.getActiveHabitDays(db, ME);
-    assert.deepEqual(days, {[H2]: ['mon', 'wed', 'fri', 'sun'], [H3]: ['sat']});
-    assert.equal(H1 in days, false);
+    assert.deepEqual(await daysById(db, ME), {[H1]: [], [H2]: ['mon', 'wed', 'fri', 'sun'], [H3]: ['sat']});
+    const [first] = await core.getActiveHabitsWithDays(db, ME);
+    assert.deepEqual(first, {
+      habitId: H1, habitName: 'Read', icon: 'book', frequencyType: 'daily', reminderTime: null, createdAt: 1000, days: [],
+    });
   });
 
   test('deleted habits are excluded, as in getHabit (deleted = 0)', async () => {
@@ -43,7 +51,7 @@ describe('getActiveHabitDays', () => {
     await seedHabit(db, {habitId: H1, frequencyType: 'weekdays', days: ['tue'], deleted: true});
     await seedHabit(db, {habitId: H2, frequencyType: 'weekdays', days: ['thu']});
 
-    assert.deepEqual(await core.getActiveHabitDays(db, ME), {[H2]: ['thu']});
+    assert.deepEqual(await daysById(db, ME), {[H2]: ['thu']});
   });
 
   test("other users' habits are not returned", async () => {
@@ -51,15 +59,15 @@ describe('getActiveHabitDays', () => {
     await seedHabit(db, {habitId: H1, frequencyType: 'weekdays', days: ['mon']});
     await seedHabit(db, {habitId: H4, userId: OTHER, frequencyType: 'weekdays', days: ['mon', 'tue']});
 
-    assert.deepEqual(await core.getActiveHabitDays(db, ME), {[H1]: ['mon']});
-    assert.deepEqual(await core.getActiveHabitDays(db, OTHER), {[H4]: ['mon', 'tue']});
+    assert.deepEqual(await daysById(db, ME), {[H1]: ['mon']});
+    assert.deepEqual(await daysById(db, OTHER), {[H4]: ['mon', 'tue']});
   });
 
   test('no habits: an empty result, and the read creates no rows', async () => {
     const db = await createTestDatabase();
-    assert.deepEqual(await core.getActiveHabitDays(db, ME), {});
+    assert.deepEqual(await core.getActiveHabitsWithDays(db, ME), []);
     await seedHabit(db, {habitId: H1, frequencyType: 'weekdays', days: ['mon']});
-    await core.getActiveHabitDays(db, ME);
+    await core.getActiveHabitsWithDays(db, ME);
     const counts = await db.getFirstAsync<{habits: number; days: number; completions: number}>(
       `SELECT (SELECT COUNT(*) FROM habits) AS habits, (SELECT COUNT(*) FROM habitDays) AS days,
         (SELECT COUNT(*) FROM completions) AS completions`,

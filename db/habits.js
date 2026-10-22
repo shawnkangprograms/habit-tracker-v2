@@ -63,7 +63,8 @@ export async function getHabit(userId, habitId) {
     return {...rest, frequency: {type: 'weekdays', days: days.map((d) => d.day)}};
 }
 
-// Home list: active habits scheduled today, with today's completed flag.
+// Home list: active habits scheduled today, with today's completed flag and completedAt, the row's updatedAt
+// (the time of the last user toggle; 0 for a system row), for the time status. No extra read.
 export async function getHabitsWithTodayStatus(userId) {
     requireUserId(userId);
     // Computed once so ensureTodayRows and the SELECT agree, even across midnight.
@@ -74,7 +75,7 @@ export async function getHabitsWithTodayStatus(userId) {
     const db = await getDatabase();
 
     return db.getAllAsync(
-        `SELECT h.habitId, h.habitName, h.icon, h.frequencyType, h.reminderTime, c.completed
+        `SELECT h.habitId, h.habitName, h.icon, h.frequencyType, h.reminderTime, c.completed, c.updatedAt AS completedAt
         FROM habits h
         JOIN completions c ON c.habitId = h.habitId AND c.date = ?
         WHERE h.userId = ? AND h.deleted = 0 AND ${SCHEDULED_ON_DAY_SQL}
@@ -83,10 +84,10 @@ export async function getHabitsWithTodayStatus(userId) {
     );
 }
 
-// Home list subtitles: {habitId: days sorted Mon..Sun} for every active weekday habit, in one read.
-export async function getActiveHabitDays(userId) {
+// Home: every active habit with its weekdays (sorted Mon..Sun), in one read.
+export async function getActiveHabitsWithDays(userId) {
     requireUserId(userId);
-    return core.getActiveHabitDays(await getDatabase(), userId);
+    return core.getActiveHabitsWithDays(await getDatabase(), userId);
 }
 
 // User action: full edit. Completion rows are never changed, so past history keeps its old frequency.

@@ -3,23 +3,24 @@
 
 const DAY_ORDER = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']; // display order, Monday first
 
-// Days of every active weekday habit of this user, as {habitId: days} with days sorted Mon..Sun.
-// Daily and deleted habits get no entry (deleted = 0, as in getHabit). One query for the whole Home list.
-export async function getActiveHabitDays(db, userId) {
+// Every active habit of this user with its weekdays, in ONE query (no row per habit): Home's "Other days"
+// section, the weekday subtitles and the habit count. Days are sorted Mon..Sun here (GROUP_CONCAT order is
+// not defined); daily habits get []. Deleted habits are excluded (deleted = 0, as in getHabit). Creates no rows.
+export async function getActiveHabitsWithDays(db, userId) {
     const rows = await db.getAllAsync(
-        `SELECT d.habitId, d.day FROM habitDays d
-        JOIN habits h ON h.habitId = d.habitId
-        WHERE h.userId = ? AND h.deleted = 0 AND h.frequencyType = 'weekdays'`,
+        `SELECT h.habitId, h.habitName, h.icon, h.frequencyType, h.reminderTime, h.createdAt,
+            GROUP_CONCAT(d.day) AS days
+        FROM habits h
+        LEFT JOIN habitDays d ON d.habitId = h.habitId
+        WHERE h.userId = ? AND h.deleted = 0
+        GROUP BY h.habitId
+        ORDER BY h.createdAt, h.habitId`,
         [userId]
     );
-
-    const byHabit = {};
-    for (const row of rows) {
-        if (!byHabit[row.habitId]) byHabit[row.habitId] = [];
-        byHabit[row.habitId].push(row.day);
-    }
-    for (const days of Object.values(byHabit)) {
-        days.sort((a, b) => DAY_ORDER.indexOf(a) - DAY_ORDER.indexOf(b));
-    }
-    return byHabit;
+    return rows.map(({days, ...habit}) => ({
+        ...habit,
+        days: habit.frequencyType === 'weekdays' && days
+            ? String(days).split(',').sort((a, b) => DAY_ORDER.indexOf(a) - DAY_ORDER.indexOf(b))
+            : [],
+    }));
 }

@@ -3,10 +3,10 @@ import {router, useFocusEffect, useNavigation} from 'expo-router';// navigation 
 import type {NativeStackNavigationProp} from 'expo-router/native-stack';
 import type {ParamListBase} from 'expo-router/react-navigation';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View} from 'react-native';
+import {Alert, AppState, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View} from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import * as Haptics from 'expo-haptics';
-import {getActiveHabitDays, getHabitsWithTodayStatus} from '@/db/habits';// habit reads in SQLite
+import {getActiveHabitsWithDays, getHabitsWithTodayStatus} from '@/db/habits';// habit reads in SQLite
 import {toggleCompletion} from '@/db/completions';// today's completion toggle
 import {getGamificationStats} from '@/db/gamification';// XP, level and streak, derived from local rows
 import {beginLoad as beginStatsLoad, publish as publishStats} from '@/services/statsStore';// shared with Profile and the tab icon
@@ -18,7 +18,7 @@ import {isDeepEqual} from '@/utils/equality';// skip a re-render when a reload r
 import type {GamificationStats} from '@/utils/gamification';
 import {colors, fonts, radii, spacing, ICON_COLORS} from '@/constants/theme';
 import {HabitIcon} from '@/constants/habitIcons';
-import type {IconId, WeekdayKey} from '@/constants/habits';
+import type {IconId} from '@/constants/habits';
 import {StatsCard} from '@/components/stats-card';
 import {HabitCheck} from '@/components/habit-check';
 import {XpFloat} from '@/components/xp-float';
@@ -31,7 +31,11 @@ import {shouldShowSoftPrompt} from '@/utils/notificationPrefs';
 import {notificationsAvailable} from '@/services/notifications';
 import {EmptyHomeCard} from '@/components/empty-home-card';// first-run card when there are no active habits
 import {useFirstPull} from '@/hooks/use-first-pull';
-import {activeHabitCount, homeEmptyState} from '@/utils/homeEmptyState';
+import {homeEmptyState} from '@/utils/homeEmptyState';
+import {
+  fullDayName, scheduleSummary, shortDayName, splitHomeRows, weekdayOfDate, type ActiveHabit,
+} from '@/utils/homeSections';
+import {nextStatusChangeAt, rowTimeStatus, type TimeStatus} from '@/utils/timeStatus';
 
 type Habit = {// one row from getHabitsWithTodayStatus: an active habit scheduled today, with today's status
   habitId: string;
@@ -40,8 +44,12 @@ type Habit = {// one row from getHabitsWithTodayStatus: an active habit schedule
   frequencyType: 'daily' | 'weekdays';
   reminderTime: string | null;
   completed: number;
-  days?: WeekdayKey[];// only for weekday habits; undefined if the lookup failed
+  completedAt: number;// the completion row's updatedAt: last user toggle (ms), 0 for a system row
+  alarm?: number;// 0/1, only once the alarm column exists (Stage B); the bell shows only when it is 1
 };
+
+// What Home shows: today's rows, every active habit (null if that read failed), and the local date they are for
+type HomeList = {date: string; today: Habit[]; all: ActiveHabit[] | null};
 
 // Home asks for a sync on focus at most this often, so switching tabs quickly doesn't hammer Firestore.
 // Starts at load time: sign-in/launch already runs a cycle, so the first focus doesn't add another.
@@ -50,7 +58,7 @@ let lastFocusSyncAt = Date.now();
 
 type StatsSnapshot = {date: string; stats: GamificationStats};// stats plus the local date they were computed for
 type Float = {key: number; amount: number};// one "+N XP" label
-type LoadReason = 'focus' | 'remote' | 'toggle' | 'refresh';// only for the dev timing log
+type LoadReason = 'focus' | 'remote' | 'toggle' | 'refresh' | 'day';// only for the dev timing log
 
 // Dev only: one line per Home load, counts and milliseconds (never habit names)
 // TODO: remove or reduce these timing logs (and the transitionEnd listener below) before the release build
@@ -73,7 +81,11 @@ function tapTime(): number {
   return Date.now();
 }
 
-const DAY_ORDER: WeekdayKey[] = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];// display order, Monday first
+// The clock for the time status: read at mount, by the status timeout and on returning to the foreground
+function clockNow(): number {
+  return Date.now();
+}
+
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'];
@@ -92,23 +104,33 @@ function greeting(): string {
   return 'Good evening';
 }
 
-// "Every day · 07:30", "Mon, Wed, Fri", or "Specific days" if the weekday lookup failed
-function subtitle(habit: Habit): string {
-  let schedule = 'Every day';
-  if (habit.frequencyType === 'weekdays') {
-    schedule = habit.days
-      ? DAY_ORDER.filter((d) => habit.days!.includes(d))
-          .map((d) => d.charAt(0).toUpperCase() + d.slice(1))
-          .join(', ')
-      : 'Specific days';
+// Read aloud after the time; colour is never the only signal
+const STATUS_WORDS: Partial<Record<TimeStatus, string>> = {onTime: 'done on time', overdue: 'overdue'};
+
+// The reminder time of a Today row in its status colour: green with a check (on time), red with "Overdue",
+// otherwise the normal subtitle colour. Never inside the done-row fade, so the green keeps its contrast.
+function TimeText({time, status}: {time: string; status: TimeStatus}) {
+  if (status === 'onTime') {
+    return (
+      <View style={styles.timeRow}>
+        <Text style={[styles.time, styles.onTime]}>{time}</Text>
+        <MaterialCommunityIcons name="check" size={11} color={colors.green} />
+      </View>
+    );
   }
-  return habit.reminderTime ? `${schedule} · ${habit.reminderTime}` : schedule;
+  if (status === 'overdue') return <Text style={[styles.time, styles.overdue]}>{time} Overdue</Text>;
+  return <Text style={styles.time}>{time}</Text>;
+}
+
+function Bell() {
+  return <MaterialCommunityIcons name="bell-ring-outline" size={11} color={colors.muted} />;
 }
 
 export default function HomeScreen() {// default export, becomes the "index" tab per Expo router convention
-  const [habits, setHabits] = useState<Habit[]>([]);// habits: current list in state, starts empty; setHabits: how we update it
+  const [list, setList] = useState<HomeList>({date: getLocalDateString(), today: [], all: null});
+  const [now, setNow] = useState(clockNow);// the clock the time status is computed from (see the status timeout below)
+  const habits = list.today;// today's rows: the toggles, stats and celebrations only ever see these
   const [loaded, setLoaded] = useState(false);// false until the first load finishes, so the empty state doesn't flash
-  const [activeCount, setActiveCount] = useState<number | null>(null);// all active habits; null = unknown
   const firstPull = useFirstPull();
 
   const user = getFirebaseAuth().currentUser;// this screen is only reachable while signed in
@@ -116,39 +138,36 @@ export default function HomeScreen() {// default export, becomes the "index" tab
   const firstName = user?.displayName?.trim().split(/\s+/)[0];// only if auth already has a displayName
 
   const habitsRequest = useRef(0);// id of the newest list load; an older one finishing later is ignored
-  const shownHabits = useRef<Habit[]>([]);// the list currently in state, to skip identical reloads
+  const shownList = useRef<HomeList | null>(null);// the list currently in state, to skip identical reloads
   const focusedAt = useRef(0);// dev timing: when Home last gained focus
 
   // useCallback keeps the same fxn between renders, so the focus effect below doesn't rerun on every render
-  // Resolves to the rows it loaded, or null if there is no user or a newer load replaced it
+  // Resolves to today's rows it loaded, or null if there is no user or a newer load replaced it
   const loadHabits = useCallback(async (reason: LoadReason = 'focus'): Promise<Habit[] | null> => {
       if (!userId) return null;// no signed-in user: nothing to load
       const request = ++habitsRequest.current;
       const startedAt = performance.now();
+      const date = getLocalDateString();
 
-      // Weekday habits need their days for the subtitle: one read for all of them, before setHabits so the list
-      // renders once, complete. If that read fails, the subtitles fall back to "Specific days".
-      const [rows, daysOrNull] = await Promise.all([
+      // Two reads, in parallel, before setList so the screen renders once, complete: today's rows, and every
+      // active habit with its weekdays (Other days, subtitles, the habit count). If the second read fails,
+      // Today still shows, subtitles fall back to "Specific days" and Other days is hidden.
+      const [rows, all] = await Promise.all([
         getHabitsWithTodayStatus(userId) as Promise<Habit[]>,// active habits scheduled today, for this user
-        (getActiveHabitDays(userId) as Promise<Record<string, WeekdayKey[]>>).catch(() => null),
+        (getActiveHabitsWithDays(userId) as Promise<ActiveHabit[]>).catch(() => null),
       ]);
-      const daysByHabit = daysOrNull ?? {};
-      const result = rows.map((habit) => {
-        const days = habit.frequencyType === 'weekdays' ? daysByHabit[habit.habitId] : undefined;
-        return days ? {...habit, days} : habit;
-      });
 
       if (request !== habitsRequest.current) return null;// a newer load started meanwhile (e.g. several pulled pages)
-      const unchanged = isDeepEqual(shownHabits.current, result);
+      const next: HomeList = {date, today: rows, all};
+      const unchanged = isDeepEqual(shownList.current, next);
       if (!unchanged) {
-        shownHabits.current = result;
-        setHabits(result);// store fetched habits in state, triggering a re-render to display them
+        shownList.current = next;
+        setList(next);// store fetched habits in state, triggering a re-render to display them
+        setNow(clockNow());// same render: the status of an edited or added habit uses the current time, not an old tick
       }
-      // all active habits (not just today's), from the same two reads, for the first-run empty state
-      setActiveCount(activeHabitCount(rows.map((h) => h.habitId), daysOrNull ? Object.keys(daysOrNull) : null));
       setLoaded(true);// no re-render once it is already true
-      perfLog(`${reason} habits ${result.length} rows in ${Math.round(performance.now() - startedAt)} ms (${unchanged ? 'unchanged, no render' : 'changed'})`);
-      return result;
+      perfLog(`${reason} habits ${rows.length} today, ${all?.length ?? '?'} active in ${Math.round(performance.now() - startedAt)} ms (${unchanged ? 'unchanged, no render' : 'changed'})`);
+      return rows;
   }, [userId]);
 
   const [stats, setStats] = useState<StatsSnapshot | null>(null);// null = not loaded or failed: the header card is hidden
@@ -223,6 +242,38 @@ export default function HomeScreen() {// default export, becomes the "index" tab
     // (same keys, no remount, loaded stays true), so the list doesn't flicker or lose its scroll position
     return onRemoteChange(reloadForRemote);
   }, [loadHabits, loadStats, reloadForRemote]));
+
+  // Time status clock. `now` is refreshed by a changed load (above), the timeout and a foreground return.
+  // One timeout, to the next due minute end among today's unchecked timed rows or the next local midnight,
+  // whichever is first; recomputed when the list or `now` changes, cleared on unmount. No interval, no loop:
+  // the target is always after the current time, so each firing is one re-render and schedules a later one.
+  // On a new local date (midnight, or back from the background on a later day) the list is reloaded once, so
+  // an open Home never shows yesterday's "Overdue" (a stale date shows no status until that reload lands).
+  const listDateShown = list.date;
+  const tick = useCallback(() => {
+    const t = clockNow();
+    setNow(t);
+    if (getLocalDateString(new Date(t)) !== listDateShown) {
+      loadHabits('day').catch((err: unknown) => console.log('Home reload failed', err));
+      loadStats('day');
+    }
+  }, [listDateShown, loadHabits, loadStats]);
+
+  useEffect(() => {
+    const t = clockNow();
+    const delay = Math.max(0, nextStatusChangeAt(list.today, t, list.date) - t) + 50;// just past the boundary
+    perfLog(`status timer in ${Math.round(delay / 1000)} s`);// dev: one line per scheduled timeout
+    const timer = setTimeout(tick, delay);
+    return () => clearTimeout(timer);
+  }, [list, now, tick]);
+
+  // JS timers pause in the background: recompute when the app comes back to the foreground
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') tick();
+    });
+    return () => sub.remove();
+  }, [tick]);
 
   // Dev timing: when the stack's back animation to the tabs finishes, relative to Home's focus,
   // to see whether the focus loads above overlap the animation
@@ -301,12 +352,16 @@ export default function HomeScreen() {// default export, becomes the "index" tab
   }, [loadHabits, loadStats]);
 
   const doneToday = habits.filter((h) => h.completed === 1).length;// Home lists exactly the habits scheduled today
+  // every active habit; if that read failed, today's rows if any, otherwise unknown (no false empty state)
+  const activeCount = list.all ? list.all.length : (habits.length > 0 ? habits.length : null);
   const emptyState = homeEmptyState({
     habitCount: activeCount ?? 0,
     loading: !loaded || activeCount === null,// unknown count: show nothing rather than a false empty state
     firstPullDone: firstPull.firstPullDone,
     waitOver: firstPull.waitOver,
   });
+  const {other} = splitHomeRows(habits, list.all, weekdayOfDate(list.date));
+  const daysById = new Map((list.all ?? []).map((h) => [h.habitId, h.days]));
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
@@ -356,20 +411,34 @@ export default function HomeScreen() {// default export, becomes the "index" tab
           {habits.map((habit) => {
             const color = ICON_COLORS[habit.icon] ?? colors.accent;
             const done = habit.completed === 1;
+            const schedule = scheduleSummary(habit.frequencyType, daysById.get(habit.habitId));
+            const status = rowTimeStatus(habit, now, list.date);
+            const alarmOn = habit.alarm === 1;
+            const label = [habit.habitName, habit.reminderTime, STATUS_WORDS[status], schedule, alarmOn && 'alarm on']
+              .filter(Boolean).join(', ');
             return (
               // tapping the card opens the Edit form
               <Pressable
                 key={habit.habitId}
                 style={[styles.card, {backgroundColor: `${color}14`, borderColor: `${color}54`}]}
-                onPress={() => router.push({pathname: '/habit-form', params: {habitId: habit.habitId}})}>
+                onPress={() => router.push({pathname: '/habit-form', params: {habitId: habit.habitId}})}
+                accessibilityRole="button"
+                accessibilityLabel={label}
+                accessibilityHint="Opens the edit form">
 
                 <View style={[styles.badge, {backgroundColor: `${color}30`, borderColor: `${color}80`}, done && styles.doneContent]}>
                   <HabitIcon id={habit.icon} size={21} color={color} />
                 </View>
 
-                <View style={[styles.details, done && styles.doneContent]}>
-                  <Text style={styles.name} numberOfLines={1}>{habit.habitName}</Text>
-                  <Text style={styles.subtitle} numberOfLines={1}>{subtitle(habit)}</Text>
+                <View style={styles.details}>
+                  <Text style={[styles.name, done && styles.doneContent]} numberOfLines={1}>{habit.habitName}</Text>
+                  <View style={styles.subtitleRow}>
+                    <Text style={[styles.subtitle, styles.shrink, done && styles.doneContent]} numberOfLines={1}>
+                      {habit.reminderTime ? `${schedule} · ` : schedule}
+                    </Text>
+                    {habit.reminderTime && <TimeText time={habit.reminderTime} status={status} />}
+                    {alarmOn && <Bell />}
+                  </View>
                 </View>
 
                 <HabitCheck
@@ -399,6 +468,49 @@ export default function HomeScreen() {// default export, becomes the "index" tab
           )}
         </View>
 
+        {/* active habits not due today: not completable, no status colours; tapping opens Edit */}
+        {other.length > 0 && (
+          <>
+            <Text style={styles.sectionTitle} accessibilityRole="header">Other days</Text>
+            <View style={styles.list}>
+              {other.map((habit) => {
+                const icon = habit.icon as IconId;
+                const color = ICON_COLORS[icon] ?? colors.accent;
+                const schedule = scheduleSummary(habit.frequencyType, habit.days);
+                const alarmOn = (habit as {alarm?: number}).alarm === 1;// Stage B adds the column
+                const label = [habit.habitName, schedule, habit.reminderTime, `next ${fullDayName(habit.next)}`, alarmOn && 'alarm on']
+                  .filter(Boolean).join(', ');
+                return (
+                  <Pressable
+                    key={habit.habitId}
+                    style={[styles.card, {backgroundColor: `${color}14`, borderColor: `${color}54`}]}
+                    onPress={() => router.push({pathname: '/habit-form', params: {habitId: habit.habitId}})}
+                    accessibilityRole="button"
+                    accessibilityLabel={label}
+                    accessibilityHint="Opens the edit form">
+
+                    <View style={[styles.badge, {backgroundColor: `${color}30`, borderColor: `${color}80`}]}>
+                      <HabitIcon id={icon} size={21} color={color} />
+                    </View>
+
+                    <View style={styles.details}>
+                      <Text style={styles.name} numberOfLines={1}>{habit.habitName}</Text>
+                      <View style={styles.subtitleRow}>
+                        <Text style={[styles.subtitle, styles.shrink]} numberOfLines={1}>
+                          {habit.reminderTime ? `${schedule} · ${habit.reminderTime}` : schedule}
+                        </Text>
+                        {alarmOn && <Bell />}
+                      </View>
+                    </View>
+
+                    <Text style={styles.next}>Next: {shortDayName(habit.next)}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </>
+        )}
+
       </ScrollView>
 
       {/* one at a time: level-up / milestone overlay, perfect-day banner (top) or toast (bottom) */}
@@ -414,6 +526,7 @@ const styles = StyleSheet.create({
   date: {fontFamily: fonts.regular, fontSize: 12, color: colors.muted},
   hello: {fontFamily: fonts.title, fontSize: 26, color: colors.text},
   title: {fontFamily: fonts.title, fontSize: 21, color: colors.text},
+  sectionTitle: {fontFamily: fonts.title, fontSize: 17, color: colors.text, marginTop: spacing.sm},
   empty: {fontFamily: fonts.regular, fontSize: 14, color: colors.muted},
   list: {gap: 7},
   card: {
@@ -435,7 +548,14 @@ const styles = StyleSheet.create({
   },
   details: {flex: 1, gap: 2},
   name: {fontFamily: fonts.title, fontSize: 14, color: colors.text},
+  subtitleRow: {flexDirection: 'row', alignItems: 'center', gap: 3},
   subtitle: {fontFamily: fonts.regular, fontSize: 10, color: colors.muted},
+  shrink: {flexShrink: 1},
+  timeRow: {flexDirection: 'row', alignItems: 'center', gap: 2},
+  time: {fontFamily: fonts.regular, fontSize: 10, color: colors.muted},
+  onTime: {fontFamily: fonts.semiBold, color: colors.green},
+  overdue: {fontFamily: fonts.semiBold, color: colors.error},
+  next: {fontFamily: fonts.semiBold, fontSize: 11, color: colors.muted},
   doneContent: {opacity: 0.55},
   addRow: {
     flexDirection: 'row',
