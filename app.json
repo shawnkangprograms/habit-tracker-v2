@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "habit-tracker-v2",
+    "name": "HabitQuest",
     "slug": "habit-tracker-v2",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -12,11 +12,19 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.shawnkang.habitquest",
+      "versionCode": 1,
+      "allowBackup": false,
+      "permissions": ["SCHEDULE_EXACT_ALARM"],
+      "blockedPermissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ],
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "monochromeImage": "./assets/images/android-icon-monochrome.png",
+        "backgroundColor": "#1a1815"
       },
       "predictiveBackGestureEnabled": false
     },
@@ -43,7 +51,14 @@
       "expo-image",
       "expo-status-bar",
       "expo-web-browser",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#f2691b"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
