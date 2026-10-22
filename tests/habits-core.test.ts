@@ -42,7 +42,7 @@ describe('getActiveHabitsWithDays', () => {
     assert.deepEqual(await daysById(db, ME), {[H1]: [], [H2]: ['mon', 'wed', 'fri', 'sun'], [H3]: ['sat']});
     const [first] = await core.getActiveHabitsWithDays(db, ME);
     assert.deepEqual(first, {
-      habitId: H1, habitName: 'Read', icon: 'book', frequencyType: 'daily', reminderTime: null, createdAt: 1000, days: [],
+      habitId: H1, habitName: 'Read', icon: 'book', frequencyType: 'daily', reminderTime: null, alarm: 0, createdAt: 1000, days: [],
     });
   });
 

@@ -10,6 +10,14 @@ export type NotificationsModule = typeof ExpoNotifications;
 export type PermissionState = 'granted' | 'undetermined' | 'denied' | 'unavailable';
 
 export const REMINDERS_CHANNEL = 'reminders';
+// Habits with "Alarm sound" on. Android channels can't be changed once created, so this is a new id (v1)
+// with its own importance, sound and vibration; a later change to them needs a new id.
+export const ALARM_CHANNEL = 'hq-alarm-v1';
+
+// The Settings test notification. NOT "hq:": the applier cancels every "hq:" id that is not in its plan.
+export const TEST_ID_PREFIX = 'hqtest:';
+export const TEST_NOTIFICATION_ID = `${TEST_ID_PREFIX}notification`;
+export const TEST_DELAY_MS = 10 * 1000;
 
 export function createNotifications(load: () => NotificationsModule, options: {
   isAndroid: boolean;
@@ -21,15 +29,19 @@ export function createNotifications(load: () => NotificationsModule, options: {
     if (!loaded) {
       try {
         const m = load();
-        // Foreground: a silent banner and an entry in the list, no badge. From the SDK 57 types: on Android,
-        // shouldPlaySound false also means no drop-down banner while the app is open (it still goes to the shade).
+        // Foreground: a banner and an entry in the list for every notification, no badge, and a sound only for
+        // alarm notifications (data.alarm, set when scheduling). Flag names from the SDK 57 types
+        // (shouldShowAlert is deprecated). On Android, shouldPlaySound false also means no drop-down banner
+        // while the app is open (it still goes to the shade). A failure or timeout in here is logged, not
+        // silent: iOS then shows nothing while the app is open.
         m.setNotificationHandler({
-          handleNotification: async () => ({
+          handleNotification: async (notification) => ({
             shouldShowBanner: true,
             shouldShowList: true,
-            shouldPlaySound: false,
+            shouldPlaySound: notification?.request?.content?.data?.alarm === true,
             shouldSetBadge: false,
           }),
+          handleError: (id, error) => console.log('Showing a notification while the app is open failed', id, error),
         });
         loaded = {mod: m};
       } catch (err) {
@@ -61,6 +73,31 @@ export function createNotifications(load: () => NotificationsModule, options: {
         });
     }
     return channelReady;
+  }
+
+  let alarmChannelReady: Promise<void> | null = null;
+
+  // Android: the alarm channel (high importance, default sound, vibration), created lazily the first time an
+  // alarm notification is scheduled. Resolves on iOS and when unavailable; a failure is retried next time.
+  function ensureAlarmChannel(): Promise<void> {
+    const m = mod();
+    if (!m || !options.isAndroid) return Promise.resolve();
+    if (!alarmChannelReady) {
+      alarmChannelReady = Promise.resolve()
+        .then(() => m.setNotificationChannelAsync(ALARM_CHANNEL, {
+          name: 'Habit alarms',
+          importance: m.AndroidImportance.HIGH,
+          sound: 'default',
+          enableVibrate: true,
+          vibrationPattern: [0, 400, 250, 400],
+        }))
+        .then(() => {})
+        .catch((err: unknown) => {
+          alarmChannelReady = null;// try again next time
+          console.log('Creating the alarm channel failed', err);
+        });
+    }
+    return alarmChannelReady;
   }
 
   function allowed(m: NotificationsModule, status: ExpoNotifications.NotificationPermissionsStatus): boolean {
@@ -97,8 +134,8 @@ export function createNotifications(load: () => NotificationsModule, options: {
     }
   }
 
-  // The API for services/notificationApplier.ts: one-off DATE triggers on the reminders channel.
-  // When unavailable: nothing is scheduled and nothing is listed.
+  // The API for services/notificationApplier.ts: one-off DATE triggers on the reminders channel, or with a
+  // sound on the alarm channel for alarm notifications. When unavailable: nothing is scheduled or listed.
   const api: NotificationsApi = {
     async getAllScheduled() {
       const m = mod();
@@ -113,6 +150,15 @@ export function createNotifications(load: () => NotificationsModule, options: {
     async schedule(n, fp) {
       const m = mod();
       if (!m) return;
+      if (n.alarm) {
+        await ensureAlarmChannel();
+        await m.scheduleNotificationAsync({
+          identifier: n.id,
+          content: {title: n.title, body: n.body, sound: true, data: {fp, alarm: true}},
+          trigger: {type: m.SchedulableTriggerInputTypes.DATE, date: n.fireAt, channelId: ALARM_CHANNEL},
+        });
+        return;
+      }
       await m.scheduleNotificationAsync({
         identifier: n.id,
         content: {title: n.title, body: n.body, data: {fp}},
@@ -120,6 +166,27 @@ export function createNotifications(load: () => NotificationsModule, options: {
       });
     },
   };
+
+  // Settings: one quiet notification on the reminders channel, TEST_DELAY_MS from now. A pending one is
+  // cancelled first, so tapping again replaces it. Never throws: true if it was scheduled. Permission is the
+  // caller's job (it goes through the usual request flow first).
+  async function sendTestNotification(): Promise<boolean> {
+    const m = mod();
+    if (!m) return false;
+    try {
+      await ensureReminderChannel();
+      await m.cancelScheduledNotificationAsync(TEST_NOTIFICATION_ID).catch(() => {});
+      await m.scheduleNotificationAsync({
+        identifier: TEST_NOTIFICATION_ID,
+        content: {title: 'HabitQuest', body: 'This is what a reminder looks like.', data: {test: true}},
+        trigger: {type: m.SchedulableTriggerInputTypes.DATE, date: Date.now() + TEST_DELAY_MS, channelId: REMINDERS_CHANNEL},
+      });
+      return true;
+    } catch (err) {
+      console.log('Scheduling the test notification failed', err);
+      return false;
+    }
+  }
 
   // Calls `onTap` when the user taps one of our notifications. Returns the unsubscribe; a no-op when unavailable.
   function addTapListener(onTap: () => void): () => void {
@@ -133,5 +200,5 @@ export function createNotifications(load: () => NotificationsModule, options: {
     }
   }
 
-  return {available, ensureReminderChannel, getPermission, requestPermission, api, addTapListener};
+  return {available, ensureReminderChannel, getPermission, requestPermission, api, addTapListener, sendTestNotification};
 }

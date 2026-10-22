@@ -9,7 +9,7 @@ function requireUid(uid) {
     if (typeof uid !== 'string' || uid.length === 0) throw new Error('A user id is required.');
 }
 
-const HABIT_COLUMNS = 'habitId, userId, habitName, icon, frequencyType, reminderTime, source, createdAt, updatedAt, deleted, synced';
+const HABIT_COLUMNS = 'habitId, userId, habitName, icon, frequencyType, reminderTime, alarm, remindBeforeMin, source, createdAt, updatedAt, deleted, synced';
 
 // habits row (+ its habitDays) -> LocalHabit (sync/merge.ts). No userId: it never travels.
 function toLocalHabit(row, days) {
@@ -20,6 +20,8 @@ function toLocalHabit(row, days) {
         frequencyType: row.frequencyType,
         days: row.frequencyType === 'weekdays' ? days : [],
         reminderTime: row.reminderTime,
+        alarm: row.alarm === 1,
+        remindBeforeMin: row.remindBeforeMin,
         source: row.source,
         createdAt: row.createdAt,
         updatedAt: row.updatedAt,
@@ -36,6 +38,8 @@ function pickHabit(h) {
         frequencyType: h.frequencyType,
         days: h.frequencyType === 'weekdays' ? [...h.days] : [],
         reminderTime: h.reminderTime,
+        alarm: h.alarm,
+        remindBeforeMin: h.remindBeforeMin,
         source: h.source,
         createdAt: h.createdAt,
         updatedAt: h.updatedAt,
@@ -120,20 +124,23 @@ async function writeHabit(db, uid, habit, synced) {
     // userId is always the passed uid; the WHERE stops an upsert from ever touching another user's row
     const result = await db.runAsync(
         `INSERT INTO habits (${HABIT_COLUMNS})
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT (habitId) DO UPDATE SET
             habitName = excluded.habitName,
             icon = excluded.icon,
             frequencyType = excluded.frequencyType,
             reminderTime = excluded.reminderTime,
+            alarm = excluded.alarm,
+            remindBeforeMin = excluded.remindBeforeMin,
             source = excluded.source,
             createdAt = excluded.createdAt,
             updatedAt = excluded.updatedAt,
             deleted = excluded.deleted,
             synced = excluded.synced
         WHERE habits.userId = excluded.userId`,
-        [habit.habitId, uid, habit.habitName, habit.icon, habit.frequencyType, habit.reminderTime, habit.source,
-            habit.createdAt, habit.updatedAt, habit.deleted ? 1 : 0, synced]
+        [habit.habitId, uid, habit.habitName, habit.icon, habit.frequencyType, habit.reminderTime,
+            habit.alarm ? 1 : 0, habit.remindBeforeMin, habit.source, habit.createdAt, habit.updatedAt,
+            habit.deleted ? 1 : 0, synced]
     );
     if (result.changes !== 1) throw new Error('Remote habit could not be written'); // rolls the call back
 

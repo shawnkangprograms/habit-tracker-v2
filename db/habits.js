@@ -32,9 +32,11 @@ export async function addHabit(userId, input) {
         await db.withTransactionAsync(async () => {
             await db.runAsync(
                 `INSERT INTO habits
-                    (habitId, userId, habitName, icon, frequencyType, reminderTime, source, createdAt, updatedAt, deleted, synced)
-                VALUES (?, ?, ?, ?, ?, ?, 'user', ?, ?, 0, 0)`,
-                [habitId, userId, habit.habitName, habit.icon, habit.frequency.type, habit.reminderTime, now, now]
+                    (habitId, userId, habitName, icon, frequencyType, reminderTime, alarm, remindBeforeMin,
+                    source, createdAt, updatedAt, deleted, synced)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'user', ?, ?, 0, 0)`,
+                [habitId, userId, habit.habitName, habit.icon, habit.frequency.type, habit.reminderTime,
+                    habit.alarm ? 1 : 0, habit.remindBeforeMin, now, now]
             );
             await insertHabitDays(db, habitId, habit.frequency);
         });
@@ -50,13 +52,14 @@ export async function getHabit(userId, habitId) {
     const db = await getDatabase();
 
     const row = await db.getFirstAsync(
-        `SELECT habitId, habitName, icon, frequencyType, reminderTime, source, createdAt, updatedAt
+        `SELECT habitId, habitName, icon, frequencyType, reminderTime, alarm, remindBeforeMin, source, createdAt, updatedAt
         FROM habits WHERE habitId = ? AND userId = ? AND deleted = 0`,
         [habitId, userId]
     );
     if (!row) return null;
 
-    const {frequencyType, ...rest} = row;
+    const {frequencyType, alarm, ...fields} = row;
+    const rest = {...fields, alarm: alarm === 1};
     if (frequencyType === 'daily') return {...rest, frequency: {type: 'daily'}};
 
     const days = await db.getAllAsync('SELECT day FROM habitDays WHERE habitId = ?', [habitId]);
@@ -75,7 +78,8 @@ export async function getHabitsWithTodayStatus(userId) {
     const db = await getDatabase();
 
     return db.getAllAsync(
-        `SELECT h.habitId, h.habitName, h.icon, h.frequencyType, h.reminderTime, c.completed, c.updatedAt AS completedAt
+        `SELECT h.habitId, h.habitName, h.icon, h.frequencyType, h.reminderTime, h.alarm,
+            c.completed, c.updatedAt AS completedAt
         FROM habits h
         JOIN completions c ON c.habitId = h.habitId AND c.date = ?
         WHERE h.userId = ? AND h.deleted = 0 AND ${SCHEDULED_ON_DAY_SQL}
@@ -100,9 +104,11 @@ export async function updateHabit(userId, habitId, input) {
         await db.withTransactionAsync(async () => {
             const result = await db.runAsync(
                 `UPDATE habits
-                SET habitName = ?, icon = ?, frequencyType = ?, reminderTime = ?, updatedAt = ?, synced = 0
+                SET habitName = ?, icon = ?, frequencyType = ?, reminderTime = ?, alarm = ?, remindBeforeMin = ?,
+                    updatedAt = ?, synced = 0
                 WHERE habitId = ? AND userId = ? AND deleted = 0`,
-                [habit.habitName, habit.icon, habit.frequency.type, habit.reminderTime, Date.now(), habitId, userId]
+                [habit.habitName, habit.icon, habit.frequency.type, habit.reminderTime, habit.alarm ? 1 : 0,
+                    habit.remindBeforeMin, Date.now(), habitId, userId]
             );
             if (result.changes === 0) throw new Error('This habit no longer exists.');
 

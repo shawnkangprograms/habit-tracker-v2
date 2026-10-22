@@ -11,6 +11,10 @@ export const ICON_IDS = [
 ] as const;
 export type IconId = (typeof ICON_IDS)[number];
 
+// How many minutes before the due time the reminder fires (0 = at the time). Same set as the SQLite CHECK.
+export const REMIND_BEFORE_OPTIONS = [0, 5, 10, 15, 30, 60] as const;
+export type RemindBeforeMin = (typeof REMIND_BEFORE_OPTIONS)[number];
+
 export type Frequency =
   | { type: 'daily' }
   | { type: 'weekdays'; days: WeekdayKey[] };

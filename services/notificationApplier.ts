@@ -16,9 +16,12 @@ export type NotificationsApi = {
 
 export type ApplyResult = {scheduled: number; cancelled: number; kept: number; failed: number};
 
-// What identifies a notification's content; a change in any part means cancel and schedule again
+// What identifies a notification's content; a change in any part means cancel and schedule again.
+// The lead and the alarm are only added when set, so a due-time reminder without an alarm keeps the
+// fingerprint it had before they existed (no one-time reschedule of everything after the update). Only an
+// early heads-up has a lead; only a due-time reminder can have the alarm.
 export function fingerprint(n: PlannedNotification): string {
-  return `${n.fireAt}|${n.title}|${n.body}`;
+  return `${n.fireAt}|${n.title}|${n.body}` + (n.leadMin > 0 ? `|lead${n.leadMin}` : '') + (n.alarm ? '|alarm' : '');
 }
 
 export function createApplier(api: NotificationsApi) {

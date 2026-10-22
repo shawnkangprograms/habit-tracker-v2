@@ -21,6 +21,8 @@ const habit = (over: Partial<LocalHabit> = {}): LocalHabit => ({
   frequencyType: 'weekdays',
   days: ['fri', 'mon', 'wed'],
   reminderTime: '07:30',
+  alarm: false,
+  remindBeforeMin: 0,
   source: 'user',
   createdAt: 1000,
   updatedAt: 2000,
@@ -66,8 +68,45 @@ describe('habit docs', () => {
       ['updatedAt as a string', ID, {...good, updatedAt: '2000'}],
       ['deleted as 0/1', ID, {...good, deleted: 0}],
       ['unknown frequency', ID, {...good, frequencyType: 'monthly'}],
+      ['alarm as a string', ID, {...good, alarm: 'true'}],
+      ['alarm as 0/1', ID, {...good, alarm: 1}],
+      ['alarm null', ID, {...good, alarm: null}],
+      ['lead not in the set', ID, {...good, remindBeforeMin: 7}],
+      ['lead as a string', ID, {...good, remindBeforeMin: '15'}],
+      ['lead null', ID, {...good, remindBeforeMin: null}],
     ];
     for (const [label, id, data] of bad) assert.equal(docToHabit(id, data), null, label);
+  });
+
+  test('alarm and lead round trip', () => {
+    const h = habit({days: ['mon', 'wed', 'fri'], alarm: true, remindBeforeMin: 15});
+    const doc = habitToDoc(h);
+    assert.equal(doc.alarm, true);
+    assert.equal(doc.remindBeforeMin, 15);
+    assert.deepEqual(docToHabit(ID, doc), h);
+  });
+
+  test('a doc from an older build (no alarm, no remindBeforeMin) reads as off / 0', () => {
+    const {alarm, remindBeforeMin, ...old} = docOf(habit({alarm: true, remindBeforeMin: 30}));
+    assert.equal(alarm, true);
+    assert.equal(remindBeforeMin, 30);
+    const parsed = docToHabit(ID, old);
+    assert.ok(parsed);
+    assert.equal(parsed.alarm, false);
+    assert.equal(parsed.remindBeforeMin, 0);
+  });
+
+  test('a newer copy that only flips alarm or lead wins and must be written / pushed', () => {
+    const local = habit({updatedAt: 2000});
+    const remote = habit({updatedAt: 3000, alarm: true, remindBeforeMin: 10});
+    const merged = mergeHabit(local, remote);
+    assert.equal(merged.habit.alarm, true);
+    assert.equal(merged.habit.remindBeforeMin, 10);
+    assert.equal(merged.writeLocal, true);
+    assert.equal(merged.needsPush, false);
+    const back = mergeHabit(remote, habit({updatedAt: 2500}));
+    assert.equal(back.writeLocal, false);
+    assert.equal(back.needsPush, true, 'the remote copy is missing the newer alarm');
   });
 });
 

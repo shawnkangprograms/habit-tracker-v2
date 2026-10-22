@@ -11,7 +11,7 @@ const s = await import('../utils/homeSections.ts');
 let created = 0;
 function habit(habitId: string, habitName: string, days: WeekdayKey[] | null): ActiveHabit {
   return {
-    habitId, habitName, icon: 'book', reminderTime: null, createdAt: ++created,
+    habitId, habitName, icon: 'book', reminderTime: null, alarm: 0, createdAt: ++created,
     frequencyType: days ? 'weekdays' : 'daily', days: days ?? [],
   };
 }

@@ -1,7 +1,7 @@
-import {useCallback, useState, type ComponentProps} from 'react';
+import {useCallback, useState} from 'react';
 import {router, useFocusEffect} from 'expo-router';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {AppState, Linking, Pressable, ScrollView, StyleSheet, Switch, Text, View} from 'react-native';
+import {AppState, Linking, Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import {signOut} from '@/services/authActions';
 import {useIsAdmin} from '@/services/adminContext';
@@ -9,41 +9,13 @@ import {getFirebaseAuth} from '@/services/authInit';
 import {setCelebrationsEnabled, useCelebrationsEnabled} from '@/services/celebrationPrefs';
 import {setNotificationPrefs, useNotificationPrefs} from '@/services/notificationPrefs';
 import {
-    getNotificationPermission, notificationsAvailable, requestNotificationPermission, type PermissionState,
+    getNotificationPermission, notificationsAvailable, requestNotificationPermission, sendTestNotification,
+    type PermissionState,
 } from '@/services/notifications';
 import {NUDGE_TIMES} from '@/utils/notificationPrefs';
 import {devSeedEarlyPraise} from '@/db/devSeed';// null outside __DEV__
 import {colors, fonts, radii, spacing} from '@/constants/theme';
-
-type IconName = ComponentProps<typeof MaterialCommunityIcons>['name'];
-
-// One settings row with a switch. The switch sits in a fixed, centred box, so the row lays out the same
-// whatever size the native switch reports.
-function SwitchRow({icon, label, value, onChange, disabled}: {
-    icon: IconName;
-    label: string;
-    value: boolean;
-    onChange: (value: boolean) => void;
-    disabled?: boolean;
-}) {
-    return (
-        <View style={styles.row}>
-            <MaterialCommunityIcons name={icon} size={22} color={colors.accent} />
-            <Text style={styles.rowText}>{label}</Text>
-            <View style={styles.switchBox}>
-                <Switch
-                    value={value}
-                    onValueChange={onChange}
-                    disabled={disabled}
-                    trackColor={{false: colors.border, true: colors.accent}}
-                    thumbColor={colors.white}
-                    ios_backgroundColor={colors.border}
-                    accessibilityLabel={label}
-                />
-            </View>
-        </View>
-    );
-}
+import {SwitchRow} from '@/components/switch-row';
 
 // DEV ONLY: long-press the title to seed early-praise history (logs first, a second long press confirms)
 const devSeed = devSeedEarlyPraise;
@@ -87,6 +59,29 @@ export default function SettingsScreen (){
         }
     };
 
+    // "Send a test notification": asks for permission first if it was never asked (the usual flow); denied
+    // shows the phone-settings notice below. Tapping again replaces the pending one. Never throws.
+    const [testStatus, setTestStatus] = useState<'sent' | 'failed' | null>(null);
+    const [sendingTest, setSendingTest] = useState(false);
+    const sendTest = async () => {
+        if (!available || sendingTest) return;
+        setSendingTest(true);
+        setTestStatus(null);
+        try {
+            let state = await getNotificationPermission();
+            if (state === 'undetermined') {
+                state = (await requestNotificationPermission()) ? 'granted' : await getNotificationPermission();
+            }
+            setPermission(state);
+            if (state !== 'granted') return;// 'denied': the notice with "Open settings" shows
+            setTestStatus((await sendTestNotification()) ? 'sent' : 'failed');
+        } catch {
+            setTestStatus('failed');
+        } finally {
+            setSendingTest(false);
+        }
+    };
+
     return(
         <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
             <ScrollView contentContainerStyle={styles.content}>
@@ -114,12 +109,6 @@ export default function SettingsScreen (){
                   disabled={asking || !available}
                 />
 
-                {!available && (
-                  <View style={styles.notice}>
-                    <Text style={styles.noticeText}>Reminders aren&apos;t available in this version of the app on this phone yet.</Text>
-                  </View>
-                )}
-
                 {available && notificationPrefs.nudgeOn && (
                   <View style={styles.chips} accessibilityRole="radiogroup" accessibilityLabel="Evening nudge time">
                     {NUDGE_TIMES.map((time) => {
@@ -135,6 +124,31 @@ export default function SettingsScreen (){
                         </Pressable>
                       );
                     })}
+                  </View>
+                )}
+
+                <Pressable
+                  style={({pressed}) => [styles.row, !available && styles.disabledRow, pressed && available && styles.pressed]}
+                  onPress={sendTest}
+                  disabled={!available || sendingTest}
+                  accessibilityRole="button"
+                  accessibilityLabel="Send a test notification"
+                  accessibilityHint="Arrives in about 10 seconds"
+                  accessibilityState={{disabled: !available || sendingTest}}>
+                  <MaterialCommunityIcons name="send-outline" size={22} color={colors.accent} />
+                  <Text style={styles.rowText}>Send a test notification</Text>
+                </Pressable>
+                {testStatus && (
+                  <Text style={styles.testLine} accessibilityLiveRegion="polite">
+                    {testStatus === 'sent'
+                      ? 'Sent. It arrives in about 10 seconds. Lock your phone to see it as a lock-screen notification.'
+                      : "Couldn't send the test notification."}
+                  </Text>
+                )}
+
+                {!available && (
+                  <View style={styles.notice}>
+                    <Text style={styles.noticeText}>Reminders aren&apos;t available in this version of the app on this phone yet.</Text>
                   </View>
                 )}
 
@@ -192,7 +206,8 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   rowText: {flex: 1, fontFamily: fonts.semiBold, fontSize: 15, color: colors.text},
-  switchBox: {width: 52, height: 32, alignItems: 'center', justifyContent: 'center'},
+  disabledRow: {opacity: 0.5},
+  testLine: {fontFamily: fonts.regular, fontSize: 12, color: colors.muted, paddingHorizontal: spacing.xs},
   chips: {flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, paddingHorizontal: spacing.xs},
   chip: {height: 34, paddingHorizontal: 14, borderRadius: radii.pill, alignItems: 'center', justifyContent: 'center'},
   chipSelected: {backgroundColor: colors.accent},

@@ -8,7 +8,7 @@ const DAY_ORDER = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']; // display 
 // not defined); daily habits get []. Deleted habits are excluded (deleted = 0, as in getHabit). Creates no rows.
 export async function getActiveHabitsWithDays(db, userId) {
     const rows = await db.getAllAsync(
-        `SELECT h.habitId, h.habitName, h.icon, h.frequencyType, h.reminderTime, h.createdAt,
+        `SELECT h.habitId, h.habitName, h.icon, h.frequencyType, h.reminderTime, h.alarm, h.createdAt,
             GROUP_CONCAT(d.day) AS days
         FROM habits h
         LEFT JOIN habitDays d ON d.habitId = h.habitId

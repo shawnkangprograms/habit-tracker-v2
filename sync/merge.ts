@@ -9,14 +9,16 @@
 // - serverUpdatedAt (serverTimestamp, the pull cursor) is added by the engine, not here.
 
 import {validateHabitInput} from '@/validation/validators';
-import type {IconId, WeekdayKey} from '@/constants/habits';
+import type {IconId, RemindBeforeMin, WeekdayKey} from '@/constants/habits';
 
 export const BATCH_LIMIT = 450; // Firestore allows 500 writes per batch; headroom for safety
 
 // Version of the remote-doc parsing rules (docToHabit / docToCompletion and the validators behind them).
 // Bump it whenever parsing accepts something new (e.g. new icons): the pull cursors then reset and every
 // phone re-reads all docs once, so docs it skipped as invalid before are picked up.
-export const PARSER_VERSION = 1;
+// 2: alarm and remindBeforeMin. A phone on an older build stored pulled docs without them, so every phone
+// re-reads all docs once after updating and picks up their values.
+export const PARSER_VERSION = 2;
 
 const DAY_ORDER: WeekdayKey[] = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']; // stored order in docs
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -33,6 +35,8 @@ export type LocalHabit = {
   frequencyType: 'daily' | 'weekdays';
   days: WeekdayKey[]; // empty for daily
   reminderTime: string | null;
+  alarm: boolean;
+  remindBeforeMin: RemindBeforeMin;
   source: (typeof SOURCES)[number];
   createdAt: number;
   updatedAt: number;
@@ -84,6 +88,8 @@ export function habitToDoc(habit: LocalHabit): HabitDoc {
     frequencyType: habit.frequencyType,
     days: habit.frequencyType === 'weekdays' ? sortDays(habit.days) : [],
     reminderTime: habit.reminderTime,
+    alarm: habit.alarm,
+    remindBeforeMin: habit.remindBeforeMin,
     source: habit.source,
     createdAt: habit.createdAt,
     updatedAt: habit.updatedAt,
@@ -94,6 +100,7 @@ export function habitToDoc(habit: LocalHabit): HabitDoc {
 // A remote habit doc as a LocalHabit, or null if it fails the app's own rules (same validators as the form).
 // The rules are looser on purpose (name up to 60, any icon string), so a doc from a newer app version
 // with an unknown icon is skipped here rather than corrupting local data.
+// alarm / remindBeforeMin may be missing (a doc written by an older build): off / 0. Present but invalid: skipped.
 export function docToHabit(habitId: string, data: unknown): LocalHabit | null {
   if (!isHabitId(habitId) || typeof data !== 'object' || data === null) return null;
   const d = data as Record<string, unknown>;
@@ -104,6 +111,8 @@ export function docToHabit(habitId: string, data: unknown): LocalHabit | null {
     icon: d.icon,
     frequency: d.frequencyType === 'daily' ? {type: 'daily'} : {type: 'weekdays', days: d.days},
     reminderTime: d.reminderTime,
+    alarm: d.alarm,
+    remindBeforeMin: d.remindBeforeMin,
   });
   if (!checked.valid) return null;
   if (d.reminderTime === undefined) return null; // must be present (null = no reminder)
@@ -119,6 +128,8 @@ export function docToHabit(habitId: string, data: unknown): LocalHabit | null {
     frequencyType: frequency.type,
     days: frequency.type === 'weekdays' ? sortDays(frequency.days) : [],
     reminderTime: checked.value.reminderTime,
+    alarm: checked.value.alarm,
+    remindBeforeMin: checked.value.remindBeforeMin,
     source: d.source as LocalHabit['source'],
     createdAt: d.createdAt,
     updatedAt: d.updatedAt,
@@ -133,6 +144,8 @@ function sameHabit(a: LocalHabit, b: LocalHabit): boolean {
     && a.frequencyType === b.frequencyType
     && sortDays(a.days).join(',') === sortDays(b.days).join(',')
     && a.reminderTime === b.reminderTime
+    && a.alarm === b.alarm
+    && a.remindBeforeMin === b.remindBeforeMin
     && a.source === b.source
     && a.createdAt === b.createdAt
     && a.updatedAt === b.updatedAt

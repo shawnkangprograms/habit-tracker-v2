@@ -1,7 +1,18 @@
 // Versioned migrations, tracked with PRAGMA user_version (pattern from the Expo SDK 57 expo-sqlite docs).
 // To change the schema later: append a new `if (version < N)` step. Never edit an earlier step.
+// Each step runs in ONE transaction together with its user_version bump: if any statement fails, SQLite rolls
+// the whole step back (ALTER TABLE and PRAGMA user_version are transactional), the version stays where it
+// was, migrateDbIfNeeded rejects, and getDatabase() never hands out the connection (the app shows its
+// "Couldn't open local data" screen; the next launch retries the same step).
 
-const DATABASE_VERSION = 1;
+export const DATABASE_VERSION = 2;
+
+// v2: per-habit alarm sound and reminder lead time. Existing rows get 0 (alarm off, remind at the time).
+const ADD_ALARM_AND_LEAD_V2 = `
+    ALTER TABLE habits ADD COLUMN alarm INTEGER NOT NULL DEFAULT 0 CHECK (alarm IN (0, 1));
+    ALTER TABLE habits ADD COLUMN remindBeforeMin INTEGER NOT NULL DEFAULT 0
+        CHECK (remindBeforeMin IN (0, 5, 10, 15, 30, 60));
+`;
 
 const CREATE_TABLES_V1 = `
     CREATE TABLE habits (
@@ -50,10 +61,11 @@ async function hasLegacyMarkers(db, existingTables) {
     return false;
 }
 
-export async function migrateDbIfNeeded(db) {
+// `targetVersion` is for tests only (to build an older schema and migrate it); the app always passes nothing.
+export async function migrateDbIfNeeded(db, targetVersion = DATABASE_VERSION) {
     const result = await db.getFirstAsync('PRAGMA user_version');
     const version = result?.user_version ?? 0;
-    if (version >= DATABASE_VERSION) return;
+    if (version >= targetVersion) return;
 
     if (version < 1) {
         await db.withTransactionAsync(async () => {
@@ -78,6 +90,14 @@ export async function migrateDbIfNeeded(db) {
             await db.execAsync(CREATE_TABLES_V1);
             await db.execAsync('PRAGMA user_version = 1');
         });
+    }
+
+    if (version < 2 && targetVersion >= 2) {
+        await db.withTransactionAsync(async () => {
+            await db.execAsync(ADD_ALARM_AND_LEAD_V2);
+            await db.execAsync('PRAGMA user_version = 2');
+        });
+        console.log('Local database migrated to v2 (alarm, remindBeforeMin)');
     }
 
     const after = await db.getFirstAsync('PRAGMA user_version');

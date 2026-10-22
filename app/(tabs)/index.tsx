@@ -45,7 +45,7 @@ type Habit = {// one row from getHabitsWithTodayStatus: an active habit schedule
   reminderTime: string | null;
   completed: number;
   completedAt: number;// the completion row's updatedAt: last user toggle (ms), 0 for a system row
-  alarm?: number;// 0/1, only once the alarm column exists (Stage B); the bell shows only when it is 1
+  alarm: number;// 0/1: the bell shows when it is 1
 };
 
 // What Home shows: today's rows, every active habit (null if that read failed), and the local date they are for
@@ -477,7 +477,7 @@ export default function HomeScreen() {// default export, becomes the "index" tab
                 const icon = habit.icon as IconId;
                 const color = ICON_COLORS[icon] ?? colors.accent;
                 const schedule = scheduleSummary(habit.frequencyType, habit.days);
-                const alarmOn = (habit as {alarm?: number}).alarm === 1;// Stage B adds the column
+                const alarmOn = habit.alarm === 1;
                 const label = [habit.habitName, schedule, habit.reminderTime, `next ${fullDayName(habit.next)}`, alarmOn && 'alarm on']
                   .filter(Boolean).join(', ');
                 return (

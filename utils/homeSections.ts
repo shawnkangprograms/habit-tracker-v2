@@ -18,6 +18,7 @@ export type ActiveHabit = {
   icon: string;
   frequencyType: 'daily' | 'weekdays';
   reminderTime: string | null;
+  alarm: number;// 0/1
   createdAt: number;
   days: WeekdayKey[];
 };

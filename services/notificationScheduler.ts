@@ -67,7 +67,10 @@ async function rebuild(): Promise<void> {
   const doneToday = new Set(rows.filter((r) => r.completedToday).map((r) => r.habitId));
   const planned = buildSchedule(rows, doneToday, prefs, now, streak);
   const result = await applier.apply(planned);
-  devLog(`${planned.length} planned: ${result.scheduled} scheduled, ${result.cancelled} cancelled, ${result.kept} kept` +
+  const count = (kind: string) => planned.filter((n) => n.kind === kind).length;
+  const alarms = planned.filter((n) => n.alarm).length;
+  devLog(`${planned.length} planned (${count('habit')} due, ${count('early')} early, ${alarms} alarm, ${count('nudge')} nudge): ` +
+    `${result.scheduled} scheduled, ${result.cancelled} cancelled, ${result.kept} kept` +
     (result.failed > 0 ? `, ${result.failed} failed` : ''));
 }
 

@@ -2,8 +2,8 @@
 // Each returns { valid: true, value } with the normalised input, or { valid: false, error }
 // with a message written for the user.
 import {
-  ICON_IDS, WEEKDAY_KEYS,
-  type Frequency, type IconId, type WeekdayKey,
+  ICON_IDS, REMIND_BEFORE_OPTIONS, WEEKDAY_KEYS,
+  type Frequency, type IconId, type RemindBeforeMin, type WeekdayKey,
 } from '@/constants/habits';
 
 export type Result<T> = { valid: true; value: T } | { valid: false; error: string };
@@ -60,16 +60,36 @@ export function validateReminderTime(input: unknown): Result<string | null> {
   return ok(input);
 }
 
+// Missing = off (older docs and callers that have no alarm); otherwise a strict boolean, no truthy coercion.
+export function validateAlarm(input: unknown): Result<boolean> {
+  if (input === undefined) return ok(false);
+  if (typeof input !== 'boolean') return fail('Alarm sound must be on or off.');
+  return ok(input);
+}
+
+// Missing = 0 (remind at the time); otherwise one of the fixed options, as a number.
+export function validateRemindBeforeMin(input: unknown): Result<RemindBeforeMin> {
+  if (input === undefined) return ok(0);
+  if (typeof input !== 'number' || !(REMIND_BEFORE_OPTIONS as readonly number[]).includes(input)) {
+    return fail('Please choose when to be reminded.');
+  }
+  return ok(input as RemindBeforeMin);
+}
+
 export type HabitInput = {
   habitName: string;
   icon: IconId;
   frequency: Frequency;
   reminderTime: string | null;
+  alarm: boolean;
+  remindBeforeMin: RemindBeforeMin;
 };
 
-// Runs the four habit validators; returns the first error, or all normalised fields.
+// Runs the habit validators; returns the first error, or all normalised fields.
+// alarm and remindBeforeMin are stored as given, also without a reminder time (they then have no effect).
 export function validateHabitInput(input: {
   habitName?: unknown; icon?: unknown; frequency?: unknown; reminderTime?: unknown;
+  alarm?: unknown; remindBeforeMin?: unknown;
 }): Result<HabitInput> {
   const name = validateHabitName(input.habitName);
   if (!name.valid) return name;
@@ -79,11 +99,17 @@ export function validateHabitInput(input: {
   if (!frequency.valid) return frequency;
   const reminderTime = validateReminderTime(input.reminderTime);
   if (!reminderTime.valid) return reminderTime;
+  const alarm = validateAlarm(input.alarm);
+  if (!alarm.valid) return alarm;
+  const remindBeforeMin = validateRemindBeforeMin(input.remindBeforeMin);
+  if (!remindBeforeMin.valid) return remindBeforeMin;
   return ok({
     habitName: name.value,
     icon: icon.value,
     frequency: frequency.value,
     reminderTime: reminderTime.value,
+    alarm: alarm.value,
+    remindBeforeMin: remindBeforeMin.value,
   });
 }
 

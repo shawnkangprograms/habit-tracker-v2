@@ -53,8 +53,8 @@ const completionRow = (db: TestDb, habitId: string, date: string) =>
   db.getFirstAsync<CompletionRow>('SELECT * FROM completions WHERE habitId = ? AND date = ?', [habitId, date]);
 
 const remote = (over: Partial<LocalHabit> & {habitId: string}): LocalHabit => ({
-  habitName: 'Read', icon: 'book', frequencyType: 'daily', days: [], reminderTime: null, source: 'user',
-  createdAt: 1000, updatedAt: 2000, deleted: false, ...over,
+  habitName: 'Read', icon: 'book', frequencyType: 'daily', days: [], reminderTime: null, alarm: false,
+  remindBeforeMin: 0, source: 'user', createdAt: 1000, updatedAt: 2000, deleted: false, ...over,
 });
 
 describe('push side', () => {
@@ -122,6 +122,24 @@ describe('applyRemoteHabits', () => {
     assert.equal(row?.habitName, 'Mine');
     assert.equal(row?.synced, 0); // still needs pushing
     assert.equal(summary.written, 0);
+  });
+
+  test('alarm and lead round trip: pulled into SQLite, then read back for a push unchanged', async () => {
+    const db = await createTestDatabase();
+    await core.applyRemoteHabits(db, ME, [remote({habitId: H1, reminderTime: '07:30', alarm: true, remindBeforeMin: 30})]);
+    assert.deepEqual(
+      await db.getFirstAsync('SELECT alarm, remindBeforeMin, synced FROM habits WHERE habitId = ?', [H1]),
+      {alarm: 1, remindBeforeMin: 30, synced: 1},
+    );
+    await db.runAsync('UPDATE habits SET synced = 0 WHERE habitId = ?', [H1]);
+    const [dirty] = await core.getDirtyHabits(db, ME);
+    assert.equal(dirty.alarm, true);
+    assert.equal(dirty.remindBeforeMin, 30);
+
+    // a newer remote that turns them off again
+    await core.applyRemoteHabits(db, ME, [remote({habitId: H1, reminderTime: '07:30', updatedAt: 3000})]);
+    assert.deepEqual(await db.getFirstAsync('SELECT alarm, remindBeforeMin FROM habits WHERE habitId = ?', [H1]),
+      {alarm: 0, remindBeforeMin: 0});
   });
 
   test('a newer remote updates the row and replaces habitDays', async () => {

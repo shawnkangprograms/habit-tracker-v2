@@ -39,6 +39,8 @@ async function writeHabits(uid, items) {
             frequencyType: d.frequencyType,
             days: d.days,
             reminderTime: d.reminderTime,
+            alarm: d.alarm, // bool; the rules accept a doc without it (older builds)
+            remindBeforeMin: d.remindBeforeMin, // int in [0, 5, 10, 15, 30, 60]
             source: d.source,
             createdAt: d.createdAt,
             updatedAt: d.updatedAt,

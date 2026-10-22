@@ -8,7 +8,7 @@ export async function getScheduleHabits(userId, today) {
     requireUserId(userId);
     const db = await getDatabase();
     const rows = await db.getAllAsync(
-        `SELECT h.habitId, h.habitName, h.frequencyType, h.reminderTime,
+        `SELECT h.habitId, h.habitName, h.frequencyType, h.reminderTime, h.alarm, h.remindBeforeMin,
             MAX(COALESCE(c.completed, 0)) AS completedToday,
             GROUP_CONCAT(d.day) AS days
         FROM habits h
@@ -24,6 +24,8 @@ export async function getScheduleHabits(userId, today) {
         frequencyType: r.frequencyType,
         days: r.frequencyType === 'weekdays' && r.days ? String(r.days).split(',') : [],
         reminderTime: r.reminderTime,
+        alarm: r.alarm === 1,
+        remindBeforeMin: r.remindBeforeMin,
         completedToday: r.completedToday === 1,
     }));
 }

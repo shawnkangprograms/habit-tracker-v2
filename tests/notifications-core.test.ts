@@ -6,17 +6,21 @@ import './helpers/alias.ts'; // must come before the dynamic imports below
 import type {NotificationsModule} from '../services/notificationsCore.ts';
 import type {PlannedNotification} from '../utils/notificationSchedule.ts';
 
-const {createNotifications, REMINDERS_CHANNEL} = await import('../services/notificationsCore.ts');
+const {
+  createNotifications, REMINDERS_CHANNEL, ALARM_CHANNEL, TEST_NOTIFICATION_ID, TEST_DELAY_MS,
+} = await import('../services/notificationsCore.ts');
 const {createApplier} = await import('../services/notificationApplier.ts');
 
-const planned: PlannedNotification = {id: 'hq:habit:a:2026-10-21', fireAt: 1_000, title: 'Read', body: 'Ready when you are.', kind: 'habit'};
+const planned: PlannedNotification = {
+  id: 'hq:habit:a:2026-10-21', fireAt: 1_000, title: 'Read', body: 'Ready when you are.', kind: 'habit', alarm: false, leadMin: 0,
+};
 
 // A stand-in for expo-notifications with just what notificationsCore uses; records the calls
 function fakeModule(permission: {granted: boolean; status: string; canAskAgain: boolean; ios?: {status: number}}, afterRequest = permission) {
   const calls: Record<string, unknown[][]> = {};
   const record = (name: string, ...args: unknown[]) => { (calls[name] ??= []).push(args); };
   const mod = {
-    AndroidImportance: {DEFAULT: 5},
+    AndroidImportance: {DEFAULT: 5, HIGH: 4},
     IosAuthorizationStatus: {PROVISIONAL: 3},
     SchedulableTriggerInputTypes: {DATE: 'date'},
     setNotificationHandler: (h: unknown) => record('setNotificationHandler', h),
@@ -75,9 +79,71 @@ describe('notifications: module present', () => {
     assert.equal(n.available(), true);
     n.available();
     assert.equal(calls.setNotificationHandler.length, 1);
-    const handler = calls.setNotificationHandler[0][0] as {handleNotification: () => Promise<unknown>};
-    assert.deepEqual(await handler.handleNotification(),
+    const handler = calls.setNotificationHandler[0][0] as {handleNotification: (n: unknown) => Promise<unknown>};
+    const withData = (data: Record<string, unknown>) => ({request: {content: {data}}});
+    assert.deepEqual(await handler.handleNotification(withData({fp: 'x'})),
       {shouldShowBanner: true, shouldShowList: true, shouldPlaySound: false, shouldSetBadge: false});
+    // only alarm notifications play a sound while the app is open; banner and list for every one
+    assert.deepEqual(await handler.handleNotification(withData({fp: 'x', alarm: true})),
+      {shouldShowBanner: true, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: false});
+    assert.deepEqual(await handler.handleNotification(withData({test: true})),
+      {shouldShowBanner: true, shouldShowList: true, shouldPlaySound: false, shouldSetBadge: false});
+    // an unexpected shape never throws (a throw would mean nothing shows while the app is open)
+    assert.deepEqual(await handler.handleNotification(undefined),
+      {shouldShowBanner: true, shouldShowList: true, shouldPlaySound: false, shouldSetBadge: false});
+  });
+
+  test('test notification: one quiet notification on the reminders channel, 10 s ahead; again replaces it', async () => {
+    const {mod, calls} = fakeModule({granted: true, status: 'granted', canAskAgain: true});
+    const n = createNotifications(() => mod, {isAndroid: true});
+    const before = Date.now();
+    assert.equal(await n.sendTestNotification(), true);
+    assert.equal(await n.sendTestNotification(), true);
+    assert.deepEqual(calls.cancel, [[TEST_NOTIFICATION_ID], [TEST_NOTIFICATION_ID]], 'a pending one is cancelled first');
+    assert.equal(calls.schedule.length, 2);
+    const req = calls.schedule[1][0] as {identifier: string; content: Record<string, unknown>; trigger: {date: number; channelId: string}};
+    assert.equal(req.identifier, 'hqtest:notification');
+    assert.deepEqual(req.content, {title: 'HabitQuest', body: 'This is what a reminder looks like.', data: {test: true}});
+    assert.equal(req.trigger.channelId, REMINDERS_CHANNEL);
+    assert.ok(req.trigger.date >= before + TEST_DELAY_MS && req.trigger.date <= Date.now() + TEST_DELAY_MS);
+  });
+
+  test('test notification never throws: unavailable or a native failure gives false', async () => {
+    const missing = createNotifications(() => { throw new Error('missing'); }, {isAndroid: true});
+    assert.equal(await missing.sendTestNotification(), false);
+    const {mod} = fakeModule({granted: true, status: 'granted', canAskAgain: true});
+    const failing = {...mod, scheduleNotificationAsync: async () => { throw new Error('native'); }} as unknown as NotificationsModule;
+    const original = console.log;
+    console.log = () => {};
+    try {
+      assert.equal(await createNotifications(() => failing, {isAndroid: false}).sendTestNotification(), false);
+    } finally {
+      console.log = original;
+    }
+  });
+
+  test('alarm: scheduled with a sound on the alarm channel, created once (Android), never the reminders channel', async () => {
+    const {mod, calls} = fakeModule({granted: true, status: 'granted', canAskAgain: true});
+    const n = createNotifications(() => mod, {isAndroid: true});
+    const alarm = {...planned, alarm: true};
+    await n.api.schedule(alarm, 'fp-a');
+    await n.api.schedule({...alarm, id: 'hq:habit:b:2026-10-21'}, 'fp-b');
+    assert.equal(calls.setNotificationChannelAsync.length, 1);
+    assert.deepEqual(calls.setNotificationChannelAsync[0], [ALARM_CHANNEL, {
+      name: 'Habit alarms', importance: 4, sound: 'default', enableVibrate: true, vibrationPattern: [0, 400, 250, 400],
+    }]);
+    assert.deepEqual(calls.schedule[0][0], {
+      identifier: planned.id,
+      content: {title: 'Read', body: 'Ready when you are.', sound: true, data: {fp: 'fp-a', alarm: true}},
+      trigger: {type: 'date', date: 1_000, channelId: ALARM_CHANNEL},
+    });
+  });
+
+  test('alarm on iOS: sound, no channel call', async () => {
+    const {mod, calls} = fakeModule({granted: true, status: 'granted', canAskAgain: true});
+    await createNotifications(() => mod, {isAndroid: false}).api.schedule({...planned, alarm: true}, 'fp');
+    assert.equal(calls.setNotificationChannelAsync, undefined);
+    assert.equal((calls.schedule[0][0] as {content: {sound: boolean}}).content.sound, true);
   });
 
   test('permission states: granted, provisional (iOS), undetermined, denied', async () => {

@@ -46,6 +46,11 @@ export function requestNotificationPermission(): Promise<boolean> {
 
 export const nativeNotificationsApi: NotificationsApi = notifications.api;
 
+// Settings' "Send a test notification": never throws, true if scheduled
+export function sendTestNotification(): Promise<boolean> {
+  return notifications.sendTestNotification();
+}
+
 // Tapping any notification opens the app on Home (the app also starts on Home after a cold start).
 // Does nothing when notifications are unavailable.
 export function useNotificationTapOpensHome(): void {

@@ -13,7 +13,8 @@ export type TestDb = {
   withTransactionAsync(task: () => Promise<void>): Promise<void>;
 };
 
-export async function createTestDatabase(): Promise<TestDb> {
+// `version`: migrate only up to this schema version (to test a later migration on an older database)
+export async function createTestDatabase(options: {version?: number} = {}): Promise<TestDb> {
   const raw = new DatabaseSync(':memory:');
   const db: TestDb = {
     raw,
@@ -47,6 +48,6 @@ export async function createTestDatabase(): Promise<TestDb> {
   // same order as db/database.js: foreign keys on (outside a transaction), then the migration
   raw.exec('PRAGMA foreign_keys = ON');
   const {migrateDbIfNeeded} = await import('../../db/schema.js');
-  await migrateDbIfNeeded(db);
+  await migrateDbIfNeeded(db, options.version);
   return db;
 }
