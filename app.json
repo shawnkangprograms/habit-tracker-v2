@@ -15,7 +15,9 @@
       "package": "com.shawnkang.habitquest",
       "versionCode": 1,
       "allowBackup": false,
-      "permissions": ["SCHEDULE_EXACT_ALARM"],
+      "permissions": [
+        "SCHEDULE_EXACT_ALARM"
+      ],
       "blockedPermissions": [
         "android.permission.SYSTEM_ALERT_WINDOW",
         "android.permission.READ_EXTERNAL_STORAGE",
@@ -63,6 +65,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "7d7dd08d-f5b3-4324-96b2-d40dfd71e2f3"
+      }
+    },
+    "owner": "shawnjoroge"
   }
 }
