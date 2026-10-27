@@ -10,8 +10,10 @@ import {
   ensureReminderChannel, getNotificationPermission, nativeNotificationsApi, notificationsAvailable,
 } from '@/services/notifications';
 import {createApplier} from '@/services/notificationApplier';
+import {decideRebuild, stillCurrent, type SchedulerAuth} from '@/services/notificationGate';
 import {buildSchedule, type ScheduleHabit} from '@/utils/notificationSchedule';
 import {getLocalDateString} from '@/utils/dates';
+import {mark} from '@/utils/startupTrace';
 
 // Keeps the scheduled local notifications in line with the user's habits. Rebuilds (debounced, so never on
 // the tap path, and never inside a queued write) after: app start, coming back to the foreground (also picks
@@ -37,26 +39,32 @@ function devLog(message: string) {
   if (__DEV__) console.log(`Notifications: ${message}`);
 }
 
+// Who the schedule is for, from auth callbacks only (see services/notificationGate.ts)
+let auth: SchedulerAuth = {kind: 'unknown'};
+
 // Signing out removes every reminder at once, so nobody gets another account's habits (registered once, when
-// this module is first imported, and kept for the app's lifetime). Nothing to remove when unavailable.
+// this module is first imported, and kept for the app's lifetime). The cancel goes through runRebuild, so it
+// runs after any rebuild already in progress and is never overtaken by it. Nothing to remove when unavailable.
 onAuthStateChanged(getFirebaseAuth(), (user) => {
-  if (!user && notificationsAvailable()) applier.apply([]).catch(() => {});
+  auth = user ? {kind: 'signedIn', uid: user.uid} : {kind: 'signedOut'};
+  if (!user && notificationsAvailable()) runRebuild();
 });
 
 async function rebuild(): Promise<void> {
   if (!notificationsAvailable()) return;// no module in this app binary: no reads, no native calls
-  const uid = getFirebaseAuth().currentUser?.uid;
-  if (!uid) {
-    await applier.apply([]);
+  const startedWith = auth;
+  const prefs = startedWith.kind === 'signedIn' ? await loadNotificationPrefs() : null;
+  const permission = prefs && (prefs.remindersOn || prefs.nudgeOn) ? await getNotificationPermission() : null;
+  const decision = decideRebuild({auth: startedWith, prefs, permission});
+  if (decision === 'skip') return;
+  if (decision === 'cancelAll') {
+    if (startedWith.kind === 'signedIn' && !stillCurrent(startedWith.uid, auth)) return;// a sign-out queues its own run
+    const result = await applier.apply([]);// signed out, or both off: cancel ours, no database read
+    if (result.cancelled > 0) devLog(`${startedWith.kind === 'signedOut' ? 'signed out' : 'all off'}, cancelled ${result.cancelled}`);
     return;
   }
-  const prefs = await loadNotificationPrefs();
-  if (!prefs.remindersOn && !prefs.nudgeOn) {
-    const result = await applier.apply([]);// both off: cancel ours, no database read
-    if (result.cancelled > 0) devLog(`all off, cancelled ${result.cancelled}`);
-    return;
-  }
-  if ((await getNotificationPermission()) !== 'granted') return;// Settings explains and links to the phone settings
+  if (startedWith.kind !== 'signedIn' || !prefs) return;// narrows the types; decideRebuild already checked
+  const uid = startedWith.uid;
   await ensureReminderChannel();
 
   const now = new Date();
@@ -66,6 +74,10 @@ async function rebuild(): Promise<void> {
   const streak = entry && entry.userId === uid && entry.date === today ? entry.stats.currentStreak : null;
   const doneToday = new Set(rows.filter((r) => r.completedToday).map((r) => r.habitId));
   const planned = buildSchedule(rows, doneToday, prefs, now, streak);
+  if (!stillCurrent(uid, auth)) {
+    devLog('the user changed during the rebuild, skipped');
+    return;
+  }
   const result = await applier.apply(planned);
   const count = (kind: string) => planned.filter((n) => n.kind === kind).length;
   const alarms = planned.filter((n) => n.alarm).length;
@@ -92,6 +104,7 @@ async function runRebuild(): Promise<void> {
     } while (again);
   } finally {
     running = false;
+    if (stopListeners) mark('notif:firstRebuildEnd');// not a signed-out launch's cancel
   }
 }
 
@@ -109,6 +122,7 @@ export function requestScheduleRebuild(): void {
 export function startNotificationScheduler(): () => void {
   if (!notificationsAvailable()) return () => {};
   if (stopListeners) return stopListeners;
+  mark('notif:schedulerStart');
   const subscriptions = [
     onLocalChange(requestScheduleRebuild),
     onRemoteChange(requestScheduleRebuild),

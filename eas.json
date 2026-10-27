@@ -6,6 +6,9 @@
   "build": {
     "preview": {
       "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_STARTUP_TRACE": "1"
+      },
       "android": {
         "buildType": "apk"
       }

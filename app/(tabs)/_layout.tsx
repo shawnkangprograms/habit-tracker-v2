@@ -1,16 +1,34 @@
 import { useEffect } from 'react';
 import { Tabs } from 'expo-router';
 import { startNotificationScheduler } from '@/services/notificationScheduler';
-import { useNotificationTapOpensHome } from '@/services/notifications';
+import { addTapOpensHomeListener } from '@/services/notifications';
+import { homeUsable, startAfter } from '@/services/startupSignals';
 import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { StreakTabIcon } from '@/components/streak-tab-icon';
 import { colors, fonts } from '@/constants/theme';
+import { mark } from '@/utils/startupTrace';
+
+mark('layout:tabsEvaluated');
+
+// Notifications start after Home's first load, so loading expo-notifications and the first schedule rebuild
+// never compete with it (the fallback covers a Home that never becomes usable)
+const NOTIFICATIONS_AFTER_HOME_MS = 3 * 1000;
+const NOTIFICATIONS_FALLBACK_MS = 8 * 1000;
 
 export default function TabLayout() {
-  // Local notifications for the signed-in user: keep the schedule current, and open Home on a tap
-  useEffect(() => startNotificationScheduler(), []);
-  useNotificationTapOpensHome();
+  useEffect(() => mark('tabs:mount'), []);
+
+  // Local notifications for the signed-in user: keep the schedule current, and open Home on a tap.
+  // Unmounting (sign-out) cancels a start that is still pending.
+  useEffect(() => startAfter(homeUsable, () => {
+    const stopScheduler = startNotificationScheduler();
+    const removeTapListener = addTapOpensHomeListener();
+    return () => {
+      stopScheduler();
+      removeTapListener();
+    };
+  }, {afterMs: NOTIFICATIONS_AFTER_HOME_MS, fallbackMs: NOTIFICATIONS_FALLBACK_MS}), []);
 
   return (
     <Tabs

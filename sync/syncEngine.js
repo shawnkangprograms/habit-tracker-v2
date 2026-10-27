@@ -5,6 +5,7 @@ import {firestoreRemote} from '@/sync/firestoreRemote';
 import * as store from '@/db/sync';
 import {emitRemoteChange} from '@/db/remoteChanges';
 import {getFirebaseAuth} from '@/services/authInit';
+import {mark, TRACE_ON} from '@/utils/startupTrace';
 
 // The app's sync engine: the engine core (sync/engineCore.ts) on the real SQLite store (db/sync.js),
 // Firestore (sync/firestoreRemote.js), pull cursors in AsyncStorage (per uid, kept across sign-outs)
@@ -32,6 +33,15 @@ if (__DEV__) {
                 `rejected ${s.rejectedCount}, error ${s.lastErrorKind ?? 'none'}, restored ${s.initialPullDone}`
             );
         }
+        previous = s.state;
+    });
+}
+
+// Startup trace (preview build only): when the first cycle ends, whatever its result
+if (TRACE_ON) {
+    let previous = engine.getStatus().state;
+    engine.subscribe((s) => {
+        if (previous === 'syncing' && s.state !== 'syncing') mark('sync:firstCycleEnd');
         previous = s.state;
     });
 }

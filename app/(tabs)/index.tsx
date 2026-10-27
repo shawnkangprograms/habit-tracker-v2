@@ -36,6 +36,8 @@ import {
   fullDayName, scheduleSummary, shortDayName, splitHomeRows, weekdayOfDate, type ActiveHabit,
 } from '@/utils/homeSections';
 import {nextStatusChangeAt, rowTimeStatus, type TimeStatus} from '@/utils/timeStatus';
+import {mark} from '@/utils/startupTrace';// startup trace (preview build only)
+import {homeUsable} from '@/services/startupSignals';// deferred startup work waits for Home's first list
 
 type Habit = {// one row from getHabitsWithTodayStatus: an active habit scheduled today, with today's status
   habitId: string;
@@ -137,6 +139,20 @@ export default function HomeScreen() {// default export, becomes the "index" tab
   const userId = user?.uid;
   const firstName = user?.displayName?.trim().split(/\s+/)[0];// only if auth already has a displayName
 
+  useEffect(() => mark('home:mount'), []);
+
+  // Home is "usable" on the frame after the first commit with the list loaded. Fires once per app run;
+  // a remount (another account) finds it already fired.
+  useEffect(() => {
+    if (!loaded) return;
+    mark('home:listCommitted');
+    const frame = requestAnimationFrame(() => {
+      mark('home:usable');
+      homeUsable.fire();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [loaded]);
+
   const habitsRequest = useRef(0);// id of the newest list load; an older one finishing later is ignored
   const shownList = useRef<HomeList | null>(null);// the list currently in state, to skip identical reloads
   const focusedAt = useRef(0);// dev timing: when Home last gained focus
@@ -196,6 +212,7 @@ export default function HomeScreen() {// default export, becomes the "index" tab
     const snapshot: StatsSnapshot | null = loaded ? {date, stats: loaded.stats} : null;
     if (request !== statsRequest.current) return null;// stale
     const published = publishStats(loaded, load);// for Profile and the tab icon; a no-op if nothing changed
+    if (loaded) mark('stats:published');
     statsSettled.current = request;
     const unchanged = isDeepEqual(statsRef.current, snapshot);// every field, incl. streaks and badges
     if (!unchanged) {

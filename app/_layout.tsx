@@ -1,3 +1,4 @@
+import {mark} from '@/utils/startupTrace'; // FIRST import: its evaluation is the trace's "first import" mark (preview build only)
 import {useState, useEffect} from 'react'; // hooks for state management and lifecycle side effects (listeners, timers)
 import {AppState} from 'react-native'; //AppState lets us detect when the app enters active/background/inactive state
 
@@ -18,6 +19,10 @@ import {AdminContext, useAdminCheck} from '@/services/adminContext'; //admins/{u
 import {useDisabledCheck} from '@/services/useDisabledCheck'; //signs out a disabled account; never blocks startup
 import * as SystemUI from 'expo-system-ui'; //root view background, behind every screen
 import {reset as resetStatsStore} from '@/services/statsStore'; //shared stats for Profile and its tab icon
+import {startTraceCapture} from '@/services/startupTraceStore'; //saves the startup trace (preview build only)
+
+mark('layout:rootEvaluated'); // every import above has been evaluated
+startTraceCapture(); // a no-op unless EXPO_PUBLIC_STARTUP_TRACE=1
 
 // Root view background behind every screen: dark, so nothing white shows during Android transitions
 SystemUI.setBackgroundColorAsync(colors.background).catch(() => {});
@@ -65,8 +70,12 @@ export default function RootLayout() {
   const [dbError, setDbError] = useState(false);
 
   useEffect(() => { //open the db and run migrations before any screen can query it
+    mark('root:firstCommit');
     getDatabase()
-      .then(() => setDbReady(true))
+      .then(() => {
+        mark('db:ready');
+        setDbReady(true);
+      })
       .catch((err: unknown) => {
         console.log('Local database setup failed', err);
         setDbError(true);
@@ -78,8 +87,18 @@ export default function RootLayout() {
   }, [fontError]);
 
   useEffect(() => {
+    if (fontsReady) mark('fonts:ready');
+  }, [fontsReady]);
+
+  const gateOpen = isLoggedIn !== null && dbReady && fontsReady; //same condition as the early return below
+  useEffect(() => {
+    if (gateOpen) mark('gate:open');
+  }, [gateOpen]);
+
+  useEffect(() => {
     const auth = getFirebaseAuth();
     const unsubscribe = onAuthStateChanged(auth, (user) => {
+      mark('auth:firstCallback'); //first call only (later ones are no-ops)
       resetStatsStore(user?.uid ?? null); //before any screen renders for this user, so no one sees another account's streak
       setIsLoggedIn(!!user);
       setUid(user?.uid ?? null);

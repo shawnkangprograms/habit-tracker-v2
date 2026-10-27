@@ -1,5 +1,6 @@
 import {useCallback, useState} from 'react';
 import {router, useFocusEffect} from 'expo-router';
+import Constants from 'expo-constants';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {AppState, Linking, Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
@@ -16,12 +17,22 @@ import {NUDGE_TIMES} from '@/utils/notificationPrefs';
 import {devSeedEarlyPraise} from '@/db/devSeed';// null outside __DEV__
 import {colors, fonts, radii, spacing} from '@/constants/theme';
 import {SwitchRow} from '@/components/switch-row';
+import {TRACE_ON} from '@/utils/startupTrace';
 
 // DEV ONLY: long-press the title to seed early-praise history (logs first, a second long press confirms)
 const devSeed = devSeedEarlyPraise;
 const onTitleLongPress = devSeed
     ? () => { devSeed(getFirebaseAuth().currentUser?.uid); }
     : undefined;
+
+// "Version 1.0.0 (build 2)": app.json's version and Android versionCode (iOS buildNumber; no build part if unset)
+const appConfig = Constants.expoConfig;
+const buildNumber = appConfig?.android?.versionCode ?? appConfig?.ios?.buildNumber;
+const VERSION_LINE = `Version ${appConfig?.version ?? '?'}${buildNumber != null ? ` (build ${buildNumber})` : ''}`;
+
+// Preview build only: a long press on the version line shows the startup trace (never shown by default)
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- loaded only in a trace build
+const StartupTracePanel = TRACE_ON ? (require('@/components/startup-trace-panel') as typeof import('@/components/startup-trace-panel')).StartupTracePanel : null;
 
 export default function SettingsScreen (){
     const {isAdmin, recheckIfFailed} = useIsAdmin();
@@ -30,6 +41,7 @@ export default function SettingsScreen (){
     const [permission, setPermission] = useState<PermissionState | null>(null);
     const [asking, setAsking] = useState(false);
     const [available] = useState(notificationsAvailable);// fixed for the app run: the module loads once or never
+    const [showTrace, setShowTrace] = useState(false);// resets on every launch (never saved)
 
     // if the sign-in admin check failed for a network reason, try again whenever Settings gains focus.
     // Notification permission is re-checked on focus and when coming back from the phone's settings.
@@ -183,6 +195,13 @@ export default function SettingsScreen (){
                   <Text style={[styles.rowText, styles.signOutText]}>Sign Out</Text>
                 </Pressable>
               </View>
+
+              <Text
+                style={styles.version}
+                onLongPress={StartupTracePanel ? () => setShowTrace((shown) => !shown) : undefined}>
+                {VERSION_LINE}
+              </Text>
+              {StartupTracePanel && showTrace && <StartupTracePanel />}
             </ScrollView>
         </SafeAreaView>
     )
@@ -234,5 +253,6 @@ const styles = StyleSheet.create({
   },
   noticeButtonText: {fontFamily: fonts.title, fontSize: 14, color: colors.white},
   signOutText: {color: colors.error},
+  version: {fontFamily: fonts.regular, fontSize: 12, color: colors.muted, textAlign: 'center'},
   pressed: {opacity: 0.85},
 });

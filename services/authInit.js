@@ -12,6 +12,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {firebaseConfig} from './firebaseConfig';
 //the existing config object
 
+import {mark} from '@/utils/startupTrace';
+//startup trace (preview build only): when session restore starts
+
 let authConnection = null;
 //cached Auth instance, same pattern as getDatabase()/getFirestoreDb()
 
@@ -20,6 +23,8 @@ export function getFirebaseAuth(){
 
 if (!authConnection){
     //only set up once; reuse afterwards
+
+    mark('auth:initStart');
 
     const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
     //if no Firebase app exists yet, create one; otherwise reuse the existing one (prevents a 'already initialized' crash)

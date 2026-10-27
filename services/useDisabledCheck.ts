@@ -3,6 +3,7 @@ import {Alert, AppState} from 'react-native';
 import {checkIsDisabled} from '@/services/accountStatus';
 import {getFirebaseAuth} from '@/services/authInit';
 import {signOut} from '@/services/authActions';
+import {mark} from '@/utils/startupTrace';
 
 // Signs the user out if an admin has disabled their account. Runs after each sign-in (or launch with a
 // saved session) and whenever the app returns to the foreground. Never part of the readiness gate,
@@ -24,7 +25,10 @@ export function useDisabledCheck(uid: string | null) {
           Alert.alert('Account disabled', 'This account has been disabled. Please contact the HabitQuest team.');
         })
         .catch((err: unknown) => console.log('Disabled-account sign-out failed', err))
-        .finally(() => { running = false; });
+        .finally(() => {
+          running = false;
+          mark('disabled:done');
+        });
     };
 
     run();

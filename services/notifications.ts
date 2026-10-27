@@ -1,4 +1,3 @@
-import {useEffect} from 'react';
 import {router} from 'expo-router';
 import type {NotificationsApi} from '@/services/notificationApplier';
 import {createNotifications, type NotificationsModule, type PermissionState} from '@/services/notificationsCore';
@@ -51,8 +50,8 @@ export function sendTestNotification(): Promise<boolean> {
   return notifications.sendTestNotification();
 }
 
-// Tapping any notification opens the app on Home (the app also starts on Home after a cold start).
-// Does nothing when notifications are unavailable.
-export function useNotificationTapOpensHome(): void {
-  useEffect(() => notifications.addTapListener(() => router.navigate('/')), []);
+// Tapping any notification opens the app on Home (the app also starts on Home after a cold start, so a tap
+// that launched the app needs no listener). Does nothing when notifications are unavailable.
+export function addTapOpensHomeListener(): () => void {
+  return notifications.addTapListener(() => router.navigate('/'));
 }

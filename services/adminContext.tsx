@@ -1,5 +1,6 @@
 import {createContext, useCallback, useContext, useEffect, useMemo, useRef, useState} from 'react';
 import {checkIsAdmin} from '@/services/admin';
+import {mark} from '@/utils/startupTrace';
 
 type AdminCheck = {state: 'admin' | 'not-admin' | 'failed'; retryable: boolean};
 
@@ -24,6 +25,7 @@ export function useAdminCheck(uid: string | null): AdminContextValue {
   const run = useCallback((forUid: string) => {
     inFlightUid.current = forUid;
     checkIsAdmin(forUid).then((check: AdminCheck) => {
+      mark('admin:done');
       if (currentUid.current === forUid) setResult({uid: forUid, check}); // drop results for a user who already signed out
       if (inFlightUid.current === forUid) inFlightUid.current = null;
     });
