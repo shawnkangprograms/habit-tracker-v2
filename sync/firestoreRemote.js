@@ -1,10 +1,8 @@
-import {
-    collection, doc, documentId, getDocFromServer, getDocsFromServer, limit, orderBy, query, serverTimestamp, startAfter,
-    Timestamp, writeBatch,
-} from 'firebase/firestore';
+import {firestore} from '@/services/firestore';
 import {getFirestoreDb} from '@/services/firebaseInit';
 
-// The Firestore side of the sync engine (sync/engineCore.ts). The only sync file that imports Firestore.
+// The Firestore side of the sync engine (sync/engineCore.ts). The only sync file that uses Firestore (loaded
+// on first use through services/firestore.js).
 // Docs carry exactly the fields the rules allow; no userId (the uid is in the path). Whole-doc set(),
 // never merge: the rules check the complete field set on every write.
 // JS integers (createdAt, updatedAt, completed 0/1) are stored as Firestore integers by the SDK
@@ -21,6 +19,7 @@ function rethrowWithCode(err) {
 // Is Firestore reachable for this user? A server read of their own users doc. A missing doc is fine
 // (the read still succeeded); only a thrown error (offline, timeout, rules) counts as unreachable.
 async function probe(uid) {
+    const {doc, getDocFromServer} = firestore();
     try {
         await getDocFromServer(doc(getFirestoreDb(), 'users', uid));
     } catch (err) {
@@ -30,6 +29,7 @@ async function probe(uid) {
 
 // One batch: users/{uid}/habits/{habitId}
 async function writeHabits(uid, items) {
+    const {doc, serverTimestamp, writeBatch} = firestore();
     const db = getFirestoreDb();
     const batch = writeBatch(db);
     for (const {habitId, doc: d} of items) {
@@ -57,6 +57,7 @@ async function writeHabits(uid, items) {
 
 // One batch: users/{uid}/completions/{habitId}_{date}
 async function writeCompletions(uid, items) {
+    const {doc, serverTimestamp, writeBatch} = firestore();
     const db = getFirestoreDb();
     const batch = writeBatch(db);
     for (const {docId, doc: d} of items) {
@@ -81,6 +82,7 @@ async function writeCompletions(uid, items) {
 // KNOWN, VERY SMALL RACE: a doc committed with a serverUpdatedAt slightly earlier than a cursor this phone
 // already moved past is never pulled here; see sync/cursorStore.ts for the recovery options.
 async function pullPage(uid, collectionName, after, pageSize) {
+    const {collection, documentId, getDocsFromServer, limit, orderBy, query, startAfter, Timestamp} = firestore();
     const constraints = [orderBy('serverUpdatedAt'), orderBy(documentId())];
     if (after) constraints.push(startAfter(new Timestamp(after.seconds, after.nanoseconds), after.docId));
     constraints.push(limit(pageSize));

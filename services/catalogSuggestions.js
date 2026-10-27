@@ -1,4 +1,4 @@
-import {collection, getDocs, limit, orderBy, query} from 'firebase/firestore';
+import {firestore} from '@/services/firestore';
 import {getFirestoreDb} from '@/services/firebaseInit';
 import {getFirebaseAuth} from '@/services/authInit';
 import {getSyncStatus} from '@/sync/syncEngine';
@@ -14,6 +14,7 @@ export const getStarterIdeas = createStarterIdeasLoader({
     // read-only use of the sync status: if the last cycle found the phone offline, don't wait 5 s for Firestore
     isOffline: () => getSyncStatus().state === 'offline',
     fetchCatalog: async () => {
+        const {collection, getDocs, limit, orderBy, query} = firestore();
         const q = query(collection(getFirestoreDb(), 'catalog'), orderBy('name'), limit(FETCH_LIMIT));
         const snap = await getDocs(q);
         return snap.docs.map((d) => ({id: d.id, data: d.data()}));

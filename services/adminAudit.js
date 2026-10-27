@@ -1,4 +1,4 @@
-import {collection, getDocsFromServer, limit, orderBy, query} from 'firebase/firestore';
+import {firestore} from '@/services/firestore';
 import {getFirestoreDb} from '@/services/firebaseInit';
 import {withTimeout} from '@/services/admin';
 
@@ -9,6 +9,7 @@ const str = (value) => (typeof value === 'string' ? value : '');
 
 // Latest `count` entries: {id, adminUid, action, targetType, targetId, targetName, at (Date or null)}
 export async function getAuditEntries(count) {
+    const {collection, getDocsFromServer, limit, orderBy, query} = firestore();
     const q = query(collection(getFirestoreDb(), 'adminLog'), orderBy('at', 'desc'), limit(count));
     const snap = await withTimeout(getDocsFromServer(q));
     return snap.docs.map((d) => {

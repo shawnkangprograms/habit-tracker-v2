@@ -1,6 +1,4 @@
-import {
-    collection, doc, getDocFromServer, getDocsFromServer, limit, orderBy, query, serverTimestamp, writeBatch,
-} from 'firebase/firestore';
+import {firestore} from '@/services/firestore';
 import {getFirestoreDb} from '@/services/firebaseInit';
 import {getFirebaseAuth} from '@/services/authInit';
 import {bumpAdminDataVersion, codedError, isNetworkError, withTimeout} from '@/services/admin';
@@ -38,12 +36,14 @@ function requireAdminUid() {
 
 // A server read before writing: offline fails here, before anything is queued
 async function checkServer(ref, mustExist) {
+    const {getDocFromServer} = firestore();
     const snap = await withTimeout(getDocFromServer(ref));
     if (mustExist && !snap.exists()) throw codedError('not-found', 'Catalog item not found');
 }
 
 // Adds the adminLog entry to the same batch, so the change and its log land together or not at all
 async function commitWithLog(db, batch, adminUid, log) {
+    const {collection, doc, serverTimestamp} = firestore();
     batch.set(doc(collection(db, 'adminLog')), {...log, adminUid, at: serverTimestamp()});
     try {
         // the write was sent; a timeout here means it is queued and may still finish once back online
@@ -55,6 +55,7 @@ async function commitWithLog(db, batch, adminUid, log) {
 
 // All items (up to CATALOG_LIMIT), sorted by name ignoring case
 export async function getCatalogItems() {
+    const {collection, getDocsFromServer, limit, orderBy, query} = firestore();
     const q = query(collection(getFirestoreDb(), 'catalog'), orderBy('name'), limit(CATALOG_LIMIT));
     const snap = await withTimeout(getDocsFromServer(q));
     return snap.docs.map(toItem).sort((a, b) => a.name.localeCompare(b.name, undefined, {sensitivity: 'base'}));
@@ -62,11 +63,13 @@ export async function getCatalogItems() {
 
 // One item, or null if it no longer exists
 export async function getCatalogItem(id) {
+    const {doc, getDocFromServer} = firestore();
     const snap = await withTimeout(getDocFromServer(doc(getFirestoreDb(), 'catalog', id)));
     return snap.exists() ? toItem(snap) : null;
 }
 
 export async function createCatalogItem(input) {
+    const {collection, doc, serverTimestamp, writeBatch} = firestore();
     const db = getFirestoreDb();
     const adminUid = requireAdminUid();
     await checkServer(doc(db, 'admins', adminUid), false); // own admins doc: readable, and proves we're online
@@ -78,6 +81,7 @@ export async function createCatalogItem(input) {
 }
 
 export async function updateCatalogItem(id, input) {
+    const {doc, serverTimestamp, writeBatch} = firestore();
     const db = getFirestoreDb();
     const adminUid = requireAdminUid();
     const ref = doc(db, 'catalog', id);
@@ -90,6 +94,7 @@ export async function updateCatalogItem(id, input) {
 
 // Hard delete; the log entry keeps the item's name
 export async function deleteCatalogItem(id, name) {
+    const {doc, writeBatch} = firestore();
     const db = getFirestoreDb();
     const adminUid = requireAdminUid();
     const ref = doc(db, 'catalog', id);

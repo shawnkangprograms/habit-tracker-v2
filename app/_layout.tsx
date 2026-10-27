@@ -20,6 +20,7 @@ import {useDisabledCheck} from '@/services/useDisabledCheck'; //signs out a disa
 import * as SystemUI from 'expo-system-ui'; //root view background, behind every screen
 import {reset as resetStatsStore} from '@/services/statsStore'; //shared stats for Profile and its tab icon
 import {startTraceCapture} from '@/services/startupTraceStore'; //saves the startup trace (preview build only)
+import {homeUsable, startAfter} from '@/services/startupSignals'; //starts network work after Home's first load
 
 mark('layout:rootEvaluated'); // every import above has been evaluated
 startTraceCapture(); // a no-op unless EXPO_PUBLIC_STARTUP_TRACE=1
@@ -44,6 +45,9 @@ const navTheme = {
 // Kill switch for cloud sync (build stage 3: push only). false = no sync at all.
 const SYNC_ENABLED = true;
 const SYNC_INTERVAL_MS = 5 * 60 * 1000;
+// Sync and the admin and disabled checks (the first users of Firestore, which loads on first use) start once
+// Home is usable, or this long after sign-in / launch if Home never gets there
+const SERVICES_FALLBACK_MS = 5 * 1000;
 
 // import config obj used by expo router to establish initial route anchoring
 export const unstable_settings = {
@@ -64,8 +68,13 @@ export default function RootLayout() {
   const fontsReady = fontsLoaded || !!fontError; //on error, fall back to system fonts so the gate can never hang
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
   const [uid, setUid] = useState<string | null>(null); //signed-in user's id; a new uid re-runs the admin check
-  const admin = useAdminCheck(uid); //not part of the readiness gate below: isAdmin starts false and fills in later
-  useDisabledCheck(uid); //on sign-in, launch and foreground; offline or unknown never signs anyone out
+  // The uid the network services run for: the signed-in uid once its start time has come (see startAfter below),
+  // otherwise null. Compared with uid on every render, so sign-out or a different user stops them in that same
+  // render; a previous user's uid is never used.
+  const [servicesStartedFor, setServicesStartedFor] = useState<string | null>(null);
+  const servicesUid = uid !== null && servicesStartedFor === uid ? uid : null;
+  const admin = useAdminCheck(servicesUid); //not part of the readiness gate below: isAdmin starts false and fills in later
+  useDisabledCheck(servicesUid); //on sign-in, launch and foreground; offline or unknown never signs anyone out
   const [dbReady, setDbReady] = useState(false);
   const [dbError, setDbError] = useState(false);
 
@@ -106,13 +115,22 @@ export default function RootLayout() {
     return () => unsubscribe();
   }, [])
 
-  // Sync for the signed-in user: one effect keyed on uid owns every trigger. Sign-in (or launch with a
-  // saved session) starts it with an immediate push; sign-out or a different uid tears everything down
-  // first, so strict-mode double effects or a fast sign-out/sign-in can't leave a second timer or listener.
+  // Network services wait for Home's first load. Unmount, sign-out or another uid cancels a pending start.
   useEffect(() => {
-    if (!SYNC_ENABLED || !uid) return;
+    if (!uid) return;
+    return startAfter(homeUsable, () => {
+      mark('services:start');
+      setServicesStartedFor(uid);
+    }, {afterMs: 0, fallbackMs: SERVICES_FALLBACK_MS});
+  }, [uid]);
 
-    startSync(uid);
+  // Sync for the signed-in user: one effect keyed on the services uid owns every trigger. Its start (above)
+  // runs a cycle at once; sign-out or a different uid tears everything down first, so strict-mode double
+  // effects or a fast sign-out/sign-in can't leave a second timer or listener.
+  useEffect(() => {
+    if (!SYNC_ENABLED || !servicesUid) return;
+
+    startSync(servicesUid);
     const unsubscribeLocal = onLocalChange(notifyLocalChange); //push ~3 s after the last committed change
     const appStateSub = AppState.addEventListener('change', (next) => {
       if (next === 'active') requestSync(); //back in the foreground
@@ -125,7 +143,7 @@ export default function RootLayout() {
       unsubscribeLocal();
       stopSync(); //a running cycle ends at its next check
     };
-  }, [uid]);
+  }, [servicesUid]);
 
   // all hooks above run before any early return
   if (dbError) return <ThemedText>Couldn&apos;t open local data. Please restart the app.</ThemedText>;

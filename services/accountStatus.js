@@ -1,4 +1,4 @@
-import {doc, getDocFromServer} from 'firebase/firestore';
+import {firestore} from '@/services/firestore';
 import {getFirestoreDb} from '@/services/firebaseInit';
 import {withTimeout} from '@/services/admin';
 
@@ -9,6 +9,7 @@ import {withTimeout} from '@/services/admin';
 /** @returns {Promise<'disabled' | 'ok' | 'unknown'>} */
 export async function checkIsDisabled(uid) {
     try {
+        const {doc, getDocFromServer} = firestore();
         const db = getFirestoreDb();
         // from the server: a cached copy could still say disabled after an admin re-enabled the account
         const user = await withTimeout(getDocFromServer(doc(db, 'users', uid)));

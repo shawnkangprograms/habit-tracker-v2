@@ -1,4 +1,4 @@
-import {doc, serverTimestamp, setDoc} from 'firebase/firestore';
+import {firestore} from '@/services/firestore';
 import {getFirestoreDb} from '@/services/firebaseInit';
 
 import {
@@ -14,6 +14,7 @@ export async function signUp(email, password, age){
 
     const uid = userCredential.user.uid;
 
+    const {doc, serverTimestamp, setDoc} = firestore();
     const db = getFirestoreDb();
     const userDocRef = doc(db, 'users', uid);
     try {

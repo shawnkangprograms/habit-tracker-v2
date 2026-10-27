@@ -1,7 +1,4 @@
-import {
-    collection, doc, getCountFromServer, getDoc, getDocFromServer, getDocsFromServer, limit, query, serverTimestamp, where,
-    writeBatch,
-} from 'firebase/firestore';
+import {firestore} from '@/services/firestore';
 import {getFirestoreDb} from '@/services/firebaseInit';
 import {getFirebaseAuth} from '@/services/authInit';
 
@@ -49,6 +46,7 @@ export function bumpAdminDataVersion() {
 /** @returns {Promise<{state: 'admin' | 'not-admin' | 'failed', retryable: boolean}>} */
 export async function checkIsAdmin(uid) {
     try {
+        const {doc, getDoc} = firestore();
         const snap = await withTimeout(getDoc(doc(getFirestoreDb(), 'admins', uid)));
         return {state: snap.exists() ? 'admin' : 'not-admin', retryable: false};
     } catch (err) {
@@ -61,6 +59,7 @@ export async function checkIsAdmin(uid) {
 // Overview counts via aggregation queries, so no user documents are downloaded.
 // Users with no numeric age (or one outside the buckets' range) land in noAge.
 export async function getAdminOverview() {
+    const {collection, getCountFromServer, query, where} = firestore();
     const db = getFirestoreDb();
     const users = collection(db, 'users');
     const count = async (q) => (await getCountFromServer(q)).data().count;
@@ -95,12 +94,14 @@ function toAdminUser(d) {
 
 // First USERS_LIMIT users, in document-id order
 export async function getAdminUsers() {
+    const {collection, getDocsFromServer, limit, query} = firestore();
     const snap = await withTimeout(getDocsFromServer(query(collection(getFirestoreDb(), 'users'), limit(USERS_LIMIT))));
     return snap.docs.map(toAdminUser);
 }
 
 // One user, or null if the users doc doesn't exist
 export async function getAdminUser(uid) {
+    const {doc, getDocFromServer} = firestore();
     const snap = await withTimeout(getDocFromServer(doc(getFirestoreDb(), 'users', uid)));
     return snap.exists() ? toAdminUser(snap) : null;
 }
@@ -109,6 +110,7 @@ export async function getAdminUser(uid) {
 // Online only: a server read first, so nothing is queued offline. The rules allow admins to change
 // only this field, and never on themselves; the UI hides the button for the admin's own uid.
 export async function setUserDisabled(uid, disabled) {
+    const {collection, doc, getDocFromServer, serverTimestamp, writeBatch} = firestore();
     const db = getFirestoreDb();
     const adminUid = getFirebaseAuth().currentUser?.uid;
     if (!adminUid) throw codedError('unauthenticated', 'Not signed in');

@@ -25,7 +25,10 @@ export type MarkName =
   | 'admin:done'
   | 'disabled:done'
   | 'notif:schedulerStart'
-  | 'notif:firstRebuildEnd';
+  | 'notif:firstRebuildEnd'
+  | 'services:start'
+  | 'firestore:requireStart'
+  | 'firestore:requireEnd';
 
 export type Marks = Partial<Record<MarkName, number>>;
 
@@ -146,6 +149,8 @@ export function summarise(record: TraceRecord): TraceRow[] {
   const m = record.marks;
   const held = gateHeldBy(m);
   const afterUsable = (label: string, name: MarkName): TraceRow => ({label, ms: span(m, 'home:usable', name), note: 'after usable'});
+  // Firestore must load after Home is usable; a negative offset means something put it back on the startup path
+  const firestoreAt = span(m, 'home:usable', 'firestore:requireStart');
   return [
     {label: 'JS span: bundle start to usable', ms: span(m, 0, 'home:usable'), note: 'stopwatch minus this = native start'},
     {label: 'Bundle evaluated (RN timing)', ms: record.rnEvalEnd},
@@ -159,6 +164,12 @@ export function summarise(record: TraceRecord): TraceRow[] {
     {label: 'First render (gate open to Home mount)', ms: span(m, 'gate:open', 'home:mount')},
     {label: 'Home data (mount to usable)', ms: span(m, 'home:mount', 'home:usable')},
     afterUsable('Stats published', 'stats:published'),
+    afterUsable('Sync, admin and disabled checks started', 'services:start'),
+    {
+      label: 'Firestore SDK load',
+      ms: span(m, 'firestore:requireStart', 'firestore:requireEnd'),
+      note: firestoreAt === null ? undefined : firestoreAt >= 0 ? `started ${firestoreAt} ms after usable` : 'BEFORE usable',
+    },
     afterUsable('Sync first cycle ended', 'sync:firstCycleEnd'),
     afterUsable('Admin check done', 'admin:done'),
     afterUsable('Disabled check done', 'disabled:done'),
