@@ -28,7 +28,8 @@ export type MarkName =
   | 'notif:firstRebuildEnd'
   | 'services:start'
   | 'firestore:requireStart'
-  | 'firestore:requireEnd';
+  | 'firestore:requireEnd'
+  | 'ota:checkEnd';// the over-the-air update check ended, whatever its result
 
 export type Marks = Partial<Record<MarkName, number>>;
 
@@ -49,7 +50,17 @@ export type TraceRecord = {
   marks: Marks;// relative to base, whole ms
   hermes: string;// Hermes version, 'yes' if unknown, 'no' if another engine
   counts: {habits: number; completions: number} | null;// sizes only, never names
+  // The running bundle (embedded in the APK, or downloaded) and this launch's update check result.
+  // Missing in records saved by builds before expo-updates.
+  ota?: {updateId: string | null; channel: string | null; embedded: boolean | null; outcome: string | null} | null;
 };
+
+// One line for the panel and the share text
+export function otaLine(ota: TraceRecord['ota']): string {
+  if (!ota) return 'Update: n/a';
+  const source = ota.embedded === null ? '' : ota.embedded ? ' (embedded in the APK)' : ' (downloaded)';
+  return `Update: ${ota.updateId ?? 'no id'}${source} | channel ${ota.channel ?? 'none'} | check ${ota.outcome ?? 'not finished'}`;
+}
 
 // One trace per app run. A name is recorded the first time only; later calls are no-ops.
 export function createStartupTrace(options: {enabled: boolean; now: () => number}) {
@@ -94,6 +105,7 @@ export function buildRecord(input: {
   rn: RnStartupTiming | null;
   hermes: string;
   counts: TraceRecord['counts'];
+  ota?: TraceRecord['ota'];
 }): TraceRecord {
   const {base, at, rnEnd} = chooseBase(input.marks['trace:firstImport'], input.rn);
   const marks: Marks = {};
@@ -113,6 +125,7 @@ export function buildRecord(input: {
     marks,
     hermes: input.hermes,
     counts: input.counts,
+    ota: input.ota ?? null,
   };
 }
 
@@ -175,6 +188,7 @@ export function summarise(record: TraceRecord): TraceRow[] {
     afterUsable('Disabled check done', 'disabled:done'),
     afterUsable('Notification scheduler started', 'notif:schedulerStart'),
     afterUsable('First schedule rebuild done', 'notif:firstRebuildEnd'),
+    afterUsable('Update check ended', 'ota:checkEnd'),
   ];
 }
 
@@ -186,6 +200,7 @@ export function traceToText(records: TraceRecord[]): string {
     return [
       `Launch ${r.launch} at ${new Date(r.at).toISOString()} | base ${r.base} | Hermes ${r.hermes}` +
         (r.counts ? ` | ${r.counts.habits} habits, ${r.counts.completions} completion rows` : ''),
+      otaLine(r.ota),
       ...rows,
       'Marks (ms from base):',
       ...marks,

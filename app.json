@@ -29,7 +29,10 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png",
         "backgroundColor": "#1a1815"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "runtimeVersion": {
+        "policy": "fingerprint"
+      }
     },
     "web": {
       "output": "static",
@@ -61,6 +64,14 @@
           "icon": "./assets/images/notification-icon.png",
           "color": "#f2691b"
         }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "buildArchs": ["armeabi-v7a", "arm64-v8a"]
+          }
+        }
       ]
     ],
     "experiments": {
@@ -73,6 +84,11 @@
         "projectId": "7d7dd08d-f5b3-4324-96b2-d40dfd71e2f3"
       }
     },
-    "owner": "shawnjoroge"
+    "owner": "shawnjoroge",
+    "updates": {
+      "url": "https://u.expo.dev/7d7dd08d-f5b3-4324-96b2-d40dfd71e2f3",
+      "checkAutomatically": "ON_ERROR_RECOVERY",
+      "fallbackToCacheTimeout": 0
+    }
   }
 }

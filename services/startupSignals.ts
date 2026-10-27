@@ -60,3 +60,6 @@ export function startAfter(
 }
 
 export const homeUsable = createOnceSignal();
+
+// Fires once per app run when the over-the-air update check ends (services/otaUpdates.ts), whatever its result
+export const otaCheckDone = createOnceSignal();

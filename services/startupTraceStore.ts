@@ -1,17 +1,20 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {getDatabase} from '@/db/database';
 import {getFirebaseAuth} from '@/services/authInit';
-import {homeUsable} from '@/services/startupSignals';
+import {homeUsable, otaCheckDone} from '@/services/startupSignals';
+import {getOtaInfo} from '@/services/otaUpdates';
 import {buildRecord, getMarks, TRACE_ON, type RnStartupTiming, type TraceRecord} from '@/utils/startupTrace';
 
-// Saves this launch's startup trace (preview build only), 10 s after Home is usable so the later marks are in,
-// or 30 s after startup if Home never became usable (e.g. a signed-out launch). Keeps the last 5 launches.
+// Saves this launch's startup trace (preview build only) once the later marks are in: when the update check
+// ends (it starts 10 s after Home is usable), but at least 10 s and at most 25 s after usable. Or 30 s after
+// startup if Home never became usable (e.g. a signed-out launch). Keeps the last 5 launches.
 // AsyncStorage only: never the SQLite write queue, never the network. Fails silently.
 
 const KEY = 'hq:startupTrace';
 const LAUNCHES_KEY = 'hq:startupTrace:launches';// saved launches since install (or since Clear)
 const KEEP = 5;
 const AFTER_USABLE_MS = 10 * 1000;
+const OTA_WAIT_MS = 15 * 1000;// after AFTER_USABLE_MS, for the update check to end
 const FALLBACK_MS = 30 * 1000;
 
 const wallClockAtImport = Date.now();// close to the trace's first import (both evaluate at bundle start)
@@ -83,6 +86,7 @@ async function save(): Promise<void> {
       rn: readRnStartupTiming(),
       hermes: hermesVersion(),
       counts: await rowCounts().catch(() => null),
+      ota: getOtaInfo(),
     });
     const kept = [record, ...(await loadTraces())].slice(0, KEEP);
     await AsyncStorage.multiSet([[KEY, JSON.stringify(kept)], [LAUNCHES_KEY, String(launch)]]);
@@ -98,6 +102,12 @@ export function startTraceCapture(): void {
   const fallback = setTimeout(() => { void save(); }, FALLBACK_MS);
   homeUsable.on(() => {
     clearTimeout(fallback);
-    setTimeout(() => { void save(); }, AFTER_USABLE_MS);
+    setTimeout(() => {
+      const cap = setTimeout(() => { void save(); }, OTA_WAIT_MS);
+      otaCheckDone.on(() => {
+        clearTimeout(cap);
+        void save();
+      });
+    }, AFTER_USABLE_MS);
   });
 }

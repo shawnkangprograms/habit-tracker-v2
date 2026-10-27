@@ -1,12 +1,12 @@
 import {useEffect, useState} from 'react';
 import {Pressable, Share, StyleSheet, Text, View} from 'react-native';
 import {clearTraces, loadTraces} from '@/services/startupTraceStore';
-import {summarise, traceToText, type TraceRecord} from '@/utils/startupTrace';
+import {otaLine, summarise, traceToText, type TraceRecord} from '@/utils/startupTrace';
 import {colors, fonts, radii, spacing} from '@/constants/theme';
 
 // Preview build only: the last saved startup traces, opened by a long press on Settings' version line.
-// Required lazily by Settings, so other builds never evaluate it. The current launch is saved 10 s after
-// Home is usable, so it appears here on a later open, not instantly.
+// Required lazily by Settings, so other builds never evaluate it. The current launch is saved 10-25 s after
+// Home is usable (once the update check ends), so it appears here on a later open, not instantly.
 export function StartupTracePanel() {
   const [records, setRecords] = useState<TraceRecord[] | null>(null);
 
@@ -31,7 +31,7 @@ export function StartupTracePanel() {
 
       {records === null && <Text style={styles.muted}>Loading...</Text>}
       {records !== null && !latest && (
-        <Text style={styles.muted}>No saved launch yet. It is saved about 10 seconds after Home is usable.</Text>
+        <Text style={styles.muted}>No saved launch yet. It is saved 10 to 25 seconds after Home is usable.</Text>
       )}
 
       {latest && (
@@ -40,6 +40,7 @@ export function StartupTracePanel() {
             Launch {latest.launch} · {new Date(latest.at).toLocaleString()} · base {latest.base} · Hermes {latest.hermes}
             {latest.counts ? ` · ${latest.counts.habits} habits, ${latest.counts.completions} rows` : ''}
           </Text>
+          <Text style={styles.muted} selectable>{otaLine(latest.ota)}</Text>
           {summarise(latest).map((row) => (
             <View key={row.label} style={styles.row}>
               <Text style={styles.label}>

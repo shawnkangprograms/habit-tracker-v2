@@ -21,6 +21,7 @@ import * as SystemUI from 'expo-system-ui'; //root view background, behind every
 import {reset as resetStatsStore} from '@/services/statsStore'; //shared stats for Profile and its tab icon
 import {startTraceCapture} from '@/services/startupTraceStore'; //saves the startup trace (preview build only)
 import {homeUsable, startAfter} from '@/services/startupSignals'; //starts network work after Home's first load
+import {startOtaUpdateCheck} from '@/services/otaUpdates'; //over-the-air update check, 10 s after Home is usable
 
 mark('layout:rootEvaluated'); // every import above has been evaluated
 startTraceCapture(); // a no-op unless EXPO_PUBLIC_STARTUP_TRACE=1
@@ -90,6 +91,8 @@ export default function RootLayout() {
         setDbError(true);
       });
   },[]);
+
+  useEffect(() => startOtaUpdateCheck(), []); //downloads only; a new update runs from the next cold start
 
   useEffect(() => {
     if (fontError) console.warn('Font loading failed, using system fonts', fontError);
