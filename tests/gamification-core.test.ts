@@ -65,3 +65,40 @@ test('the wrapper and the core give identical results for the same rows', async 
   assert.ok(fromCore.totalXp > 0, 'the rows earned some XP, so the comparison is not of two empty results');
   await assert.rejects(wrapper.getGamificationStats(''), /signed in/);
 });
+
+test('getUserRows: only this user\'s rows, shaped for the pure modules; getSummaryRows returns the same', async () => {
+  const ROWS_ME = 'uid-rows';
+  const R1 = '55555555-5555-4555-8555-555555555555';
+  const R2 = '66666666-6666-4666-8666-666666666666';
+  const R3 = '77777777-7777-4777-8777-777777777777';
+  const created = daysAgo(3);
+  const habits: [string, string, string, string, number][] = [
+    [R1, ROWS_ME, 'Run', 'weekdays', 0], [R2, ROWS_ME, 'Old', 'daily', 1], [R3, OTHER, 'Theirs', 'daily', 0],
+  ];
+  for (const [habitId, userId, habitName, frequencyType, deleted] of habits) {
+    await testDb.runAsync(
+      `INSERT INTO habits (habitId, userId, habitName, icon, frequencyType, reminderTime, source, createdAt, updatedAt, deleted, synced)
+      VALUES (?, ?, ?, 'run', ?, NULL, 'user', ?, ?, ?, 1)`,
+      [habitId, userId, habitName, frequencyType, created.getTime(), created.getTime(), deleted],
+    );
+  }
+  await testDb.runAsync('INSERT INTO habitDays (habitId, day) VALUES (?, ?)', [R1, 'tue']);
+  const today = getLocalDateString();
+  for (const [habitId, completed] of [[R1, 1], [R2, 0], [R3, 1]] as const) {
+    await testDb.runAsync('INSERT INTO completions (habitId, date, completed, updatedAt, synced) VALUES (?, ?, ?, 0, 0)',
+      [habitId, today, completed]);
+  }
+
+  const rows = await core.getUserRows(testDb, ROWS_ME);
+  const byId = (a: {habitId: string}, b: {habitId: string}) => a.habitId.localeCompare(b.habitId);
+  assert.deepEqual([...rows.habits].sort(byId), [
+    {habitId: R1, habitName: 'Run', icon: 'run', createdDate: getLocalDateString(created), frequencyType: 'weekdays', days: ['tue'], deleted: false},
+    {habitId: R2, habitName: 'Old', icon: 'run', createdDate: getLocalDateString(created), frequencyType: 'daily', days: [], deleted: true},
+  ]);
+  assert.deepEqual([...rows.completions].sort(byId), [
+    {habitId: R1, date: today, completed: true},
+    {habitId: R2, date: today, completed: false},
+  ]);
+  assert.deepEqual(await wrapper.getSummaryRows(ROWS_ME), rows);
+  await assert.rejects(wrapper.getSummaryRows(''), /signed in/);
+});

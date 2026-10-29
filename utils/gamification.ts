@@ -32,31 +32,32 @@ export const STREAK_MILESTONES = [
 // ---------- Calendar arithmetic on YYYY-MM-DD strings ----------
 // Dates are mapped to UTC day numbers only to step through the calendar. The current time is never read,
 // so time zones and daylight saving can't shift a day. `today` always comes from getLocalDateString().
+// Exported for utils/summary.ts, so the calendar stepping lives in one place.
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const WEEKDAYS_BY_UTC_DAY: WeekdayKey[] = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']; // getUTCDay() order
 
-function isDateString(value: unknown): value is string {
+export function isDateString(value: unknown): value is string {
   return typeof value === 'string' && DATE_RE.test(value);
 }
 
-function toDayNumber(date: string): number {
+export function toDayNumber(date: string): number {
   const [y, m, d] = date.split('-').map(Number);
   return Date.UTC(y, m - 1, d) / DAY_MS;
 }
 
-function fromDayNumber(n: number): string {
+export function fromDayNumber(n: number): string {
   const dt = new Date(n * DAY_MS);
   const pad = (v: number, len = 2) => String(v).padStart(len, '0');
   return `${pad(dt.getUTCFullYear(), 4)}-${pad(dt.getUTCMonth() + 1)}-${pad(dt.getUTCDate())}`;
 }
 
-function weekdayOf(dayNumber: number): WeekdayKey {
+export function weekdayOf(dayNumber: number): WeekdayKey {
   return WEEKDAYS_BY_UTC_DAY[new Date(dayNumber * DAY_MS).getUTCDay()];
 }
 
-function requireToday(today: string): void {
+export function requireToday(today: string): void {
   if (!isDateString(today)) throw new Error(`today must be a local YYYY-MM-DD date, got "${today}"`);
 }
 
