@@ -7,7 +7,7 @@ import {router, useLocalSearchParams} from 'expo-router';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
 import {addHabit, getHabit, softDeleteHabit, updateHabit} from '@/db/habits';
-import {getFirebaseAuth} from '@/services/authInit';
+import {useSessionUid} from '@/services/session';
 import {
   ICON_IDS, REMIND_BEFORE_OPTIONS, type Frequency, type IconId, type RemindBeforeMin, type WeekdayKey,
 } from '@/constants/habits';
@@ -46,7 +46,7 @@ export default function HabitFormScreen() {
   const params = useLocalSearchParams<{habitId?: string}>();
   const habitId = typeof params.habitId === 'string' && params.habitId ? params.habitId : undefined;
   const isEdit = !!habitId;
-  const userId = getFirebaseAuth().currentUser?.uid;
+  const userId = useSessionUid() ?? undefined;// presumed or confirmed (services/session.ts)
 
   // Add mode defaults match the Figma frame: star selected, Every day
   const [habitName, setHabitName] = useState('');

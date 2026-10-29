@@ -78,6 +78,15 @@ describe('records and phases', () => {
     assert.equal(gateHeldBy({}), null);
   });
 
+  test('fix #1: a presumed uid releases auth from the gate before Firebase answers', () => {
+    const presumed: Marks = {'auth:presumed': 300, 'auth:firstCallback': 2500, 'db:ready': 1800, 'fonts:ready': 1700, 'gate:open': 1810, 'root:firstCommit': 1500};
+    assert.equal(gateHeldBy(presumed), 'db');
+    const rows = new Map(summarise({...record, marks: presumed}).map((r) => [r.label, r]));
+    assert.equal(rows.get('  auth: init to first callback')?.note, '690 ms after the gate opened');
+    // no marker (first launch after install): Firebase's answer is still what counts
+    assert.equal(gateHeldBy({'auth:firstCallback': 2500, 'db:ready': 1800, 'fonts:ready': 1700}), 'auth');
+  });
+
   test('summarise: JS span, gate wait and Home phases; missing marks are null', () => {
     const rows = new Map(summarise(record).map((r) => [r.label, r]));
     assert.equal(rows.get('JS span: bundle start to usable')?.ms, 3200);

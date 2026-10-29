@@ -12,7 +12,8 @@ import {getGamificationStats} from '@/db/gamification';// XP, level and streak, 
 import {beginLoad as beginStatsLoad, publish as publishStats} from '@/services/statsStore';// shared with Profile and the tab icon
 import {onRemoteChange} from '@/db/remoteChanges';// data pulled from another device changed local rows
 import {requestSync} from '@/sync/syncEngine';// pull + push now (does nothing while sync is stopped)
-import {getFirebaseAuth} from '@/services/authInit';// to read the signed-in user's id
+import {getFirebaseAuth} from '@/services/authInit';// only for an optional display name
+import {useSessionUid} from '@/services/session';// the user whose local data Home shows (presumed or confirmed)
 import {getLocalDateString} from '@/utils/dates';
 import {isDeepEqual} from '@/utils/equality';// skip a re-render when a reload returned what is already shown
 import type {GamificationStats} from '@/utils/gamification';
@@ -135,9 +136,11 @@ export default function HomeScreen() {// default export, becomes the "index" tab
   const [loaded, setLoaded] = useState(false);// false until the first load finishes, so the empty state doesn't flash
   const firstPull = useFirstPull();
 
-  const user = getFirebaseAuth().currentUser;// this screen is only reachable while signed in
-  const userId = user?.uid;
-  const firstName = user?.displayName?.trim().split(/\s+/)[0];// only if auth already has a displayName
+  // This screen is only reachable while signed in. The uid comes from the session (services/session.ts), never
+  // from auth.currentUser, which is null at launch until Firebase's network check has answered.
+  const userId = useSessionUid() ?? undefined;
+  const user = getFirebaseAuth().currentUser;
+  const firstName = user?.uid === userId ? user?.displayName?.trim().split(/\s+/)[0] : undefined;// only if auth already has a displayName
 
   useEffect(() => mark('home:mount'), []);
 
@@ -172,11 +175,13 @@ export default function HomeScreen() {// default export, becomes the "index" tab
         getHabitsWithTodayStatus(userId) as Promise<Habit[]>,// active habits scheduled today, for this user
         (getActiveHabitsWithDays(userId) as Promise<ActiveHabit[]>).catch(() => null),
       ]);
+      mark('home:queriesEnd');// first load only (later marks are no-ops)
 
       if (request !== habitsRequest.current) return null;// a newer load started meanwhile (e.g. several pulled pages)
       const next: HomeList = {date, today: rows, all};
       const unchanged = isDeepEqual(shownList.current, next);
       if (!unchanged) {
+        mark('home:setList');
         shownList.current = next;
         setList(next);// store fetched habits in state, triggering a re-render to display them
         setNow(clockNow());// same render: the status of an edited or added habit uses the current time, not an old tick
@@ -207,7 +212,11 @@ export default function HomeScreen() {// default export, becomes the "index" tab
     const startedAt = performance.now();
     const date = getLocalDateString();
     // through the shared store, so Profile can join this load and reuse the result (never rejects)
-    const load = beginStatsLoad(userId, date, () => getGamificationStats(userId) as Promise<GamificationStats>);
+    const load = beginStatsLoad(userId, date, () => (getGamificationStats(userId) as Promise<GamificationStats>)
+      .then((computed) => {
+        mark('stats:computeEnd');// queries and computation done, before the store publish
+        return computed;
+      }));
     const loaded = await load.promise;// null if it failed: the card hides; the habit list keeps working
     const snapshot: StatsSnapshot | null = loaded ? {date, stats: loaded.stats} : null;
     if (request !== statsRequest.current) return null;// stale

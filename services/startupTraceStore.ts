@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {getDatabase} from '@/db/database';
-import {getFirebaseAuth} from '@/services/authInit';
+import {getSessionUid} from '@/services/session';
 import {homeUsable, otaCheckDone} from '@/services/startupSignals';
 import {getOtaInfo} from '@/services/otaUpdates';
 import {buildRecord, getMarks, TRACE_ON, type RnStartupTiming, type TraceRecord} from '@/utils/startupTrace';
@@ -48,7 +48,7 @@ function hermesVersion(): string {
 
 // Sizes only (the stats load grows with history): one plain read, after startup, never queued
 async function rowCounts(): Promise<TraceRecord['counts']> {
-  const uid = getFirebaseAuth().currentUser?.uid;
+  const uid = getSessionUid();
   if (!uid) return null;
   const db = await getDatabase();
   const row: {habits: number; completions: number} | null = await db.getFirstAsync(

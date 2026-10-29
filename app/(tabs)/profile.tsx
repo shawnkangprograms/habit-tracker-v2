@@ -6,7 +6,7 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import Animated, {FadeInDown, ReduceMotion} from 'react-native-reanimated';
 import {getGamificationStats} from '@/db/gamification';// XP, level and streak, derived from local rows
 import {onRemoteChange} from '@/db/remoteChanges';// data pulled from another device changed local rows
-import {getFirebaseAuth} from '@/services/authInit';
+import {useSessionUid} from '@/services/session';
 import {loadShared} from '@/services/statsStore';// shared with Home: reuse, join or load once
 import {useStatsEntry} from '@/hooks/use-stats';
 import {getLocalDateString} from '@/utils/dates';
@@ -26,7 +26,7 @@ function storeLog(message: string) {
 const days = (n: number) => `${n} day${n === 1 ? '' : 's'}`;
 
 export default function ProfileScreen() {
-  const userId = getFirebaseAuth().currentUser?.uid;// this screen is only reachable while signed in
+  const userId = useSessionUid() ?? undefined;// this screen is only reachable while signed in (presumed or confirmed)
   const entry = useStatsEntry();
   const stats = entry && entry.userId === userId ? entry.stats : null;
   const [failed, setFailed] = useState(false);// the last load failed and nothing is shown: one quiet line

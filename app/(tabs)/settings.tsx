@@ -2,11 +2,11 @@ import {useCallback, useState} from 'react';
 import {router, useFocusEffect} from 'expo-router';
 import Constants from 'expo-constants';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {AppState, Linking, Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
+import {Alert, AppState, Linking, Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import {signOut} from '@/services/authActions';
 import {useIsAdmin} from '@/services/adminContext';
-import {getFirebaseAuth} from '@/services/authInit';
+import {getSessionUid} from '@/services/session';
 import {setCelebrationsEnabled, useCelebrationsEnabled} from '@/services/celebrationPrefs';
 import {setNotificationPrefs, useNotificationPrefs} from '@/services/notificationPrefs';
 import {
@@ -22,8 +22,16 @@ import {TRACE_ON} from '@/utils/startupTrace';
 // DEV ONLY: long-press the title to seed early-praise history (logs first, a second long press confirms)
 const devSeed = devSeedEarlyPraise;
 const onTitleLongPress = devSeed
-    ? () => { devSeed(getFirebaseAuth().currentUser?.uid); }
+    ? () => { devSeed(getSessionUid()); }
     : undefined;
+
+// Sign-out is refused only if the sign-in marker can't be cleared (services/authActions.js); nothing changes then
+function handleSignOut() {
+    signOut().catch((err: unknown) => {
+        console.log('Sign-out failed', err);
+        Alert.alert("Couldn't sign out", 'Please try again.');
+    });
+}
 
 // "Version 1.0.0 (build 2)": app.json's version and Android versionCode (iOS buildNumber; no build part if unset)
 const appConfig = Constants.expoConfig;
@@ -189,7 +197,7 @@ export default function SettingsScreen (){
 
                 <Pressable
                   style={({pressed}) => [styles.row, pressed && styles.pressed]}
-                  onPress={signOut}
+                  onPress={handleSignOut}
                   accessibilityRole="button">
                   <MaterialCommunityIcons name="logout" size={22} color={colors.error} />
                   <Text style={[styles.rowText, styles.signOutText]}>Sign Out</Text>

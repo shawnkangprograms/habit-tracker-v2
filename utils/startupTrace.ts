@@ -12,14 +12,19 @@ export type MarkName =
   | 'layout:tabsEvaluated'
   | 'root:firstCommit'// the root layout's first commit (it renders nothing until the gate opens)
   | 'auth:initStart'// first getFirebaseAuth(): session restore starts
+  | 'auth:markerRead'// the sign-in marker was read (utils/authSession.ts), with or without a uid
+  | 'auth:presumed'// the marker's uid let the gate open before Firebase's own answer
   | 'auth:firstCallback'
   | 'db:ready'
   | 'fonts:ready'
   | 'gate:open'// auth answered, db open and fonts loaded: the Stack renders
   | 'tabs:mount'// the splash hides about one frame after this
   | 'home:mount'
+  | 'home:queriesEnd'// Home's first list reads returned
+  | 'home:setList'// Home's first list handed to React
   | 'home:listCommitted'// the first commit with Home's list loaded
   | 'home:usable'// the frame after that commit: what the stopwatch measures
+  | 'stats:computeEnd'// Home's first stats load: queries and computation done
   | 'stats:published'
   | 'sync:firstCycleEnd'
   | 'admin:done'
@@ -129,18 +134,18 @@ export function buildRecord(input: {
   };
 }
 
-const GATE_PARTS = [
-  ['auth', 'auth:firstCallback'],
-  ['db', 'db:ready'],
-  ['fonts', 'fonts:ready'],
-] as const;
+// When auth stopped holding the gate: a presumed uid from the marker, or Firebase's first answer, whichever was first
+export function authReadyAt(marks: Marks): number | undefined {
+  const times = [marks['auth:presumed'], marks['auth:firstCallback']].filter((t): t is number => t !== undefined);
+  return times.length > 0 ? Math.min(...times) : undefined;
+}
 
 // Which of the three gate conditions finished last (the one that kept the splash up), or null if unknown
 export function gateHeldBy(marks: Marks): 'auth' | 'db' | 'fonts' | null {
+  const parts = [['auth', authReadyAt(marks)], ['db', marks['db:ready']], ['fonts', marks['fonts:ready']]] as const;
   let held: 'auth' | 'db' | 'fonts' | null = null;
   let latest = -Infinity;
-  for (const [label, name] of GATE_PARTS) {
-    const t = marks[name];
+  for (const [label, t] of parts) {
     if (t !== undefined && t > latest) {
       latest = t;
       held = label;
@@ -150,6 +155,15 @@ export function gateHeldBy(marks: Marks): 'auth' | 'db' | 'fonts' | null {
 }
 
 export type TraceRow = {label: string; ms: number | null; note?: string};
+
+// Fix #1's acceptance check: with a presumed uid, Firebase's answer must come after the gate opened
+function firstCallbackNote(m: Marks): string | undefined {
+  const presumed = m['auth:presumed'];
+  const callback = m['auth:firstCallback'];
+  const gate = m['gate:open'];
+  if (presumed === undefined || callback === undefined || gate === undefined) return undefined;
+  return callback >= gate ? `${callback - gate} ms after the gate opened` : 'before the gate opened';
+}
 
 function span(marks: Marks, from: MarkName | 0, to: MarkName): number | null {
   const start = from === 0 ? 0 : marks[from];
@@ -171,11 +185,17 @@ export function summarise(record: TraceRecord): TraceRow[] {
     {label: 'Root layout imports', ms: span(m, 'trace:firstImport', 'layout:rootEvaluated')},
     {label: 'Imports to first commit', ms: span(m, 'layout:rootEvaluated', 'root:firstCommit')},
     {label: 'Gate wait (first commit to gate open)', ms: span(m, 'root:firstCommit', 'gate:open'), note: held ? `held by ${held}` : undefined},
-    {label: '  auth: init to first callback', ms: span(m, 'auth:initStart', 'auth:firstCallback')},
+    {label: '  auth: init to first callback', ms: span(m, 'auth:initStart', 'auth:firstCallback'), note: firstCallbackNote(m)},
+    {label: '  auth: marker read', ms: span(m, 0, 'auth:markerRead'), note: m['auth:presumed'] !== undefined ? 'presumed, from bundle start' : 'from bundle start'},
     {label: '  db ready', ms: span(m, 0, 'db:ready'), note: 'from bundle start'},
     {label: '  fonts ready', ms: span(m, 0, 'fonts:ready'), note: 'from bundle start'},
     {label: 'First render (gate open to Home mount)', ms: span(m, 'gate:open', 'home:mount')},
     {label: 'Home data (mount to usable)', ms: span(m, 'home:mount', 'home:usable')},
+    {label: '  list reads (mount to queries end)', ms: span(m, 'home:mount', 'home:queriesEnd')},
+    {label: '  handed to React (queries end to setList)', ms: span(m, 'home:queriesEnd', 'home:setList')},
+    {label: '  render (setList to commit)', ms: span(m, 'home:setList', 'home:listCommitted')},
+    {label: '  next frame (commit to usable)', ms: span(m, 'home:listCommitted', 'home:usable')},
+    {label: '  stats computed (from mount)', ms: span(m, 'home:mount', 'stats:computeEnd')},
     afterUsable('Stats published', 'stats:published'),
     afterUsable('Sync, admin and disabled checks started', 'services:start'),
     {

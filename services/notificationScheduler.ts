@@ -45,9 +45,13 @@ let auth: SchedulerAuth = {kind: 'unknown'};
 // Signing out removes every reminder at once, so nobody gets another account's habits (registered once, when
 // this module is first imported, and kept for the app's lifetime). The cancel goes through runRebuild, so it
 // runs after any rebuild already in progress and is never overtaken by it. Nothing to remove when unavailable.
+// A signed-in callback asks for a rebuild: Home can be usable (and this scheduler started) before Firebase's
+// network check at launch has answered, and a rebuild that ran before then was skipped ('unknown').
+// The presumed uid from the sign-in marker (utils/authSession.ts) never reaches this scheduler.
 onAuthStateChanged(getFirebaseAuth(), (user) => {
   auth = user ? {kind: 'signedIn', uid: user.uid} : {kind: 'signedOut'};
   if (!user && notificationsAvailable()) runRebuild();
+  if (user) requestScheduleRebuild();// a no-op until the scheduler has started
 });
 
 async function rebuild(): Promise<void> {

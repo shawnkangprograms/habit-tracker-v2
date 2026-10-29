@@ -1,5 +1,5 @@
 import {mark} from '@/utils/startupTrace'; // FIRST import: its evaluation is the trace's "first import" mark (preview build only)
-import {useState, useEffect} from 'react'; // hooks for state management and lifecycle side effects (listeners, timers)
+import {useState, useEffect, useCallback, useRef} from 'react'; // hooks for state management and lifecycle side effects (listeners, timers)
 import {AppState} from 'react-native'; //AppState lets us detect when the app enters active/background/inactive state
 
 import {getDatabase} from '@/db/database'; //opens the local db and runs migrations; resolves once it's ready
@@ -22,6 +22,11 @@ import {reset as resetStatsStore} from '@/services/statsStore'; //shared stats f
 import {startTraceCapture} from '@/services/startupTraceStore'; //saves the startup trace (preview build only)
 import {homeUsable, startAfter} from '@/services/startupSignals'; //starts network work after Home's first load
 import {startOtaUpdateCheck} from '@/services/otaUpdates'; //over-the-air update check, 10 s after Home is usable
+import {clearMarker, readMarker, writeMarker} from '@/services/authMarker'; //the uid Firebase last confirmed on this phone
+import {setSessionUid} from '@/services/session'; //the uid screens show local data for
+import {
+  confirmedUid, INITIAL_SESSION, nextSession, sessionKnown, shownUid, type AuthEvent, type AuthSession,
+} from '@/utils/authSession'; //unknown / presumed / confirmed (fix #1: the splash never waits for Firebase's network check)
 
 mark('layout:rootEvaluated'); // every import above has been evaluated
 startTraceCapture(); // a no-op unless EXPO_PUBLIC_STARTUP_TRACE=1
@@ -67,9 +72,15 @@ export default function RootLayout() {
     Inter_700Bold,
   });
   const fontsReady = fontsLoaded || !!fontError; //on error, fall back to system fonts so the gate can never hang
-  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
-  const [uid, setUid] = useState<string | null>(null); //signed-in user's id; a new uid re-runs the admin check
-  // The uid the network services run for: the signed-in uid once its start time has come (see startAfter below),
+  // Who the screens show local data for: presumed from the sign-in marker, then confirmed (or not) by Firebase.
+  // See utils/authSession.ts. The ref is the same state, read synchronously by applyAuthEvent.
+  const [session, setSession] = useState<AuthSession>(INITIAL_SESSION);
+  const sessionRef = useRef<AuthSession>(INITIAL_SESSION);
+  const [stackKey, setStackKey] = useState(0); //bumped when one uid replaces another directly, so every screen remounts
+  const isLoggedIn = shownUid(session) !== null;
+  // Network work waits for Firebase's own answer: a presumed uid never starts sync or the admin/disabled checks
+  const uid = confirmedUid(session);
+  // The uid the network services run for: the confirmed uid once its start time has come (see startAfter below),
   // otherwise null. Compared with uid on every render, so sign-out or a different user stops them in that same
   // render; a previous user's uid is never used.
   const [servicesStartedFor, setServicesStartedFor] = useState<string | null>(null);
@@ -102,21 +113,46 @@ export default function RootLayout() {
     if (fontsReady) mark('fonts:ready');
   }, [fontsReady]);
 
-  const gateOpen = isLoggedIn !== null && dbReady && fontsReady; //same condition as the early return below
+  const gateOpen = sessionKnown(session) && dbReady && fontsReady; //same condition as the early return below
   useEffect(() => {
     if (gateOpen) mark('gate:open');
   }, [gateOpen]);
 
+  // Every marker read and auth callback goes through here. The stats store and the session uid change BEFORE any
+  // screen renders for the new uid, so no one sees another account's streak or habits.
+  const applyAuthEvent = useCallback((event: AuthEvent) => {
+    const before = sessionRef.current;
+    const next = nextSession(before, event);
+    if (next === before) return;
+    sessionRef.current = next;
+    const fromUid = shownUid(before);
+    const toUid = shownUid(next);
+    resetStatsStore(toUid);
+    setSessionUid(toUid);
+    if (fromUid !== null && toUid !== null && fromUid !== toUid) setStackKey((k) => k + 1);
+    setSession(next);
+    if (next.kind === 'presumed') mark('auth:presumed');
+  }, []);
+
   useEffect(() => {
+    let active = true;
+    readMarker().then((markerUid) => { //started before Firebase's own restore, both read AsyncStorage
+      if (!active) return;
+      mark('auth:markerRead');
+      applyAuthEvent({type: 'markerRead', uid: markerUid});
+    });
     const auth = getFirebaseAuth();
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       mark('auth:firstCallback'); //first call only (later ones are no-ops)
-      resetStatsStore(user?.uid ?? null); //before any screen renders for this user, so no one sees another account's streak
-      setIsLoggedIn(!!user);
-      setUid(user?.uid ?? null);
+      if (user) writeMarker(user.uid); //confirmed: the next launch may presume this uid
+      else clearMarker().catch((err: unknown) => console.log('Clearing the sign-in marker failed', err));
+      applyAuthEvent({type: 'callback', uid: user?.uid ?? null});
     })
-    return () => unsubscribe();
-  }, [])
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [applyAuthEvent])
 
   // Network services wait for Home's first load. Unmount, sign-out or another uid cancels a pending start.
   useEffect(() => {
@@ -150,12 +186,12 @@ export default function RootLayout() {
 
   // all hooks above run before any early return
   if (dbError) return <ThemedText>Couldn&apos;t open local data. Please restart the app.</ThemedText>;
-  if (isLoggedIn === null || !dbReady || !fontsReady) return null; //still checking auth state, opening the db or loading fonts, let splash screen linger
+  if (!gateOpen) return null; //no marker and no auth answer yet, opening the db or loading fonts, let splash screen linger
 
   return (
     <AdminContext.Provider value={admin}>
     <ThemeProvider value={navTheme}>
-      <Stack screenOptions={{contentStyle: {backgroundColor: colors.background}}}>
+      <Stack key={stackKey} screenOptions={{contentStyle: {backgroundColor: colors.background}}}>
         {/* old line */}
         {/*<Stack.Screen name="(tabs)" options={{ headerShown: false }} />*/}
 
