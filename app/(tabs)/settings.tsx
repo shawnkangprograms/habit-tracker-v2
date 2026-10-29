@@ -13,7 +13,7 @@ import {
     getNotificationPermission, notificationsAvailable, requestNotificationPermission, sendTestNotification,
     type PermissionState,
 } from '@/services/notifications';
-import {NUDGE_TIMES} from '@/utils/notificationPrefs';
+import {NUDGE_TIMES, reminderSwitchValue} from '@/utils/notificationPrefs';
 import {devSeedEarlyPraise} from '@/db/devSeed';// null outside __DEV__
 import {colors, fonts, radii, spacing} from '@/constants/theme';
 import {SwitchRow} from '@/components/switch-row';
@@ -109,7 +109,7 @@ export default function SettingsScreen (){
                 <SwitchRow
                   icon="bell-outline"
                   label="Habit reminders"
-                  value={available && notificationPrefs.remindersOn}
+                  value={reminderSwitchValue(notificationPrefs, permission, available)}// the real state: off while the phone blocks notifications
                   onChange={(value) => setNotificationSwitch('remindersOn', value)}
                   disabled={asking || !available}
                 />

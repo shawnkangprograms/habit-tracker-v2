@@ -19,8 +19,11 @@ import {
 import {StarterIdeas, type StarterIdea} from '@/components/starter-ideas';
 import {SwitchRow} from '@/components/switch-row';
 import {TimeField} from '@/components/time-field';
-import {useNotificationPrefs} from '@/services/notificationPrefs';
-import {notificationsAvailable} from '@/services/notifications';
+import {loadNotificationPrefs, useNotificationPrefs} from '@/services/notificationPrefs';
+import {
+  getNotificationPermission, notificationsAvailable, requestNotificationPermission, type PermissionState,
+} from '@/services/notifications';
+import {shouldAskOnReminderSave} from '@/utils/notificationPrefs';
 import {DEFAULT_REMINDER_TIME, LEAD_LABELS, reminderTimingNote, timingNoteText} from '@/utils/reminderForm';
 
 // For the timing line under the chips: a plain function so the React Compiler lint doesn't treat it as a render-time read
@@ -56,6 +59,7 @@ export default function HabitFormScreen() {
   const [lead, setLead] = useState<RemindBeforeMin>(0);
   const notificationPrefs = useNotificationPrefs();
   const [available] = useState(notificationsAvailable);// fixed for the app run: the module loads once or never
+  const [permission, setPermission] = useState<PermissionState | null>(null);// never asks; read once for the note
   const [errors, setErrors] = useState<FieldErrors>({});
   const [isLoaded, setIsLoaded] = useState(!isEdit); // Edit mode waits for the habit before showing the form
   const savingRef = useRef(false); // a ref, not state, so a second tap in the same frame is ignored
@@ -90,6 +94,18 @@ export default function HabitFormScreen() {
         Alert.alert('Something went wrong', err instanceof Error ? err.message : 'Please try again.', [{text: 'OK', onPress: goBack}]);
       });
   }, [userId, habitId]);
+
+  useEffect(() => {
+    if (available) getNotificationPermission().then(setPermission);
+  }, [available]);
+
+  // After a save with a reminder time: the in-context permission request (Android 13+ and iOS), only while
+  // reminders are on and the app has never asked. Never throws; a denial just leaves reminders silent.
+  async function askForReminderPermission() {
+    if (!available) return;
+    const [prefs, current] = await Promise.all([loadNotificationPrefs(), getNotificationPermission()]);
+    if (shouldAskOnReminderSave(prefs, current)) await requestNotificationPermission();
+  }
 
   function goBack() {
     if (router.canGoBack()) router.back();
@@ -152,6 +168,7 @@ export default function HabitFormScreen() {
     try {
       if (habitId) await updateHabit(userId, habitId, input.value);
       else await addHabit(userId, input.value);
+      if (reminderTime !== null) await askForReminderPermission();
       goBack();
     } catch (err) {
       Alert.alert("Couldn't save habit", err instanceof Error ? err.message : 'Something went wrong. Please try again.');
@@ -192,6 +209,7 @@ export default function HabitFormScreen() {
   const notifyNote = !reminderOn ? null
     : !available ? "Reminders aren't available in this version of the app on this phone yet."
     : !notificationPrefs.remindersOn ? 'Habit reminders are off in Settings, so this habit won’t notify you.'
+    : permission === 'denied' ? 'Notifications are off for HabitQuest in your phone settings.'
     : null;
 
   return (

@@ -118,7 +118,8 @@ export function createNotifications(load: () => NotificationsModule, options: {
     }
   }
 
-  // Asks only if the system still allows asking. Only ever called from a user's tap (a switch or the soft prompt).
+  // Asks only if the system still allows asking. Only ever called from a user's tap (a switch, the soft prompt,
+  // the test notification, or saving a habit with a reminder time).
   async function requestPermission(): Promise<boolean> {
     const m = mod();
     if (!m) return false;

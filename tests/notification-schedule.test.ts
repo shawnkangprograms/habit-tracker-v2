@@ -18,7 +18,9 @@ const daily = (habitId: string, reminderTime: string | null = '18:00', habitName
 const onDays = (habitId: string, days: ScheduleHabit['days'], reminderTime: string | null = '18:00'): ScheduleHabit =>
   ({habitId, habitName: 'Run', frequencyType: 'weekdays', days, reminderTime, alarm: false, remindBeforeMin: 0});
 
-const prefs = (over: Partial<NotificationPrefs>): NotificationPrefs => ({...DEFAULT_NOTIFICATION_PREFS, ...over});
+// Both switches off unless a test turns one on (the app's default has habit reminders on)
+const ALL_OFF: NotificationPrefs = {...DEFAULT_NOTIFICATION_PREFS, remindersOn: false, nudgeOn: false};
+const prefs = (over: Partial<NotificationPrefs>): NotificationPrefs => ({...ALL_OFF, ...over});
 const REMINDERS = prefs({remindersOn: true});
 const NUDGE = prefs({nudgeOn: true});
 const none = new Set<string>();
@@ -50,7 +52,7 @@ describe('habit reminders', () => {
   });
 
   test('both switches off: nothing', () => {
-    assert.deepEqual(s.buildSchedule([daily('h1')], none, DEFAULT_NOTIFICATION_PREFS, NOW, 5), []);
+    assert.deepEqual(s.buildSchedule([daily('h1')], none, ALL_OFF, NOW, 5), []);
   });
 
   test('the window rolls over a month end with local dates', () => {
