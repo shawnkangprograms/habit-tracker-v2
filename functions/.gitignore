@@ -1,0 +1,8 @@
+node_modules/
+
+# emulator secrets and local env overrides: never committed
+*.local
+.secret.local
+
+firebase-debug.log
+firebase-debug.*.log

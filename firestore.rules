@@ -120,6 +120,15 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // AI insight rate-limit state: written only by the generateInsight Cloud Function through the
+    // Admin SDK (which bypasses these rules). Clients can neither read nor write it.
+    match /aiUsage/{uid} {
+      allow read, write: if false;
+    }
+    match /aiUsageDaily/{day} {
+      allow read, write: if false;
+    }
+
     // Starter-habit catalog: anyone signed in can read; only admins write.
     match /catalog/{itemId} {
       allow read: if signedIn();

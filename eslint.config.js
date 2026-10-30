@@ -5,7 +5,8 @@ const expoConfig = require('eslint-config-expo/flat');
 module.exports = defineConfig([
   expoConfig,
   {
-    ignores: ['dist/*'],
+    // functions/ is the Cloud Functions package (Node 22, its own dependencies), not app code
+    ignores: ['dist/*', 'functions/**'],
   },
   {
     // Firestore is loaded on first use through services/firestore.js, so it never costs startup time.
