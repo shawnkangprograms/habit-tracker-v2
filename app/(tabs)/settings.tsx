@@ -18,6 +18,7 @@ import {devSeedEarlyPraise} from '@/db/devSeed';// null outside __DEV__
 import {colors, fonts, radii, spacing} from '@/constants/theme';
 import {SwitchRow} from '@/components/switch-row';
 import {TRACE_ON} from '@/utils/startupTrace';
+import {SETTINGS_ROW} from '@/utils/onboarding/copy';
 
 // DEV ONLY: long-press the title to seed early-praise history (logs first, a second long press confirms)
 const devSeed = devSeedEarlyPraise;
@@ -183,6 +184,16 @@ export default function SettingsScreen (){
                     </Pressable>
                   </View>
                 )}
+
+                {/* onboarding for everyone, any time: never opens on its own for users who already have habits */}
+                <Pressable
+                  style={({pressed}) => [styles.row, pressed && styles.pressed]}
+                  onPress={() => router.push({pathname: '/onboarding', params: {entry: 'settings'}})}
+                  accessibilityRole="button">
+                  <MaterialCommunityIcons name="compass-outline" size={22} color={colors.accent} />
+                  <Text style={styles.rowText}>{SETTINGS_ROW}</Text>
+                  <MaterialCommunityIcons name="chevron-right" size={22} color={colors.muted} />
+                </Pressable>
 
                 {isAdmin && (
                   <Pressable

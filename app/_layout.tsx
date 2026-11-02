@@ -209,6 +209,8 @@ export default function RootLayout() {
         <Stack.Protected guard={isLoggedIn}>
           <Stack.Screen name="(tabs)" options={{headerShown: false}} />
           <Stack.Screen name="habit-form" options={{headerShown: false}} />
+          {/* full screen, no swipe-to-dismiss: leaving is only "Skip setup" or finishing (hardware Back steps back) */}
+          <Stack.Screen name="onboarding" options={{headerShown: false, presentation: 'fullScreenModal', gestureEnabled: false}} />
         </Stack.Protected>
 
         {/* admin screens: reachable only while signed in AND the admins/{uid} check said yes; Firestore rules are the real guard */}

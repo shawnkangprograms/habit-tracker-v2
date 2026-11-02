@@ -174,8 +174,16 @@ describe('matches docs/ONBOARDING_SPEC.md', () => {
     assert.deepEqual(names, c.REPLACE_NAMES);
   });
 
-  test('first-step notice (section 1)', () => {
+  test('first-step notice and progress line (section 1)', () => {
     assert.ok(section(SPEC_DOC, '1.').includes(`"${c.FIRST_STEP_NOTICE}"`));
+    assert.ok(section(SPEC_DOC, '1.').includes('Progress reads "STEP n OF 11"'));
+    assert.equal(c.stepLabel(3, f.STEP_COUNT), 'STEP 3 OF 11');
+  });
+
+  test('Back and Continue (section 8)', () => {
+    const text = section(SPEC_DOC, '8.');
+    assert.ok(text.includes(`"${c.BACK}" top left`));
+    assert.ok(text.includes(`"${c.CONTINUE}" button`));
   });
 
   test('titles, hints and option labels per step (section 8)', () => {

@@ -33,7 +33,7 @@ module.exports = defineConfig([
     // scans these files for require() calls, which this rule can't see.
     files: [
       'app/onboarding*', 'app/onboarding/**', 'components/onboarding/**', 'utils/onboarding/**',
-      'services/onboardingStore.ts', 'hooks/use-onboarding-gate.ts',
+      'services/onboardingStore*.ts', 'hooks/use-onboarding-gate.ts',
     ],
     rules: {
       'no-restricted-imports': ['error', {

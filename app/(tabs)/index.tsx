@@ -33,6 +33,7 @@ import {shouldShowSoftPrompt} from '@/utils/notificationPrefs';
 import {notificationsAvailable} from '@/services/notifications';
 import {EmptyHomeCard} from '@/components/empty-home-card';// first-run card when there are no active habits
 import {useFirstPull} from '@/hooks/use-first-pull';
+import {useOnboardingGate} from '@/hooks/use-onboarding-gate';// opens onboarding for a new user with no habits
 import {homeEmptyState} from '@/utils/homeEmptyState';
 import {
   fullDayName, scheduleSummary, shortDayName, splitHomeRows, weekdayOfDate, type ActiveHabit,
@@ -387,6 +388,14 @@ export default function HomeScreen() {// default export, becomes the "index" tab
     firstPullDone: firstPull.firstPullDone,
     waitOver: firstPull.waitOver,
   });
+  // Never on waitOver: only once the first restore has finished (utils/onboarding/gate.ts)
+  const onboarding = useOnboardingGate({
+    userId,
+    loaded,
+    activeCount,
+    firstPullDone: firstPull.firstPullDone,
+  });
+  const showChecking = emptyState === 'checking' || (emptyState === 'empty' && onboarding.checking);
   const {other} = splitHomeRows(habits, list.all, weekdayOfDate(list.date));
   const daysById = new Map((list.all ?? []).map((h) => [h.habitId, h.days]));
 
@@ -429,11 +438,12 @@ export default function HomeScreen() {// default export, becomes the "index" tab
 
         <Text style={styles.title}>Today.</Text>
 
-        {emptyState === 'checking' && (
-          // a returning user on a new phone has no local habits until the first pull finishes
+        {showChecking && (
+          // a returning user on a new phone has no local habits until the first pull finishes; a new user also
+          // sees this while the onboarding record is read, instead of a flash of the empty card
           <Text style={styles.empty} accessibilityLiveRegion="polite">Checking for your habits...</Text>
         )}
-        {emptyState === 'empty' && (
+        {emptyState === 'empty' && !onboarding.checking && (
           <EmptyHomeCard reduceMotion={reduceMotion} onPick={() => router.push('/habit-form')} />
         )}
 

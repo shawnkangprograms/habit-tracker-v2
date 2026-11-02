@@ -12,7 +12,15 @@ import type {StepKey} from '@/utils/onboarding/flow';
 
 export const SKIP_SETUP = 'Skip setup';
 export const SKIP_THIS_ONE = 'Skip this one';
+export const BACK = 'Back';
+export const CONTINUE = 'Continue';
 export const FIRST_STEP_NOTICE = 'Your answers stay on this phone. Skip anything you like.';
+export const SETTINGS_ROW = 'Set up your plan';
+
+// "STEP n OF 11" (n counts from 1)
+export function stepLabel(n: number, count: number): string {
+  return `STEP ${n} OF ${count}`;
+}
 
 export const STEP_TITLES: Record<StepKey, string> = {
   age: 'How old are you?',
