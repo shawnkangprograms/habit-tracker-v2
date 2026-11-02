@@ -13,7 +13,7 @@
     },
     "android": {
       "package": "com.shawnkang.habitquest",
-      "versionCode": 2,
+      "versionCode": 3,
       "allowBackup": false,
       "permissions": [
         "SCHEDULE_EXACT_ALARM",
