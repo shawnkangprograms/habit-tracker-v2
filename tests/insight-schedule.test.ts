@@ -9,7 +9,7 @@ import type {CacheEntry, InsightView, RunnerDeps} from '@/utils/insightSchedule'
 import type {InsightInputResult, InsightRequest} from '@/utils/insightInput';
 
 const S = await import('../utils/insightSchedule.ts');
-const {BUSY_WAIT_MS, NETWORK_WAIT_MS, MESSAGES, EMPTY_ENTRY} = S;
+const {BUSY_WAIT_MS, NETWORK_WAIT_MS, SERVER_WAIT_MS, MESSAGES, EMPTY_ENTRY} = S;
 
 const TODAY = '2026-10-29';
 const INSIGHT = {day: TODAY, teaser: 'Hydration is your anchor.', detail: 'You drank water 18 of 21 days.'};
@@ -18,7 +18,7 @@ const REQUEST: InsightRequest = {v: 1, trackedDays: 21, streak: 4, bestWeekday: 
 
 const entry = (over: Partial<CacheEntry> = {}): CacheEntry => ({...EMPTY_ENTRY, ...over});
 const view = (over: Partial<InsightView> = {}): InsightView =>
-  ({cacheRead: true, entry: EMPTY_ENTRY, eligibility: 'unknown', phase: 'idle', ...over});
+  ({cacheRead: true, entry: EMPTY_ENTRY, eligibility: 'unknown', phase: 'idle', waitReason: null, ...over});
 
 describe('needsInsight and canCallNow', () => {
   test('a request is needed unless today is cached or attempted', () => {
@@ -26,7 +26,8 @@ describe('needsInsight and canCallNow', () => {
     assert.equal(S.needsInsight(entry({insight: {...INSIGHT, day: '2026-10-28'}}), TODAY), true);
     assert.equal(S.needsInsight(entry({attemptedDay: '2026-10-28', attemptStatus: 'limit'}), TODAY), true);
     assert.equal(S.needsInsight(entry({insight: INSIGHT}), TODAY), false);
-    assert.equal(S.needsInsight(entry({attemptedDay: TODAY, attemptStatus: 'unavailable'}), TODAY), false);
+    assert.equal(S.needsInsight(entry({attemptedDay: TODAY, attemptStatus: 'refused'}), TODAY), false);
+    assert.equal(S.needsInsight(entry({attemptedDay: TODAY, attemptStatus: 'limit'}), TODAY), false);
   });
 
   test('a call goes out only when confirmed, idle and not waiting', () => {
@@ -40,25 +41,28 @@ describe('needsInsight and canCallNow', () => {
 });
 
 describe('classifyResult', () => {
-  test('a valid ok is kept (trimmed); a malformed ok counts as unavailable', () => {
+  const SERVER_WAIT = {kind: 'wait', ms: SERVER_WAIT_MS, reason: 'server'};
+
+  test('a valid ok is kept (trimmed); a malformed ok is a server failure: wait 30 min', () => {
     assert.deepEqual(S.classifyResult({data: {status: 'ok', ...INSIGHT, teaser: ` ${INSIGHT.teaser} `}}), {kind: 'ok', insight: INSIGHT});
     for (const bad of [{teaser: 'x'.repeat(91)}, {detail: 'x'.repeat(601)}, {day: '29/10/2026'}, {teaser: '  '}, {detail: 5}]) {
-      assert.deepEqual(S.classifyResult({data: {status: 'ok', ...INSIGHT, ...bad}}), {kind: 'attempted', status: 'unavailable'});
+      assert.deepEqual(S.classifyResult({data: {status: 'ok', ...INSIGHT, ...bad}}), SERVER_WAIT);
     }
   });
 
-  test('limit and unavailable end the day; busy waits 60 min; anything unexpected ends the day', () => {
+  test('limit ends the day; busy waits 60 min; unavailable and anything unexpected wait 30 min', () => {
+    assert.equal(SERVER_WAIT_MS, 30 * 60 * 1000);
     assert.deepEqual(S.classifyResult({data: {status: 'limit'}}), {kind: 'attempted', status: 'limit'});
-    assert.deepEqual(S.classifyResult({data: {status: 'unavailable'}}), {kind: 'attempted', status: 'unavailable'});
     assert.deepEqual(S.classifyResult({data: {status: 'busy'}}), {kind: 'wait', ms: BUSY_WAIT_MS, reason: 'busy'});
+    assert.deepEqual(S.classifyResult({data: {status: 'unavailable'}}), SERVER_WAIT);
     for (const data of [null, undefined, 'ok', {status: 'great'}]) {
-      assert.deepEqual(S.classifyResult({data}), {kind: 'attempted', status: 'unavailable'});
+      assert.deepEqual(S.classifyResult({data}), SERVER_WAIT);
     }
   });
 
-  test('refusal errors end the day; network-type errors wait 30 min', () => {
+  test('refusal errors end the day as refused; network-type errors wait 30 min', () => {
     for (const code of ['functions/invalid-argument', 'functions/permission-denied', 'functions/not-found', 'functions/failed-precondition']) {
-      assert.deepEqual(S.classifyResult({error: {code}}), {kind: 'attempted', status: 'unavailable'}, code);
+      assert.deepEqual(S.classifyResult({error: {code}}), {kind: 'attempted', status: 'refused'}, code);
     }
     const errors = [{code: 'functions/unavailable'}, {code: 'functions/deadline-exceeded'}, {code: 'functions/internal'},
       {code: 'functions/unauthenticated'}, new Error('boom'), null, 'text'];
@@ -83,14 +87,26 @@ describe('cardContent', () => {
 
   test('the three messages', () => {
     assert.deepEqual(S.cardContent(view({entry: entry({attemptedDay: TODAY, attemptStatus: 'limit'})}), TODAY), {kind: 'message', text: MESSAGES.tomorrow});
-    assert.deepEqual(S.cardContent(view({entry: entry({attemptedDay: TODAY, attemptStatus: 'unavailable'})}), TODAY), {kind: 'message', text: MESSAGES.tomorrow});
+    assert.deepEqual(S.cardContent(view({entry: entry({attemptedDay: TODAY, attemptStatus: 'refused'})}), TODAY), {kind: 'message', text: MESSAGES.tomorrow});
     assert.deepEqual(S.cardContent(view({eligibility: 'notEnoughData'}), TODAY), {kind: 'message', text: MESSAGES.firstAfterThreeDays});
-    assert.deepEqual(S.cardContent(view({phase: 'waiting', eligibility: 'eligible'}), TODAY), {kind: 'message', text: MESSAGES.online});
+    assert.deepEqual(S.cardContent(view({phase: 'waiting', waitReason: 'network', eligibility: 'eligible'}), TODAY), {kind: 'message', text: MESSAGES.online});
     assert.deepEqual(S.cardContent(view({phase: 'idle'}), TODAY), {kind: 'message', text: MESSAGES.online});// not confirmed yet
   });
 
+  test('a server-failure or busy wait with nothing cached hides the card (no online, no tomorrow)', () => {
+    for (const waitReason of ['server', 'busy'] as const) {
+      assert.deepEqual(S.cardContent(view({phase: 'waiting', waitReason, eligibility: 'eligible'}), TODAY), {kind: 'hidden'}, waitReason);
+    }
+  });
+
+  test('a cached insight still shows during a server wait', () => {
+    const old = {...INSIGHT, day: '2026-10-28'};
+    assert.deepEqual(S.cardContent(view({entry: entry({insight: old}), phase: 'waiting', waitReason: 'server'}), TODAY),
+      {kind: 'insight', insight: old, label: 'Yesterday'});
+  });
+
   test('yesterday\'s attempt does not say tomorrow today', () => {
-    const content = S.cardContent(view({entry: entry({attemptedDay: '2026-10-28', attemptStatus: 'limit'}), phase: 'waiting'}), TODAY);
+    const content = S.cardContent(view({entry: entry({attemptedDay: '2026-10-28', attemptStatus: 'limit'}), phase: 'waiting', waitReason: 'network'}), TODAY);
     assert.deepEqual(content, {kind: 'message', text: MESSAGES.online});
   });
 });
@@ -218,31 +234,81 @@ describe('createInsightRunner', () => {
     assert.deepEqual(S.cardContent(last(f), TODAY), {kind: 'message', text: MESSAGES.tomorrow});
   });
 
-  test('unavailable keeps the previous insight on screen', async () => {
+  test('unavailable keeps the previous insight on screen and records no attempt', async () => {
     const old = {...INSIGHT, day: '2026-10-27'};
     const f = fake({}, [async () => ({status: 'unavailable'})]);
     f.stored.set('u1', entry({insight: old}));
     const runner = S.createInsightRunner(f.deps);
     await runner.start();
-    assert.deepEqual(f.stored.get('u1'), {v: 1, insight: old, attemptedDay: TODAY, attemptStatus: 'unavailable'});
+    assert.deepEqual(f.stored.get('u1'), entry({insight: old}));// unchanged: today is not over
+    assert.deepEqual(f.deps.waits.get('u1'), {until: f.clock.now + SERVER_WAIT_MS, reason: 'server'});
     assert.deepEqual(S.cardContent(last(f), TODAY), {kind: 'insight', insight: old, label: 'From Tue 27 Oct'});
   });
 
-  test('busy waits 60 min, a network error 30 min, in memory only', async () => {
+  test('field case: unavailable with nothing cached hides the card, retries after 30 min, and limit ends the day', async () => {
+    // e.g. the model's teaser was over 90 characters twice; the third attempt hits the server's cap
+    const f = fake({}, [async () => ({status: 'unavailable'}), async () => ({status: 'unavailable'}), async () => ({status: 'limit'})]);
+    const runner = S.createInsightRunner(f.deps);
+    await runner.start();
+    assert.equal(f.calls.length, 1);
+    assert.equal(f.stored.has('u1'), false);// no attempt recorded
+    assert.deepEqual(S.cardContent(last(f), TODAY), {kind: 'hidden'});// neither "online" nor "tomorrow"
+
+    await runner.maybeRequest();// focus during the wait: no call
+    assert.equal(f.calls.length, 1);
+    assert.deepEqual(S.cardContent(last(f), TODAY), {kind: 'hidden'});
+
+    f.clock.now += SERVER_WAIT_MS;
+    await runner.maybeRequest();
+    assert.equal(f.calls.length, 2);
+    assert.deepEqual(S.cardContent(last(f), TODAY), {kind: 'hidden'});
+
+    f.clock.now += SERVER_WAIT_MS;
+    await runner.maybeRequest();
+    assert.equal(f.calls.length, 3);
+    assert.deepEqual(f.stored.get('u1'), {v: 1, insight: null, attemptedDay: TODAY, attemptStatus: 'limit'});
+    assert.deepEqual(S.cardContent(last(f), TODAY), {kind: 'message', text: MESSAGES.tomorrow});
+
+    f.clock.now += SERVER_WAIT_MS;
+    await runner.maybeRequest();
+    assert.equal(f.calls.length, 3);// the day is over
+  });
+
+  test('unavailable then ok: the insight arrives on the retry', async () => {
+    const f = fake({}, [async () => ({status: 'unavailable'})]);
+    const runner = S.createInsightRunner(f.deps);
+    await runner.start();
+    f.clock.now += SERVER_WAIT_MS;
+    await runner.maybeRequest();
+    assert.equal(f.calls.length, 2);
+    assert.deepEqual(S.cardContent(last(f), TODAY), {kind: 'insight', insight: INSIGHT, label: 'Today'});
+  });
+
+  test('a remounted card during a server wait keeps the card hidden (the reason is shared)', async () => {
+    const f = fake({}, [async () => ({status: 'unavailable'})]);
+    await S.createInsightRunner(f.deps).start();
+    const views: InsightView[] = [];
+    await S.createInsightRunner({...f.deps, onChange: (v) => views.push(v)}).start();
+    assert.equal(f.calls.length, 1);
+    assert.deepEqual(S.cardContent(views[views.length - 1], TODAY), {kind: 'hidden'});
+  });
+
+  test('busy waits 60 min (card hidden), a network error 30 min (online message), in memory only', async () => {
     const f = fake({}, [async () => ({status: 'busy'}), async () => {
       throw {code: 'functions/unavailable'};
     }]);
     const runner = S.createInsightRunner(f.deps);
     await runner.start();
-    assert.equal(f.deps.waits.get('u1'), f.clock.now + BUSY_WAIT_MS);
+    assert.deepEqual(f.deps.waits.get('u1'), {until: f.clock.now + BUSY_WAIT_MS, reason: 'busy'});
     assert.equal(f.stored.has('u1'), false);
+    assert.deepEqual(S.cardContent(last(f), TODAY), {kind: 'hidden'});
     await runner.maybeRequest();
     assert.equal(f.calls.length, 1);// still waiting
     assert.equal(last(f).phase, 'waiting');
     f.clock.now += BUSY_WAIT_MS;
     await runner.maybeRequest();
     assert.equal(f.calls.length, 2);
-    assert.equal(f.deps.waits.get('u1'), f.clock.now + NETWORK_WAIT_MS);
+    assert.deepEqual(f.deps.waits.get('u1'), {until: f.clock.now + NETWORK_WAIT_MS, reason: 'network'});
     assert.deepEqual(S.cardContent(last(f), TODAY), {kind: 'message', text: MESSAGES.online});
   });
 
@@ -312,7 +378,7 @@ describe('createInsightRunner never throws (catch paths)', () => {
       throw new TypeError('not a function');
     }});
     await assert.doesNotReject(S.createInsightRunner(f.deps).start());
-    assert.equal(f.deps.waits.get('u1'), f.clock.now + NETWORK_WAIT_MS);
+    assert.deepEqual(f.deps.waits.get('u1'), {until: f.clock.now + NETWORK_WAIT_MS, reason: 'network'});
     assert.equal(f.deps.inFlight.has('u1'), false);
   });
 

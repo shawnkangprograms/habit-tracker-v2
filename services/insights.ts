@@ -15,7 +15,7 @@ import {getSummaryRows} from '@/db/gamification';
 import {computeSummary, type SummaryHabit} from '@/utils/summary';
 import type {GamiCompletion} from '@/utils/gamification';
 import {buildInsightInput, type InsightRequest} from '@/utils/insightInput';
-import {createInsightRunner, type InsightView} from '@/utils/insightSchedule';
+import {createInsightRunner, type InsightView, type Wait} from '@/utils/insightSchedule';
 import {getLocalDateString} from '@/utils/dates';
 import {mark} from '@/utils/startupTrace';
 
@@ -23,7 +23,7 @@ const REGION = 'africa-south1';// functions/src/config.js REGION
 const CALL_TIMEOUT_MS = 25000;// the function itself stops at 30 s
 
 const cache = createInsightCache(AsyncStorage);
-const waits = new Map<string, number>();// busy / network waits, per uid, for this app run only
+const waits = new Map<string, Wait>();// busy / server / network waits, per uid, for this app run only
 const inFlight = new Set<string>();
 
 let callable: HttpsCallable<InsightRequest, unknown> | null = null;

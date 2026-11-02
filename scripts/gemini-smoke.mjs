@@ -108,7 +108,8 @@ if (tight) {
 }
 if (!output.ok) {
   ok = false;
-  console.log(`\nFAIL: the response did not pass validateOutput (${output.reason}).`);
+  console.log(`\nFAIL: the response did not pass validateOutput (${output.reason}; `
+    + `teaser ${output.lengths.teaser ?? '-'} chars, detail ${output.lengths.detail ?? '-'} chars).`);
 } else {
   console.log(`\nTeaser (${[...output.value.teaser].length} chars): ${scrub(output.value.teaser)}`);
   console.log(`Detail (${[...output.value.detail].length} chars): ${scrub(output.value.detail)}`);

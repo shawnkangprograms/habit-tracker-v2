@@ -39,6 +39,20 @@ describe('parseEntry', () => {
       {v: 1, insight: null, attemptedDay: '2026-10-29', attemptStatus: null});
   });
 
+  test('limit and refused attempts are kept', () => {
+    for (const attemptStatus of ['limit', 'refused']) {
+      const stored = {v: 1, insight: null, attemptedDay: '2026-10-29', attemptStatus};
+      assert.deepEqual(parseEntry(JSON.stringify(stored)), stored);
+    }
+  });
+
+  test('an older build\'s unavailable attempt is dropped (the user is retried); the insight stays', () => {
+    assert.deepEqual(parseEntry(JSON.stringify({v: 1, insight: null, attemptedDay: '2026-10-29', attemptStatus: 'unavailable'})), EMPTY_ENTRY);
+    const old = {...INSIGHT, day: '2026-10-27'};
+    assert.deepEqual(parseEntry(JSON.stringify({v: 1, insight: old, attemptedDay: '2026-10-29', attemptStatus: 'unavailable'})),
+      {v: 1, insight: old, attemptedDay: null, attemptStatus: null});
+  });
+
   test('extra stored fields are not carried over', () => {
     assert.deepEqual(parseEntry(JSON.stringify({...ENTRY, insight: {...INSIGHT, html: '<b>'}, extra: 1})), ENTRY);
   });

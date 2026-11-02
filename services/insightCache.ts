@@ -19,8 +19,11 @@ export function parseEntry(raw: string | null): CacheEntry {
     const o = v as Record<string, unknown>;
     if (o.v !== 1) return EMPTY_ENTRY;
     const insight = isInsight(o.insight) ? {day: o.insight.day, teaser: o.insight.teaser, detail: o.insight.detail} : null;
+    // An attempt recorded as 'unavailable' (older builds ended the day on a server failure) is dropped, so
+    // that user is retried; the server's attempt cap still bounds it. 'limit' and 'refused' still end the day.
+    if (o.attemptStatus === 'unavailable') return {v: 1, insight, attemptedDay: null, attemptStatus: null};
     const attemptedDay = isDateString(o.attemptedDay) ? o.attemptedDay : null;
-    const attemptStatus = attemptedDay && (o.attemptStatus === 'limit' || o.attemptStatus === 'unavailable') ? o.attemptStatus : null;
+    const attemptStatus = attemptedDay && (o.attemptStatus === 'limit' || o.attemptStatus === 'refused') ? o.attemptStatus : null;
     return {v: 1, insight, attemptedDay, attemptStatus};
   } catch {
     return EMPTY_ENTRY;

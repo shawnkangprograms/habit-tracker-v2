@@ -31,9 +31,13 @@ export const MAX_TRACKED_DAYS = 30;
 export const MAX_STREAK = 3650;
 export const MAX_INPUT_CHARS = 2048;// JSON length of the whole request; 10 habits need about 900
 
-// Output bounds (validateOutput.js), in code points
+// Output bounds (validateOutput.js), in code points: the hard limits the server enforces
 export const TEASER_MAX = 90;
 export const DETAIL_MAX = 600;
+// What the prompt asks for. Models count characters loosely, so the prompt aims about 20-25% below the hard
+// limits (a 9-habit account got a teaser over 90 when the prompt asked for "at most 90").
+export const TEASER_TARGET = 70;
+export const DETAIL_TARGET = 450;
 
 // Icon id -> the only habit description the model ever sees. The keys are the app's ICON_IDS
 // (constants/habits.ts); a test keeps the two lists equal. No user text reaches the prompt.

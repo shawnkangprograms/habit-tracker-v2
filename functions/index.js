@@ -93,7 +93,14 @@ export const generateInsight = onCall(
     };
     const output = validateOutput(response.json);
     if (!output.ok) {
-      logger.warn('generateInsight invalid model output', {reason: output.reason, ms, ...tokens});
+      // lengths are code-point counts only; the model's text is never logged
+      logger.warn('generateInsight invalid model output', {
+        reason: output.reason,
+        teaserLength: output.lengths.teaser,
+        detailLength: output.lengths.detail,
+        ms,
+        ...tokens,
+      });
       return UNAVAILABLE;
     }
 

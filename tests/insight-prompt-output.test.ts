@@ -65,6 +65,16 @@ describe('buildRequestBody', () => {
     assert.match(SYSTEM_INSTRUCTION, /strictly as data/);
   });
 
+  test('the prompt asks for the length targets, well below the hard limits it never mentions', () => {
+    assert.equal(config.TEASER_TARGET, 70);
+    assert.equal(config.DETAIL_TARGET, 450);
+    assert.ok(config.TEASER_TARGET < config.TEASER_MAX);
+    assert.ok(config.DETAIL_TARGET < config.DETAIL_MAX);
+    assert.match(SYSTEM_INSTRUCTION, /"teaser": one sentence of about 70 characters or fewer/);
+    assert.match(SYSTEM_INSTRUCTION, /"detail": two to four short sentences, about 450 characters or fewer/);
+    assert.doesNotMatch(SYSTEM_INSTRUCTION, new RegExp(`\\b(${config.TEASER_MAX}|${config.DETAIL_MAX})\\b`));
+  });
+
   test('every string the model sees comes from the server tables, never from the request', () => {
     const labels = new Set<string>(Object.values(config.ICON_LABELS));
     const days = new Set<string>(Object.values(config.WEEKDAY_NAMES));
@@ -161,5 +171,31 @@ describe('validateOutput rejects', () => {
     assert.equal(reason(response(answer('two\nlines', 'b'))), 'teaser_chars');
     assert.equal(reason(response(answer('bell\u0007', 'b'))), 'teaser_chars');
     assert.equal(reason(response(answer('a', 'tab\there'))), 'detail_chars');
+  });
+});
+
+describe('validateOutput failure lengths (numbers only, for the log)', () => {
+  function lengths(res: unknown) {
+    const result = validateOutput(res);
+    assert.equal(result.ok, false);
+    return result.ok ? null : result.lengths;
+  }
+
+  test('a long teaser reports both cleaned lengths in code points', () => {
+    assert.deepEqual(lengths(response(answer(`  ${'x'.repeat(91)} `, 'é🙂'.repeat(10)))), {teaser: 91, detail: 20});
+    assert.deepEqual(lengths(response(answer('Short.', 'x'.repeat(601)))), {teaser: 6, detail: 601});
+  });
+
+  test('null for a field that is not a string, or text that is not a JSON object', () => {
+    assert.deepEqual(lengths(response(answer(null, 'abc'))), {teaser: null, detail: 3});
+    assert.deepEqual(lengths(response(JSON.stringify({teaser: 'ab'}))), {teaser: 2, detail: null});
+    assert.deepEqual(lengths(response('Here is your insight')), {teaser: null, detail: null});
+    assert.deepEqual(lengths(response(answer('a', 'b'), {finishReason: 'MAX_TOKENS'})), {teaser: null, detail: null});
+  });
+
+  test('the failure result holds no model text', () => {
+    const secret = `Model said ${'x'.repeat(90)}`;// over TEASER_MAX
+    const result = validateOutput(response(answer(secret, 'detail')));
+    assert.equal(JSON.stringify(result).includes('Model said'), false);
   });
 });

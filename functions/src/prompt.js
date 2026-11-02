@@ -3,7 +3,7 @@
 // (icon labels, weekday names, fixed wording); the only values from the phone are validated integers and enums.
 // Plain text-to-JSON: no tools, no Google Search grounding, no toolConfig.
 
-import {ICON_LABELS, MAX_OUTPUT_TOKENS, TEASER_MAX, DETAIL_MAX, TEMPERATURE, THINKING_LEVEL, WEEKDAY_NAMES} from './config.js';
+import {ICON_LABELS, MAX_OUTPUT_TOKENS, TEASER_TARGET, DETAIL_TARGET, TEMPERATURE, THINKING_LEVEL, WEEKDAY_NAMES} from './config.js';
 
 export const SYSTEM_INSTRUCTION = [
   'You are the coach inside HabitQuest, a habit-tracking app.',
@@ -12,8 +12,9 @@ export const SYSTEM_INSTRUCTION = [
   'Write one short, warm, specific observation and one practical suggestion based only on the numbers given.',
   'Do not invent habits, numbers or history that are not in the data.',
   'No medical, diet, mental-health or financial advice. No links. No emoji. Plain English.',
-  `Reply with JSON only: {"teaser": at most ${TEASER_MAX} characters, one sentence,`,
-  `"detail": at most ${DETAIL_MAX} characters, two to four sentences}.`,
+  // the targets, not the hard limits: the model should aim well below what validateOutput.js rejects
+  `Reply with JSON only: {"teaser": one sentence of about ${TEASER_TARGET} characters or fewer,`,
+  `"detail": two to four short sentences, about ${DETAIL_TARGET} characters or fewer}.`,
 ].join(' ');
 
 const RESPONSE_SCHEMA = {

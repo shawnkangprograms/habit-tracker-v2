@@ -12,15 +12,32 @@ function codePoints(s) {
   return [...s].length;
 }
 
-/** @typedef {{ok: true, value: {teaser: string, detail: string}} | {ok: false, reason: string}} OutputResult */
+/**
+ * Every failure carries `lengths`: the cleaned teaser and detail lengths in code points, null when that field
+ * is missing or not a string, or the text was not a JSON object. Numbers only, so they are safe to log.
+ * @typedef {{teaser: number | null, detail: number | null}} OutputLengths
+ * @typedef {{ok: true, value: {teaser: string, detail: string}} |
+ *           {ok: false, reason: string, lengths: OutputLengths}} OutputResult
+ */
+
+const NO_LENGTHS = Object.freeze({teaser: null, detail: null});
 
 /** @returns {OutputResult} */
-function fail(reason) {
-  return {ok: false, reason};
+function fail(reason, lengths = NO_LENGTHS) {
+  return {ok: false, reason, lengths: {...lengths}};
 }
 
 function isPlainObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+// What the card would show: NFC, CRLF to LF (detail only), trimmed. Null for a non-string.
+function cleanTeaser(value) {
+  return typeof value === 'string' ? value.normalize('NFC').trim() : null;
+}
+
+function cleanDetail(value) {
+  return typeof value === 'string' ? value.normalize('NFC').replace(/\r\n?/g, '\n').trim() : null;
 }
 
 /** @returns {OutputResult} */
@@ -50,15 +67,17 @@ export function validateOutput(response) {
     return fail('not_json');
   }
   if (!isPlainObject(parsed)) return fail('not_object');
-  const keys = Object.keys(parsed);
-  if (keys.length !== 2 || !Object.hasOwn(parsed, 'teaser') || !Object.hasOwn(parsed, 'detail')) return fail('keys');
-  if (typeof parsed.teaser !== 'string' || typeof parsed.detail !== 'string') return fail('types');
 
-  const teaser = parsed.teaser.normalize('NFC').trim();
-  const detail = parsed.detail.normalize('NFC').replace(/\r\n?/g, '\n').trim();
-  if (teaser === '' || codePoints(teaser) > TEASER_MAX) return fail('teaser_length');
-  if (detail === '' || codePoints(detail) > DETAIL_MAX) return fail('detail_length');
-  if (CONTROL.test(teaser)) return fail('teaser_chars');
-  if (CONTROL_EXCEPT_NEWLINE.test(detail)) return fail('detail_chars');
+  const teaser = cleanTeaser(parsed.teaser);
+  const detail = cleanDetail(parsed.detail);
+  const lengths = {teaser: teaser === null ? null : codePoints(teaser), detail: detail === null ? null : codePoints(detail)};
+  const keys = Object.keys(parsed);
+  if (keys.length !== 2 || !Object.hasOwn(parsed, 'teaser') || !Object.hasOwn(parsed, 'detail')) return fail('keys', lengths);
+  if (teaser === null || detail === null) return fail('types', lengths);
+
+  if (teaser === '' || lengths.teaser > TEASER_MAX) return fail('teaser_length', lengths);
+  if (detail === '' || lengths.detail > DETAIL_MAX) return fail('detail_length', lengths);
+  if (CONTROL.test(teaser)) return fail('teaser_chars', lengths);
+  if (CONTROL_EXCEPT_NEWLINE.test(detail)) return fail('detail_chars', lengths);
   return {ok: true, value: {teaser, detail}};
 }

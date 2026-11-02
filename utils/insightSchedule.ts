@@ -7,8 +7,13 @@
 //   A cached insight for today, or a recorded attempt today, means no request.
 // - Only when Firebase has confirmed the user (never on a presumed uid), no request is in flight, and no wait
 //   is running.
-// - ok: cache it with its day. limit / unavailable / a malformed answer / a refusal error: record today as
-//   attempted, no retry today. busy: wait 60 min. Network-type errors: wait 30 min. Waits are in memory only.
+// - ok: cache it with its day. limit, or a refusal error (invalid-argument, permission-denied, not-found,
+//   failed-precondition): record today as attempted, no retry today.
+// - Waits, in memory only: busy 60 min; a server failure (status unavailable, a malformed ok, anything
+//   unexpected) 30 min; network-type errors 30 min. The server's 3 attempts per user per day are the final
+//   limit: after them it answers limit, which ends the day.
+// - With nothing cached, "Check back once you're online" is only for a network wait (or Firebase not having
+//   confirmed the user yet); during a server or busy wait the card is hidden.
 // - Nothing here ever throws to the caller: any failure leaves the card hidden or on its last good state.
 
 import {fromDayNumber, isDateString, toDayNumber, weekdayOf} from '@/utils/gamification';
@@ -18,6 +23,7 @@ export const TEASER_MAX = 90;
 export const DETAIL_MAX = 600;
 export const BUSY_WAIT_MS = 60 * 60 * 1000;
 export const NETWORK_WAIT_MS = 30 * 60 * 1000;
+export const SERVER_WAIT_MS = 30 * 60 * 1000;
 
 export const MESSAGES = {
   online: 'Check back once you\'re online for your first insight.',
@@ -26,7 +32,9 @@ export const MESSAGES = {
 } as const;
 
 export type Insight = {day: string; teaser: string; detail: string};
-export type AttemptStatus = 'limit' | 'unavailable';
+// Why the day's tries ended without an insight. ('unavailable' was stored by an older build for a server
+// failure; services/insightCache.ts drops it on read, so those users are retried.)
+export type AttemptStatus = 'limit' | 'refused';
 
 // What services/insightCache.ts stores per uid
 export type CacheEntry = {
@@ -41,13 +49,21 @@ export const EMPTY_ENTRY: CacheEntry = {v: 1, insight: null, attemptedDay: null,
 // 'pending' until the first request check has run (the card stays hidden meanwhile)
 export type Phase = 'pending' | 'idle' | 'inFlight' | 'waiting';
 export type Eligibility = 'unknown' | 'eligible' | 'notEnoughData';
+export type WaitReason = 'busy' | 'network' | 'server';
+export type Wait = {until: number; reason: WaitReason};
 
-export type InsightView = {cacheRead: boolean; entry: CacheEntry; eligibility: Eligibility; phase: Phase};
+export type InsightView = {
+  cacheRead: boolean;
+  entry: CacheEntry;
+  eligibility: Eligibility;
+  phase: Phase;
+  waitReason: WaitReason | null;// set while phase is 'waiting'
+};
 
 export type Outcome =
   | {kind: 'ok'; insight: Insight}
   | {kind: 'attempted'; status: AttemptStatus}
-  | {kind: 'wait'; ms: number; reason: 'busy' | 'network'};
+  | {kind: 'wait'; ms: number; reason: WaitReason};
 
 function codePoints(s: string): number {
   return [...s].length;
@@ -79,7 +95,7 @@ export function classifyResult(result: {data: unknown} | {error: unknown}): Outc
   if ('error' in result) {
     const raw = (result.error as {code?: unknown} | null)?.code;
     const code = typeof raw === 'string' ? raw.replace(/^functions\//, '') : '';
-    if (REFUSAL_CODES.has(code)) return {kind: 'attempted', status: 'unavailable'};
+    if (REFUSAL_CODES.has(code)) return {kind: 'attempted', status: 'refused'};
     return {kind: 'wait', ms: NETWORK_WAIT_MS, reason: 'network'};// unavailable, deadline-exceeded, internal, unknown...
   }
   const data = result.data as {status?: unknown; day?: unknown; teaser?: unknown; detail?: unknown} | null;
@@ -87,11 +103,12 @@ export function classifyResult(result: {data: unknown} | {error: unknown}): Outc
   if (status === 'ok') {
     const insight = {day: data?.day, teaser: data?.teaser, detail: data?.detail};
     if (isInsight(insight)) return {kind: 'ok', insight: {day: insight.day, teaser: insight.teaser.trim(), detail: insight.detail.trim()}};
-    return {kind: 'attempted', status: 'unavailable'};
   }
   if (status === 'limit') return {kind: 'attempted', status: 'limit'};
   if (status === 'busy') return {kind: 'wait', ms: BUSY_WAIT_MS, reason: 'busy'};
-  return {kind: 'attempted', status: 'unavailable'};// 'unavailable' or anything unexpected
+  // 'unavailable' (e.g. the model's answer failed validation), a malformed ok, or anything unexpected:
+  // try again later today; the server's attempt cap decides when the day ends
+  return {kind: 'wait', ms: SERVER_WAIT_MS, reason: 'server'};
 }
 
 export type CardContent =
@@ -106,7 +123,9 @@ export function cardContent(view: InsightView, today: string): CardContent {
   if (entry.attemptedDay === today) return {kind: 'message', text: MESSAGES.tomorrow};
   if (view.eligibility === 'notEnoughData') return {kind: 'message', text: MESSAGES.firstAfterThreeDays};
   if (view.phase === 'pending' || view.phase === 'inFlight') return {kind: 'hidden'};
-  return {kind: 'message', text: MESSAGES.online};// waiting after a network error or busy, or not signed in to Firebase yet
+  // a server failure or busy: the phone is online, so the online message would be wrong; retried quietly
+  if (view.phase === 'waiting' && view.waitReason !== 'network') return {kind: 'hidden'};
+  return {kind: 'message', text: MESSAGES.online};// waiting after a network error, or not signed in to Firebase yet
 }
 
 const SHORT_DAYS = {mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat', sun: 'Sun'} as const;
@@ -131,7 +150,7 @@ export type RunnerDeps = {
   isAuthConfirmed: () => boolean;
   today: () => string;
   now: () => number;
-  waits: Map<string, number>;// per uid, shared by every runner (module level in the app)
+  waits: Map<string, Wait>;// per uid, shared by every runner (module level in the app)
   inFlight: Set<string>;// uids with a request running, shared the same way
   onChange: (view: InsightView) => void;
   mark?: (name: 'insight:cacheRead' | 'insight:requestStart' | 'insight:requestEnd') => void;
@@ -140,7 +159,7 @@ export type RunnerDeps = {
 
 // One runner per mounted card (per uid). readCache and start never reject; after dispose nothing calls onChange.
 export function createInsightRunner(deps: RunnerDeps) {
-  let view: InsightView = {cacheRead: false, entry: EMPTY_ENTRY, eligibility: 'unknown', phase: 'pending'};
+  let view: InsightView = {cacheRead: false, entry: EMPTY_ENTRY, eligibility: 'unknown', phase: 'pending', waitReason: null};
   let eligibilityDay: string | null = null;
   let started = false;
   let disposed = false;
@@ -192,29 +211,32 @@ export function createInsightRunner(deps: RunnerDeps) {
     const {uid} = deps;
     const today = deps.today();
     if (!needsInsight(view.entry, today)) {
-      update({phase: 'idle'});
+      update({phase: 'idle', waitReason: null});
       return;
     }
-    const waitUntil = deps.waits.get(uid) ?? null;
-    const callable = canCallNow({now: deps.now(), waitUntil, authConfirmed: deps.isAuthConfirmed(), inFlight: deps.inFlight.has(uid)});
+    const wait = deps.waits.get(uid) ?? null;
+    const waiting = wait !== null && deps.now() < wait.until;
+    // not calling now: 'waiting' (with why) while a wait runs, otherwise 'idle'
+    const notCalling: Partial<InsightView> = waiting ? {phase: 'waiting', waitReason: wait.reason} : {phase: 'idle', waitReason: null};
+    const callable = canCallNow({now: deps.now(), waitUntil: wait?.until ?? null, authConfirmed: deps.isAuthConfirmed(), inFlight: deps.inFlight.has(uid)});
     // Read the rows only when a call can go out, or once a day to know which message to show
     if (!callable && eligibilityDay === today) {
-      update({phase: waitUntil !== null && deps.now() < waitUntil ? 'waiting' : 'idle'});
+      update(notCalling);
       return;
     }
     const built = await deps.buildRequest();
     eligibilityDay = today;
     if (!built.ok) {
-      update({eligibility: 'notEnoughData', phase: 'idle'});
+      update({eligibility: 'notEnoughData', phase: 'idle', waitReason: null});
       return;
     }
     if (!callable) {
-      update({eligibility: 'eligible', phase: waitUntil !== null && deps.now() < waitUntil ? 'waiting' : 'idle'});
+      update({eligibility: 'eligible', ...notCalling});
       return;
     }
 
     deps.inFlight.add(uid);
-    update({eligibility: 'eligible', phase: 'inFlight'});
+    update({eligibility: 'eligible', phase: 'inFlight', waitReason: null});
     let outcome: Outcome;
     try {
       deps.mark?.('insight:requestStart');
@@ -232,8 +254,8 @@ export function createInsightRunner(deps: RunnerDeps) {
       await save({...view.entry, attemptedDay: today, attemptStatus: outcome.status});
       update({phase: 'idle'});
     } else {
-      deps.waits.set(uid, deps.now() + outcome.ms);
-      update({phase: 'waiting'});
+      deps.waits.set(uid, {until: deps.now() + outcome.ms, reason: outcome.reason});
+      update({phase: 'waiting', waitReason: outcome.reason});
     }
   }
 
