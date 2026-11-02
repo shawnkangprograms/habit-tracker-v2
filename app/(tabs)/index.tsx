@@ -26,6 +26,7 @@ import {XpFloat} from '@/components/xp-float';
 import {useReduceMotion} from '@/hooks/use-reduce-motion';
 import {useCelebrations, type TickStats} from '@/hooks/use-celebrations';// overlays, banner and toasts after a tick
 import {CelebrationLayer} from '@/components/celebration-layer';
+import {InsightCard} from '@/components/insight-card';// AI insight; shows nothing until after Home is usable
 import {ReminderPrompt} from '@/components/reminder-prompt';// one-time "gentle evening reminder?" card
 import {getNotificationPrefs, notificationPrefsLoaded, useNotificationPrefs} from '@/services/notificationPrefs';
 import {shouldShowSoftPrompt} from '@/utils/notificationPrefs';
@@ -420,6 +421,9 @@ export default function HomeScreen() {// default export, becomes the "index" tab
             scheduledToday={habits.length}
           />
         )}
+
+        {/* keyed by uid: another account always gets a fresh card, never the previous one's insight */}
+        {userId && <InsightCard key={userId} userId={userId} />}
 
         {reminderPrompt && <ReminderPrompt onClose={closeReminderPrompt} />}
 

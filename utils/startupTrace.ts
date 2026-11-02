@@ -34,7 +34,10 @@ export type MarkName =
   | 'services:start'
   | 'firestore:requireStart'
   | 'firestore:requireEnd'
-  | 'ota:checkEnd';// the over-the-air update check ended, whatever its result
+  | 'ota:checkEnd'// the over-the-air update check ended, whatever its result
+  | 'insight:cacheRead'// the insight card's cache was read (after usable)
+  | 'insight:requestStart'// the first generateInsight call started (at most once a day)
+  | 'insight:requestEnd';
 
 export type Marks = Partial<Record<MarkName, number>>;
 
@@ -209,6 +212,9 @@ export function summarise(record: TraceRecord): TraceRow[] {
     afterUsable('Notification scheduler started', 'notif:schedulerStart'),
     afterUsable('First schedule rebuild done', 'notif:firstRebuildEnd'),
     afterUsable('Update check ended', 'ota:checkEnd'),
+    afterUsable('Insight cache read', 'insight:cacheRead'),
+    afterUsable('Insight request started', 'insight:requestStart'),
+    afterUsable('Insight request ended', 'insight:requestEnd'),
   ];
 }
 
