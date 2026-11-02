@@ -26,4 +26,32 @@ module.exports = defineConfig([
       }],
     },
   },
+  {
+    // Onboarding answers never leave the phone (docs/ONBOARDING_SPEC.md, section 2): no Firebase at all, not even
+    // type imports, and no sync or insight modules. This block replaces the rule above for these files, so it
+    // repeats the Firestore and Functions bans in their stricter form. tests/onboarding-isolation.test.ts also
+    // scans these files for require() calls, which this rule can't see.
+    files: [
+      'app/onboarding*', 'app/onboarding/**', 'components/onboarding/**', 'utils/onboarding/**',
+      'services/onboardingStore.ts', 'hooks/use-onboarding-gate.ts',
+    ],
+    rules: {
+      'no-restricted-imports': ['error', {
+        paths: [
+          { name: 'firebase/firestore', message: 'Onboarding answers never leave the phone.' },
+          { name: '@firebase/firestore', message: 'Onboarding answers never leave the phone.' },
+          { name: 'firebase/functions', message: 'Onboarding answers never leave the phone.' },
+          { name: '@firebase/functions', message: 'Onboarding answers never leave the phone.' },
+          { name: '@/services/firestore', message: 'Onboarding answers never leave the phone.' },
+          { name: '@/services/insights', message: 'Onboarding answers are never sent to the insight function.' },
+          { name: '@/services/insightCache', message: 'Onboarding answers are never sent to the insight function.' },
+          { name: '@/utils/insightInput', message: 'Onboarding answers are never sent to the insight function.' },
+        ],
+        patterns: [
+          { group: ['firebase', 'firebase/*', '@firebase/*'], message: 'Onboarding answers never leave the phone.' },
+          { group: ['@/sync/*', '@/db/sync', '@/db/syncCore'], message: 'Onboarding answers are never synced.' },
+        ],
+      }],
+    },
+  },
 ]);
