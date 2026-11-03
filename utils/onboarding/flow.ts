@@ -4,19 +4,19 @@
 
 import type {Result} from '@/validation/validators';
 import {
-  AGE_RANGES, BAD_HABITS, CONFIDENCE_DEFAULT, CONFIDENCE_MAX, CONFIDENCE_MIN, DAYS, DERAILS, FOCUS_AREAS, FOCUS_MAX,
-  GENERAL_CHALLENGES, HABITS_FEEL, OCCUPATIONS, SLEEP, STUDENT_CHALLENGES, VALUES, VALUES_MAX, isOneOf,
-  type Answers, type Challenge, type CompleteAnswers, type Occupation, type StoredAnswers,
+  BAD_HABITS, CONFIDENCE_DEFAULT, CONFIDENCE_MAX, CONFIDENCE_MIN, DAYS, DERAILS, FOCUS_AREAS, FOCUS_MAX,
+  GENERAL_CHALLENGES, HABITS_FEEL, OCCUPATIONS, SLEEP, STUDENT_CHALLENGES, TIME_BUDGETS, VALUES, VALUES_MAX, isOneOf,
+  type Answers, type Challenge, type CompleteAnswers, type Occupation,
 } from '@/utils/onboarding/types';
 
 // One step per question; the progress line reads "STEP n OF 11"
 export const STEPS = [
-  'age', 'occupation', 'habitsFeel', 'focus', 'challenge', 'derails', 'sleep', 'days', 'values', 'badHabit', 'confidence',
+  'timeBudget', 'occupation', 'habitsFeel', 'focus', 'challenge', 'derails', 'sleep', 'days', 'values', 'badHabit', 'confidence',
 ] as const;
 export type StepKey = (typeof STEPS)[number];
 export const STEP_COUNT = STEPS.length;
 
-export type SingleKey = 'age' | 'occupation' | 'habitsFeel' | 'challenge' | 'derails' | 'sleep' | 'days' | 'badHabit';
+export type SingleKey = 'timeBudget' |'occupation' | 'habitsFeel' | 'challenge' | 'derails' | 'sleep' | 'days' | 'badHabit';
 export type MultiKey = 'focus' | 'values';
 export const MULTI_MAX: Record<MultiKey, number> = {focus: FOCUS_MAX, values: VALUES_MAX};
 
@@ -25,7 +25,7 @@ const fail = <T>(error: string): Result<T> => ({valid: false, error});
 
 export function emptyAnswers(): Answers {
   return {
-    age: null, occupation: null, habitsFeel: null, focus: [], challenge: null, derails: null,
+    timeBudget: null, occupation: null, habitsFeel: null, focus: [], challenge: null, derails: null,
     sleep: null, days: null, values: [], badHabit: null, confidence: CONFIDENCE_DEFAULT,
   };
 }
@@ -39,7 +39,7 @@ export function challengeOptions(occupation: Occupation | null): readonly Challe
 
 export function singleOptions(key: SingleKey, answers: Answers): readonly string[] {
   switch (key) {
-    case 'age': return AGE_RANGES;
+    case 'timeBudget': return TIME_BUDGETS;
     case 'occupation': return OCCUPATIONS;
     case 'habitsFeel': return HABITS_FEEL;
     case 'challenge': return challengeOptions(answers.occupation);
@@ -113,11 +113,12 @@ function validMulti<T extends string>(list: readonly T[], value: unknown, max: n
     && value.every((v) => isOneOf(list, v)) && new Set(value).size === value.length;
 }
 
-// Every field except Q10, rebuilt from the known fields only (anything else is dropped)
-function validateCore(input: unknown): Result<StoredAnswers> {
+// A finished questionnaire, ready for scoring and picking, rebuilt from the known fields only (anything else is
+// dropped). The answers are held in memory only: the local record no longer stores them (record.ts).
+export function validateAnswers(input: unknown): Result<CompleteAnswers> {
   if (typeof input !== 'object' || input === null || Array.isArray(input)) return fail('answers');
   const o = input as Record<string, unknown>;
-  if (!isOneOf(AGE_RANGES, o.age)) return fail('age');
+  if (!isOneOf(TIME_BUDGETS, o.timeBudget)) return fail('timeBudget');
   if (!isOneOf(OCCUPATIONS, o.occupation)) return fail('occupation');
   if (!isOneOf(HABITS_FEEL, o.habitsFeel)) return fail('habitsFeel');
   if (!validMulti(FOCUS_AREAS, o.focus, FOCUS_MAX)) return fail('focus');
@@ -127,22 +128,11 @@ function validateCore(input: unknown): Result<StoredAnswers> {
   if (!isOneOf(DAYS, o.days)) return fail('days');
   if (!validMulti(VALUES, o.values, VALUES_MAX)) return fail('values');
   if (!isConfidence(o.confidence)) return fail('confidence');
-  return ok({
-    age: o.age, occupation: o.occupation, habitsFeel: o.habitsFeel, focus: [...o.focus], challenge: o.challenge,
-    derails: o.derails, sleep: o.sleep, days: o.days, values: [...o.values], confidence: o.confidence,
-  });
-}
-
-// A finished questionnaire, ready for scoring and picking
-export function validateAnswers(input: unknown): Result<CompleteAnswers> {
-  const core = validateCore(input);
-  if (!core.valid) return core;
-  const badHabit = (input as Record<string, unknown>).badHabit ?? null;
+  const badHabit = o.badHabit ?? null;
   if (badHabit !== null && !isOneOf(BAD_HABITS, badHabit)) return fail('badHabit');
-  return ok({...core.value, badHabit});
-}
-
-// The answers as stored in the local record: Q10 is never part of them, even if the input has it
-export function validateStoredAnswers(input: unknown): Result<StoredAnswers> {
-  return validateCore(input);
+  return ok({
+    timeBudget: o.timeBudget, occupation: o.occupation, habitsFeel: o.habitsFeel, focus: [...o.focus],
+    challenge: o.challenge, derails: o.derails, sleep: o.sleep, days: o.days, values: [...o.values], badHabit,
+    confidence: o.confidence,
+  });
 }

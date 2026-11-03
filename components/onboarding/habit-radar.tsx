@@ -1,12 +1,13 @@
 import {useEffect} from 'react';
-import {StyleSheet, View} from 'react-native';
+import {useWindowDimensions, View} from 'react-native';
 import Svg, {Line, Polygon, Text as SvgText} from 'react-native-svg';
 import Animated, {
   Easing, ReduceMotion, useAnimatedStyle, useSharedValue, withDelay, withTiming,
 } from 'react-native-reanimated';
 import {colors, fonts} from '@/constants/theme';
 import {useReduceMotion} from '@/hooks/use-reduce-motion';
-import {polygonPoints, radarPoint} from '@/utils/onboarding/radar';
+import {SCREEN_PADDING, textWidth} from '@/utils/onboarding/layout';
+import {LABEL_SIZE, fitRadar, polygonPoints, radarPoint} from '@/utils/onboarding/radar';
 import {
   RADAR_BASELINE_MS, RADAR_DATA_DELAY_MS, RADAR_DATA_FROM_SCALE, RADAR_DATA_MS, RADAR_LABELS_DELAY_MS, RADAR_LABELS_MS,
   shouldAnimate,
@@ -23,16 +24,23 @@ import {AXES} from '@/utils/onboarding/types';
 // then the labels fade in. Under reduced motion every layer is simply there. The radar reads the setting itself
 // (its parent takes no motion prop); the hook reads false for its first moment, which the ReduceMotion.System
 // backstop on every animation covers, and the effect then re-runs and shows every layer at once.
+//
+// Size: the drawing area is the full content width, and fitRadar (utils/onboarding/radar.ts) picks the largest
+// radius that keeps every label inside it, from a conservative estimate of each label's width
+// (tests/onboarding-layout.test.ts checks screen widths 300 to 430).
 
-const SIZE = 280;
-const C = SIZE / 2;
-const RADIUS = 92;
-const LABEL_GAP = 20;
 const FULL = AXES.map(() => 1);
 const BASELINE = AXES.map(() => RADAR_BASELINE / AXIS_MAX);
 const SYSTEM = ReduceMotion.System;// a backstop for the first render, before useReduceMotion has read the setting
+const labelWidth = (text: string) => textWidth(text, LABEL_SIZE);
 
 export function HabitRadar({scores}: {scores: Scores}) {
+  const {width: screenWidth} = useWindowDimensions();
+  const fit = fitRadar(screenWidth - 2 * SCREEN_PADDING, AXES, labelWidth);
+  const {width, height, cx, cy, radius} = fit;
+  const box = {width, height, alignSelf: 'center'} as const;
+  const layer = {position: 'absolute', top: 0, left: 0, width, height} as const;
+  const viewBox = `0 0 ${width} ${height}`;
   const animate = shouldAnimate(useReduceMotion());
   const baseline = useSharedValue(animate ? 0 : 1);
   const data = useSharedValue(animate ? 0 : 1);// 0..1: opacity, and scale from RADAR_DATA_FROM_SCALE to 1
@@ -60,30 +68,30 @@ export function HabitRadar({scores}: {scores: Scores}) {
 
   const label = AXES.map((axis) => `${axis} ${scores[axis]} of ${AXIS_MAX}`).join(', ');
   return (
-    <View style={styles.box} accessible accessibilityRole="image" accessibilityLabel={label}>
+    <View style={box} accessible accessibilityRole="image" accessibilityLabel={label}>
       {/* 1. grid: axis lines and the outer hexagon (static) */}
-      <View style={styles.layer}>
-        <Svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`}>
+      <View style={layer}>
+        <Svg width={width} height={height} viewBox={viewBox}>
           {AXES.map((axis, i) => {
-            const end = radarPoint(i, AXES.length, 1, RADIUS, C, C);
-            return <Line key={axis} x1={C} y1={C} x2={end.x} y2={end.y} stroke={colors.border} strokeWidth={1} />;
+            const end = radarPoint(i, AXES.length, 1, radius, cx, cy);
+            return <Line key={axis} x1={cx} y1={cy} x2={end.x} y2={end.y} stroke={colors.border} strokeWidth={1} />;
           })}
-          <Polygon points={polygonPoints(FULL, RADIUS, C, C)} fill="none" stroke={colors.border} strokeWidth={1.5} />
+          <Polygon points={polygonPoints(FULL, radius, cx, cy)} fill="none" stroke={colors.border} strokeWidth={1.5} />
         </Svg>
       </View>
 
       {/* 2. the 2/5 baseline */}
-      <Animated.View style={[styles.layer, baselineStyle]}>
-        <Svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`}>
-          <Polygon points={polygonPoints(BASELINE, RADIUS, C, C)} fill="none" stroke={colors.muted} strokeWidth={1} strokeDasharray="4 4" />
+      <Animated.View style={[layer, baselineStyle]}>
+        <Svg width={width} height={height} viewBox={viewBox}>
+          <Polygon points={polygonPoints(BASELINE, radius, cx, cy)} fill="none" stroke={colors.muted} strokeWidth={1} strokeDasharray="4 4" />
         </Svg>
       </Animated.View>
 
       {/* 3. the scores */}
-      <Animated.View style={[styles.layer, dataStyle]}>
-        <Svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`}>
+      <Animated.View style={[layer, dataStyle]}>
+        <Svg width={width} height={height} viewBox={viewBox}>
           <Polygon
-            points={polygonPoints(radarValues(scores), RADIUS, C, C)}
+            points={polygonPoints(radarValues(scores), radius, cx, cy)}
             fill={colors.accent}
             fillOpacity={0.25}
             stroke={colors.accent}
@@ -93,25 +101,15 @@ export function HabitRadar({scores}: {scores: Scores}) {
       </Animated.View>
 
       {/* 4. axis labels */}
-      <Animated.View style={[styles.layer, labelsStyle]}>
-        <Svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`}>
-          {AXES.map((axis, i) => {
-            const p = radarPoint(i, AXES.length, 1, RADIUS + LABEL_GAP, C, C);
-            const anchor = Math.abs(p.x - C) < 1 ? 'middle' : p.x < C ? 'end' : 'start';
-            const dy = p.y < C - 1 ? -2 : p.y > C + 1 ? 10 : 4;// keep top and bottom labels clear of the shape
-            return (
-              <SvgText key={axis} x={p.x} y={p.y + dy} textAnchor={anchor} fill={colors.muted} fontSize={12} fontFamily={fonts.semiBold}>
-                {axis}
-              </SvgText>
-            );
-          })}
+      <Animated.View style={[layer, labelsStyle]}>
+        <Svg width={width} height={height} viewBox={viewBox}>
+          {fit.labels.map((l) => (
+            <SvgText key={l.text} x={l.x} y={l.y} textAnchor={l.anchor} fill={colors.muted} fontSize={LABEL_SIZE} fontFamily={fonts.semiBold}>
+              {l.text}
+            </SvgText>
+          ))}
         </Svg>
       </Animated.View>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  box: {width: SIZE, height: SIZE, alignSelf: 'center'},
-  layer: {position: 'absolute', top: 0, left: 0, width: SIZE, height: SIZE},
-});

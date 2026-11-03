@@ -6,6 +6,7 @@ import {
 } from 'firebase/auth';
 import {getFirebaseAuth} from '@/services/authInit';
 import {endSession} from '@/services/authMarker';
+import {onboardingStore} from '@/services/onboardingStore';
 // Every sign-out goes through endSession (clears the sign-in marker first); tests/auth-session.test.ts checks
 // that nothing else in the app calls Firebase's signOut or deletes the user.
 
@@ -16,6 +17,10 @@ export async function signUp(email, password, age){
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
 
     const uid = userCredential.user.uid;
+    // Onboarding opens on its own only after a sign-up on this phone (utils/onboarding/gate.ts). Set before the
+    // profile write, because the auth listener can mount Home before setDoc returns. Local only; a failed save
+    // just means it doesn't open on its own (Settings still has it).
+    await onboardingStore.markPending(uid).catch(() => {});
 
     const {doc, serverTimestamp, setDoc} = firestore();
     const db = getFirestoreDb();
@@ -26,6 +31,7 @@ export async function signUp(email, password, age){
         // roll back: no account may exist without its users doc (age). The sign-in is seconds old, so no reauth is needed.
         // Deleting also signs out, so it goes through endSession; it goes ahead even if the marker can't be cleared.
         await endSession(() => userCredential.user.delete(), {proceedIfMarkerClearFails: true}).catch(() => {});
+        await onboardingStore.clearPending(uid).catch(() => {});
         const err = new Error('Could not create the user profile');
         err.code = 'profile-write-failed';
         err.cause = cause;

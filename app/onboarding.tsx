@@ -7,6 +7,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import {addHabit, getActiveHabitsWithDays} from '@/db/habits';
+import type {IconId} from '@/constants/habits';
 import {selectionHaptic} from '@/services/haptics';
 import {useSessionUid} from '@/services/session';
 import {onboardingStore} from '@/services/onboardingStore';
@@ -27,13 +28,15 @@ import {
   singleOptions, toggleMulti, validateAnswers, type MultiKey, type SingleKey,
 } from '@/utils/onboarding/flow';
 import {
-  ADD_OWN_HABIT, AGE_LABELS, BAD_HABIT_LABELS, CHALLENGE_LABELS, CONTINUE, CREATE_FAILED, DAYS_LABELS, DERAIL_LABELS,
-  DONE, FIRST_STEP_NOTICE, FOCUS_LABELS, HABITS_FEEL_LABELS, NOTHING_LEFT, OCCUPATION_LABELS, ROUTINE_HINT, ROUTINE_TITLE,
-  SKIP_THIS_ONE, SLEEP_LABELS, START, STEP_HINTS, STEP_TITLES, STUDENT_CHALLENGE_TITLE, VALUE_LABELS,
+  ADD_OWN_HABIT, BAD_HABIT_LABELS, CHALLENGE_LABELS, CONTINUE, CREATE_FAILED, DAYS_LABELS, DERAIL_LABELS,
+  DONE, FIRST_STEP_NOTICE, FOCUS_LABELS, HABITS_FEEL_LABELS, NOTHING_LEFT, OCCUPATION_LABELS, OWN_HABIT_REASON,
+  ROUTINE_HINT, ROUTINE_TITLE, SKIP_THIS_ONE, SLEEP_LABELS, START, STEP_HINTS, STEP_TITLES, STUDENT_CHALLENGE_TITLE,
+  TIME_BUDGET_LABELS, VALUE_LABELS,
 } from '@/utils/onboarding/copy';
 import {entryFromParam, recordOnSkip} from '@/utils/onboarding/gate';
 import {
-  ROUTINE_REMINDER_DEFAULT, buildPlan, createPlannedHabits, type CreateSession, type Plan,
+  ROUTINE_REMINDER_DEFAULT, buildPlan, createPlannedHabits, newHabitIds, recordAfterOwnHabit, type CreateSession,
+  type Plan,
 } from '@/utils/onboarding/plan';
 import {
   BUTTON_PRESS_IN_MS, BUTTON_PRESS_OUT_MS, BUTTON_PRESS_SCALE, STEP_ENTER_MS, enterOffsetX, shouldAnimate,
@@ -48,17 +51,23 @@ import type {Answers, CompleteAnswers} from '@/utils/onboarding/types';
 // run) or by the Settings row (?entry=settings, a retake).
 //
 // The record is written only by "Skip setup" (utils/onboarding/gate.ts) or by the routine's habit creation
-// (utils/onboarding/plan.ts: after the first habit, or on Start with nothing selected). Leaving any other way,
-// including the app being killed before the first habit, writes nothing.
+// (utils/onboarding/plan.ts: after the first habit, on Start with nothing selected, or when the user's own habit
+// from the habit form is the first one). Leaving any other way, including the app being killed before the first
+// habit, writes nothing.
 //
-// Motion (stage 4, timings in utils/onboarding/motion.ts): a new question slides and fades in from the side it
-// came from (enter only; nothing on the first step), and the buttons scale slightly while pressed. Answer
-// changes play a light haptic. No motion under reduced motion; haptics stay.
+// "Add your own habit" pushes the habit form over this screen, so its Back returns to the routine. The active
+// habit ids are read just before it opens; on returning, any new id is the user's own habit, shown as an added
+// card (and it counts as "a habit exists": no way back from the routine).
+//
+// Motion (stage 4, timings in utils/onboarding/motion.ts): a new question fades in, and its options also slide in
+// from the side it came from (enter only; nothing on the first step). The title only fades, so no transform ever
+// touches the title text. The buttons scale slightly while pressed. Answer changes play a light haptic. No motion
+// under reduced motion; haptics stay.
 
 type Phase = 'questions' | 'building' | 'toldUs' | 'profile' | 'routine';
 
 const LABELS: Record<SingleKey | MultiKey, Record<string, string>> = {
-  age: AGE_LABELS,
+  timeBudget: TIME_BUDGET_LABELS,
   occupation: OCCUPATION_LABELS,
   habitsFeel: HABITS_FEEL_LABELS,
   focus: FOCUS_LABELS,
@@ -85,6 +94,22 @@ function stepEntering(direction: Direction | null, animate: boolean) {
     0: {opacity: 0, transform: [{translateX: enterOffsetX(direction)}]},
     100: {opacity: 1, transform: [{translateX: 0}], easing: Easing.out(Easing.cubic)},
   }).duration(STEP_ENTER_MS).reduceMotion(SYSTEM);
+}
+
+// The new step's title, hint and notice: the same timing, opacity only
+function titleEntering(direction: Direction | null, animate: boolean) {
+  if (!animate || direction === null) return undefined;
+  return new Keyframe({
+    0: {opacity: 0},
+    100: {opacity: 1, easing: Easing.out(Easing.cubic)},
+  }).duration(STEP_ENTER_MS).reduceMotion(SYSTEM);
+}
+
+type OwnHabit = {habitId: string; habitName: string; icon: IconId};
+
+// The user's active habits, for "Add your own habit": ids before the form opens, and the new ones after
+async function activeHabits(userId: string): Promise<OwnHabit[]> {
+  return getActiveHabitsWithDays(userId) as Promise<OwnHabit[]>;
 }
 
 function closeFlow() {
@@ -134,9 +159,11 @@ export default function OnboardingScreen() {
   const [reminderTime, setReminderTime] = useState(ROUTINE_REMINDER_DEFAULT);
   const [pickerAvailable] = useState(timePickerAvailable);// fixed for the app run
   const skippingRef = useRef(false);
+  const [ownHabits, setOwnHabits] = useState<OwnHabit[]>([]);// made in the habit form during this run
+  const formOpenedWith = useRef<ReadonlySet<string> | null>(null);// active ids when the form opened; null = not open
 
   const step = STEPS[stepIndex];
-  const anyCreated = created.size > 0;
+  const anyCreated = created.size > 0 || ownHabits.length > 0;
   // Once a habit exists, the answers that produced it can't be changed: no way back from the routine
   const canGoBack = phase === 'questions' ? stepIndex > 0
     : phase === 'toldUs' || phase === 'profile' || (phase === 'routine' && !anyCreated && !running);
@@ -233,7 +260,8 @@ export default function OnboardingScreen() {
 
   // Creates the selected cards one at a time (utils/onboarding/plan.ts). Resolves true when everything selected
   // exists; false if one failed (what was created stays, and Start tries the rest) or nothing could run.
-  const createSelected = async (): Promise<boolean> => {
+  // writeIfNone: false for "Add your own habit", which must not write the "chose none" record.
+  const createSelected = async (writeIfNone = true): Promise<boolean> => {
     if (!plan || !userId || runningRef.current) return false;
     runningRef.current = true;
     setRunning(true);
@@ -244,7 +272,7 @@ export default function OnboardingScreen() {
         saveRecord: (record) => onboardingStore.write(userId, record),
         now: clockNow,
         onCreated: (id) => setCreated((c) => new Set(c).add(id)),
-      }, {plan, selected, reminderTime: reminderOn ? reminderTime : null, session: session.current});
+      }, {plan, selected, reminderTime: reminderOn ? reminderTime : null, session: session.current, writeIfNone});
       session.current = {created: result.created, saved: result.saved};
       if (result.failed) {
         setCreateFailed(true);
@@ -263,10 +291,33 @@ export default function OnboardingScreen() {
     if (await createSelected()) closeFlow();
   };
 
-  // Saves the selected cards first, then the habit form takes this screen's place (its Back goes to Home)
+  // Saves the selected cards first, then opens the habit form over this screen (its Back returns here)
   const addOwnHabit = async () => {
-    if (await createSelected()) router.replace('/habit-form');
+    if (!userId || !(await createSelected(false))) return;
+    const before = await activeHabits(userId).catch(() => null);
+    if (!before) return;// without the ids before, a new habit couldn't be told apart; stay here
+    formOpenedWith.current = new Set(before.map((h) => h.habitId));
+    router.push('/habit-form');
   };
+
+  // Back from the habit form: a habit that wasn't there before is the user's own. The first habit of this run
+  // writes the finished record (plan.ts); later ones change nothing in it. Not cancelled on blur: the record
+  // write must happen even if the user moves on before the read returns.
+  useFocusEffect(useCallback(() => {
+    const before = formOpenedWith.current;
+    if (!before || !userId || !plan) return;
+    formOpenedWith.current = null;
+    activeHabits(userId).then(async (rows) => {
+      const fresh = newHabitIds(before, rows.map((h) => h.habitId));
+      if (fresh.length === 0) return;
+      setOwnHabits((own) => [...own, ...rows.filter((h) => fresh.includes(h.habitId))]);
+      const record = recordAfterOwnHabit(plan, session.current, clockNow());
+      if (record) {
+        session.current = {...session.current, saved: record};
+        await onboardingStore.write(userId, record);
+      }
+    }).catch(() => {});
+  }, [userId, plan]));
 
   const continueOn = canContinue(answers, step);
   const title = step === 'challenge' && answers.occupation === 'student' ? STUDENT_CHALLENGE_TITLE : STEP_TITLES[step];
@@ -284,50 +335,54 @@ export default function OnboardingScreen() {
       {/* keyed by step or screen, so each starts scrolled to the top */}
       <ScrollView key={phase === 'questions' ? step : phase} contentContainerStyle={styles.content}>
         {phase === 'questions' && (
-          <Animated.View entering={stepEntering(direction, animate)}>
-            <Text style={styles.title} accessibilityRole="header">{title}</Text>
-            {hint && <Text style={styles.hint}>{hint}</Text>}
-            {stepIndex === 0 && <Text style={styles.notice}>{FIRST_STEP_NOTICE}</Text>}
+          <>
+            <Animated.View entering={titleEntering(direction, animate)}>
+              <Text style={styles.title} accessibilityRole="header">{title}</Text>
+              {hint && <Text style={styles.hint}>{hint}</Text>}
+              {stepIndex === 0 && <Text style={styles.notice}>{FIRST_STEP_NOTICE}</Text>}
+            </Animated.View>
 
-            {step === 'confidence' ? (
-              <ConfidenceSlider
-                value={answers.confidence}
-                onChange={(n) => setAnswers((a) => setConfidence(a, n))}
-                label={title}
-                reduceMotion={reduceMotion}
-              />
-            ) : isMulti(step) ? (
-              <View style={styles.options}>
-                {multiOptions(step).map((value) => {
-                  const isSelected = (answers[step] as string[]).includes(value);
-                  return (
+            <Animated.View entering={stepEntering(direction, animate)}>
+              {step === 'confidence' ? (
+                <ConfidenceSlider
+                  value={answers.confidence}
+                  onChange={(n) => setAnswers((a) => setConfidence(a, n))}
+                  label={title}
+                  reduceMotion={reduceMotion}
+                />
+              ) : isMulti(step) ? (
+                <View style={styles.options}>
+                  {multiOptions(step).map((value) => {
+                    const isSelected = (answers[step] as string[]).includes(value);
+                    return (
+                      <OptionButton
+                        key={value}
+                        label={LABELS[step][value]}
+                        selected={isSelected}
+                        multi
+                        dimmed={!isSelected && isAtMax(answers, step)}
+                        reduceMotion={reduceMotion}
+                        onPress={() => pickMulti(step, value)}
+                      />
+                    );
+                  })}
+                </View>
+              ) : (
+                <View style={styles.options} accessibilityRole="radiogroup">
+                  {singleOptions(step, answers).map((value) => (
                     <OptionButton
                       key={value}
                       label={LABELS[step][value]}
-                      selected={isSelected}
-                      multi
-                      dimmed={!isSelected && isAtMax(answers, step)}
+                      selected={answers[step] === value}
+                      multi={false}
                       reduceMotion={reduceMotion}
-                      onPress={() => pickMulti(step, value)}
+                      onPress={() => pickSingle(step, value)}
                     />
-                  );
-                })}
-              </View>
-            ) : (
-              <View style={styles.options} accessibilityRole="radiogroup">
-                {singleOptions(step, answers).map((value) => (
-                  <OptionButton
-                    key={value}
-                    label={LABELS[step][value]}
-                    selected={answers[step] === value}
-                    multi={false}
-                    reduceMotion={reduceMotion}
-                    onPress={() => pickSingle(step, value)}
-                  />
-                ))}
-              </View>
-            )}
-          </Animated.View>
+                  ))}
+                </View>
+              )}
+            </Animated.View>
+          </>
         )}
 
         {phase === 'building' && <BuildingProfile reduceMotion={reduceMotion} ready={plan !== null} onDone={onBuilt} />}
@@ -367,6 +422,22 @@ export default function OnboardingScreen() {
               </>
             ) : (
               <Text style={styles.nothingLeft}>{NOTHING_LEFT}</Text>
+            )}
+            {ownHabits.length > 0 && (
+              <View style={styles.cards}>
+                {ownHabits.map((habit, i) => (
+                  <RoutineCard
+                    key={habit.habitId}
+                    pick={{habitName: habit.habitName, icon: habit.icon, reason: OWN_HABIT_REASON}}
+                    index={i}
+                    selected={false}
+                    added
+                    disabled
+                    reduceMotion={reduceMotion}
+                    onToggle={() => {}}
+                  />
+                ))}
+              </View>
             )}
           </View>
         )}
@@ -436,7 +507,8 @@ function PressButton({label, enabled, onPress, reduceMotion, variant = 'primary'
 const styles = StyleSheet.create({
   screen: {flex: 1, backgroundColor: colors.background},
   content: {paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.xl},
-  title: {fontFamily: fonts.title, fontSize: 28, lineHeight: 34, color: colors.text},
+  // 36: at least Space Grotesk Bold's natural line height (1.276 em = 35.7 at 28), so Android never trims line 1
+  title: {fontFamily: fonts.title, fontSize: 28, lineHeight: 36, color: colors.text},
   hint: {fontFamily: fonts.regular, fontSize: 14, color: colors.muted, marginTop: spacing.sm},
   notice: {fontFamily: fonts.regular, fontSize: 12, color: colors.muted, marginTop: spacing.sm},
   options: {gap: spacing.sm, marginTop: spacing.xl},

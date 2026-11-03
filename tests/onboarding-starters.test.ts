@@ -14,7 +14,7 @@ const {ICON_IDS} = await import('../constants/habits.ts');
 
 // Scores only Career (4); every other axis 1. Confidence 5: 3 habits.
 const BASE: CompleteAnswers = {
-  age: '25_34', occupation: 'early_career', habitsFeel: 'thriving', focus: ['career'], challenge: 'focus',
+  timeBudget: 'min60', occupation: 'early_career', habitsFeel: 'thriving', focus: ['career'], challenge: 'focus',
   derails: 'boredom', sleep: 'good', days: 'predictable', values: ['freedom'], badHabit: null, confidence: 5,
 };
 
@@ -167,5 +167,67 @@ describe('toHabitInput', () => {
       alarm: false, remindBeforeMin: 0,
     });
     assert.equal(st.toHabitInput(pick, null).reminderTime, null);
+  });
+});
+
+describe('time budget (Q1)', () => {
+  const minutesOf = (id: string) => st.CATALOG.find((tpl) => tpl.id === id)!.minutes;
+
+  test('the caps: single = the budget, total = twice the budget; an hour or more has none', () => {
+    assert.deepEqual(st.BUDGET_CAPS, {
+      min5: {single: 5, total: 10}, min15: {single: 15, total: 30}, min30: {single: 30, total: 60},
+      min60: {single: Infinity, total: Infinity},
+    });
+  });
+
+  test('every template and replace habit has whole minutes, at least 1', () => {
+    for (const tpl of st.CATALOG) assert.ok(Number.isInteger(tpl.minutes) && tpl.minutes >= 1, tpl.id);
+    assert.deepEqual(Object.keys(st.REPLACE_MINUTES), [...t.REPLACE_ANSWERS]);
+    for (const m of Object.values(st.REPLACE_MINUTES)) assert.ok(Number.isInteger(m) && m >= 1);
+  });
+
+  test('across a sweep of answers, no catalog pick breaks either cap, and the count never grows', () => {
+    for (const timeBudget of t.TIME_BUDGETS) {
+      const caps = st.BUDGET_CAPS[timeBudget];
+      for (const area of t.FOCUS_AREAS) {
+        for (const sleep of t.SLEEP) {
+          for (const confidence of [1, 5, 10]) {
+            const a: CompleteAnswers = {...BASE, timeBudget, focus: [area], sleep, confidence};
+            const catalog = st.pickStarters(a).filter((p) => p.kind === 'catalog');
+            const label = JSON.stringify({timeBudget, area, sleep, confidence});
+            for (const p of catalog) assert.ok(minutesOf(p.id) <= caps.single, `${p.id} ${label}`);
+            assert.ok(catalog.reduce((sum, p) => sum + minutesOf(p.id), 0) <= caps.total, label);
+            assert.ok(catalog.length <= st.baseStarterCount(confidence), label);
+          }
+        }
+      }
+    }
+  });
+
+  test('a pick that does not fit is skipped and picking continues down the list', () => {
+    // Career's only template is 15 minutes: too long for min5, so the next axes in rank order fill in
+    const picks = ids(st.pickStarters({...BASE, timeBudget: 'min5'}));
+    assert.equal(picks.includes('skill15'), false);
+    assert.equal(picks.includes('plan_top1'), true);
+    assert.deepEqual(ids(st.pickStarters({...BASE, timeBudget: 'min15'})).slice(0, 2), ['skill15', 'plan_top1']);
+  });
+
+  test('a sleep struggle still gets a sleep template on the smallest budget', () => {
+    for (const sleep of ['struggle', 'irregular'] as const) {
+      const picks = ids(st.pickStarters({...BASE, timeBudget: 'min5', sleep, confidence: 10}));
+      assert.ok(picks.some((id) => (st.SLEEP_TEMPLATE_IDS as readonly string[]).includes(id)), sleep);
+    }
+  });
+
+  test('the Q10 replace pick is exempt from the caps', () => {
+    const picks = st.pickStarters({...BASE, timeBudget: 'min5', badHabit: 'junk_food'});
+    assert.ok(picks.some((p) => p.kind === 'replace' && p.habitName === REPLACE_NAMES.junk_food));// 30 minutes
+  });
+
+  test('the time budget never changes the scores', async () => {
+    const {scoreAxes} = await import('../utils/onboarding/scoring.ts');
+    const answers = (timeBudget: CompleteAnswers['timeBudget']): CompleteAnswers => ({...BASE, timeBudget});
+    const first = scoreAxes(answers('min5'));
+    for (const timeBudget of t.TIME_BUDGETS) assert.deepEqual(scoreAxes(answers(timeBudget)), first, timeBudget);
   });
 });

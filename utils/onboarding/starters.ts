@@ -7,6 +7,10 @@
 // left out before picking, so the count holds while templates remain) and the names of the user's habits (a
 // replace habit with one of those names is left out, since Q10 is never stored).
 //
+// Time budget (Q1): no single catalog pick longer than the budget's `single` cap, and the catalog picks together
+// at most its `total` cap (twice the budget). A template that doesn't fit is skipped and picking continues down
+// the same order, so a small budget can give fewer picks than the count. The Q10 replace pick is exempt.
+//
 // Q10 never becomes part of an id: the replace pick's id is always REPLACE_PICK_ID.
 
 import type {IconId} from '@/constants/habits';
@@ -17,28 +21,42 @@ import {
 import {rankAxes, focusAxis, scoreAxes, AXIS_MIN} from '@/utils/onboarding/scoring';
 import {
   REPLACE_ANSWERS, TEMPLATE_IDS, isOneOf, type Axis, type CompleteAnswers, type ReplaceAnswer, type TemplateId,
+  type TimeBudget,
 } from '@/utils/onboarding/types';
 
-export type Template = {id: TemplateId; axis: Axis; habitName: string; icon: IconId; reason: string};
+// minutes: a typical day's time; habits that take no real time (lights out, water with meals) are 1
+export type Template = {id: TemplateId; axis: Axis; habitName: string; icon: IconId; reason: string; minutes: number};
 
 // Icons from the existing set. Known gaps (no fitting icon yet, neutral 'star'): plan_top1, phone_social,
 // gaming, procrastination.
-const TEMPLATE_DEFS: {id: TemplateId; axis: Axis; icon: IconId}[] = [
-  {id: 'walk20', axis: 'Health', icon: 'run'},
-  {id: 'stretch10', axis: 'Health', icon: 'heart'},
-  {id: 'water_meals', axis: 'Health', icon: 'water'},
-  {id: 'lights_out', axis: 'Health', icon: 'sleep'},
-  {id: 'screens_off', axis: 'Health', icon: 'sleep'},
-  {id: 'breathe5', axis: 'Mind', icon: 'meditate'},
-  {id: 'journal3', axis: 'Mind', icon: 'book'},
-  {id: 'plan_top1', axis: 'Discipline', icon: 'star'},
-  {id: 'focus25', axis: 'Discipline', icon: 'work'},
-  {id: 'study25', axis: 'Learning', icon: 'study'},
-  {id: 'review10', axis: 'Learning', icon: 'book'},
-  {id: 'skill15', axis: 'Career', icon: 'work'},
-  {id: 'message_friend', axis: 'Relations', icon: 'heart'},
-  {id: 'family_time', axis: 'Relations', icon: 'food'},
+const TEMPLATE_DEFS: {id: TemplateId; axis: Axis; icon: IconId; minutes: number}[] = [
+  {id: 'walk20', axis: 'Health', icon: 'run', minutes: 20},
+  {id: 'stretch10', axis: 'Health', icon: 'heart', minutes: 10},
+  {id: 'water_meals', axis: 'Health', icon: 'water', minutes: 1},
+  {id: 'lights_out', axis: 'Health', icon: 'sleep', minutes: 1},
+  {id: 'screens_off', axis: 'Health', icon: 'sleep', minutes: 1},
+  {id: 'breathe5', axis: 'Mind', icon: 'meditate', minutes: 5},
+  {id: 'journal3', axis: 'Mind', icon: 'book', minutes: 5},
+  {id: 'plan_top1', axis: 'Discipline', icon: 'star', minutes: 5},
+  {id: 'focus25', axis: 'Discipline', icon: 'work', minutes: 25},
+  {id: 'study25', axis: 'Learning', icon: 'study', minutes: 25},
+  {id: 'review10', axis: 'Learning', icon: 'book', minutes: 10},
+  {id: 'skill15', axis: 'Career', icon: 'work', minutes: 15},
+  {id: 'message_friend', axis: 'Relations', icon: 'heart', minutes: 5},
+  {id: 'family_time', axis: 'Relations', icon: 'food', minutes: 30},
 ];
+
+// The replace habits' minutes (approved with the catalog's; the replace pick itself is exempt from the caps)
+export const REPLACE_MINUTES: Record<ReplaceAnswer, number> = {
+  phone_social: 1, porn: 1, smoking_vaping: 5, gaming: 1, junk_food: 30, alcohol: 1, procrastination: 5,
+};
+
+export const BUDGET_CAPS: Record<TimeBudget, {single: number; total: number}> = {
+  min5: {single: 5, total: 10},
+  min15: {single: 15, total: 30},
+  min30: {single: 30, total: 60},
+  min60: {single: Infinity, total: Infinity},
+};
 
 export const CATALOG: readonly Template[] = TEMPLATE_DEFS.map((t) => ({
   ...t, habitName: TEMPLATE_NAMES[t.id], reason: TEMPLATE_REASONS[t.id],
@@ -92,9 +110,12 @@ export function pickStarters(
   const ranked = rankAxes(scores, answers.focus);
   const focus = focusAxis(scores, answers.focus);
   const base = baseStarterCount(answers.confidence);
+  const caps = BUDGET_CAPS[answers.timeBudget];
 
   const picked: Template[] = [];
-  const nextFor = (axis: Axis) => pool.find((t) => t.axis === axis && !picked.includes(t));
+  const total = () => picked.reduce((sum, t) => sum + t.minutes, 0);
+  const fits = (t: Template) => t.minutes <= caps.single && total() + t.minutes <= caps.total;
+  const nextFor = (axis: Axis) => pool.find((t) => t.axis === axis && !picked.includes(t) && fits(t));
 
   for (const axis of ranked) {
     if (picked.length >= base) break;
@@ -108,9 +129,10 @@ export function pickStarters(
 
   if ((answers.sleep === 'struggle' || answers.sleep === 'irregular')
     && !picked.some((t) => SLEEP_TEMPLATE_IDS.includes(t.id))) {
+    // sleep templates take 1 minute, the least any template takes, so taking the last slot never breaks the caps
     const sleep = SLEEP_TEMPLATE_IDS.map((id) => pool.find((t) => t.id === id)).find((t) => t !== undefined);
     if (sleep) {
-      if (picked.length < base) picked.push(sleep);
+      if (picked.length < base && fits(sleep)) picked.push(sleep);
       else picked[picked.length - 1] = sleep;
     }
   }

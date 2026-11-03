@@ -12,10 +12,13 @@ import {
   ADDED_IN_MS, ADDED_OUT_MS, CHECK_POP_HALF_MS, ITEM_ENTER_MS, ITEM_OFFSET_PX, ROUTINE_STAGGER_MS, shouldAnimate,
   staggerDelay,
 } from '@/utils/onboarding/motion';
+import {ROUTINE_CARD, ROUTINE_NAME_LINES} from '@/utils/onboarding/layout';
 import type {StarterPick} from '@/utils/onboarding/starters';
 
 // One Recommended Routine card: the habit, its reason line, and a check. Tapping toggles it (with a light
 // haptic); a card already created this run shows "Added" and can't be toggled. Styled like Home's habit cards.
+// The name takes up to two lines: every catalog and replace name fits in two on a 360 dp screen
+// (tests/onboarding-layout.test.ts, with the widths in utils/onboarding/layout.ts).
 // Motion (stage 4): cards fade and rise in 70 ms apart (capped at 280 ms), the check pops on each toggle, and
 // the check cross-fades to "Added" in one fixed slot. The card's own colours change instantly. None of it under
 // reduced motion.
@@ -31,7 +34,7 @@ function cardEntering(index: number) {
 }
 
 export function RoutineCard({pick, index, selected, added, disabled, reduceMotion, onToggle}: {
-  pick: StarterPick;
+  pick: Pick<StarterPick, 'habitName' | 'icon' | 'reason'>;// a starter, or the user's own habit
   index: number;// position in the list, for the stagger
   selected: boolean;
   added: boolean;
@@ -96,7 +99,7 @@ export function RoutineCard({pick, index, selected, added, disabled, reduceMotio
           <HabitIcon id={pick.icon} size={21} color={tint} />
         </View>
         <View style={styles.text}>
-          <Text style={[styles.name, !on && styles.faded]} numberOfLines={1}>{pick.habitName}</Text>
+          <Text style={[styles.name, !on && styles.faded]} numberOfLines={ROUTINE_NAME_LINES}>{pick.habitName}</Text>
           <Text style={[styles.reason, !on && styles.faded]}>{pick.reason}</Text>
         </View>
         {/* one fixed slot: the check and "Added" stacked, so the cross-fade never moves the text */}
@@ -115,21 +118,24 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 11,
+    gap: ROUTINE_CARD.gap,
     minHeight: 68,
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: ROUTINE_CARD.padding,
     paddingVertical: spacing.md,
     borderRadius: radii.habitCard,
     borderWidth: 1,
   },
   off: {backgroundColor: colors.surface, borderColor: colors.border},
   pressed: {opacity: 0.85},
-  badge: {width: 38, height: 38, borderRadius: radii.iconBadge, borderWidth: 1, alignItems: 'center', justifyContent: 'center'},
+  badge: {
+    width: ROUTINE_CARD.badge, height: ROUTINE_CARD.badge, borderRadius: radii.iconBadge, borderWidth: 1,
+    alignItems: 'center', justifyContent: 'center',
+  },
   text: {flex: 1, gap: 2},
-  name: {fontFamily: fonts.title, fontSize: 14, color: colors.text},
+  name: {fontFamily: fonts.title, fontSize: ROUTINE_CARD.nameSize, color: colors.text},
   reason: {fontFamily: fonts.regular, fontSize: 12, color: colors.muted},
   faded: {opacity: 0.5},
-  slot: {width: 52, height: 24, alignItems: 'flex-end', justifyContent: 'center'},
+  slot: {width: ROUTINE_CARD.slot, height: 24, alignItems: 'flex-end', justifyContent: 'center'},
   check: {
     position: 'absolute',
     right: 0,

@@ -10,12 +10,12 @@ const f = await import('../utils/onboarding/flow.ts');
 const t = await import('../utils/onboarding/types.ts');
 
 const COMPLETE: CompleteAnswers = {
-  age: '25_34', occupation: 'early_career', habitsFeel: 'alright', focus: ['health', 'career'], challenge: 'time',
+  timeBudget: 'min15', occupation: 'early_career', habitsFeel: 'alright', focus: ['health', 'career'], challenge: 'time',
   derails: 'stress', sleep: 'okay', days: 'mostly', values: ['achievement'], badHabit: null, confidence: 6,
 };
 
 const SINGLE_ENUMS: [SingleKey, readonly string[]][] = [
-  ['age', t.AGE_RANGES], ['occupation', t.OCCUPATIONS], ['habitsFeel', t.HABITS_FEEL], ['derails', t.DERAILS],
+  ['timeBudget', t.TIME_BUDGETS], ['occupation', t.OCCUPATIONS], ['habitsFeel', t.HABITS_FEEL], ['derails', t.DERAILS],
   ['sleep', t.SLEEP], ['days', t.DAYS], ['badHabit', t.BAD_HABITS],
 ];
 
@@ -53,9 +53,9 @@ describe('single answers', () => {
   });
 
   test('only Q10 can be cleared ("Skip this one")', () => {
-    const answered = {...f.emptyAnswers(), age: '18_24' as const, badHabit: 'gaming' as const};
+    const answered = {...f.emptyAnswers(), timeBudget: 'min5' as const, badHabit: 'gaming' as const};
     assert.equal(f.selectSingle(answered, 'badHabit', null).badHabit, null);
-    assert.equal(f.selectSingle(answered, 'age', null), answered);
+    assert.equal(f.selectSingle(answered, 'timeBudget', null), answered);
   });
 
   test('Q5 takes only values from the list Q2 chose', () => {
@@ -131,7 +131,7 @@ describe('validateAnswers', () => {
 
   test('every enum value of every question validates', () => {
     const lists: [keyof CompleteAnswers, readonly string[]][] = [
-      ['age', t.AGE_RANGES], ['occupation', t.OCCUPATIONS.filter((o) => o !== 'student')], ['habitsFeel', t.HABITS_FEEL],
+      ['timeBudget', t.TIME_BUDGETS], ['occupation', t.OCCUPATIONS.filter((o) => o !== 'student')], ['habitsFeel', t.HABITS_FEEL],
       ['derails', t.DERAILS], ['sleep', t.SLEEP], ['days', t.DAYS], ['badHabit', t.BAD_HABITS],
     ];
     for (const [key, values] of lists) {
@@ -155,7 +155,8 @@ describe('validateAnswers', () => {
   test('anything off is rejected, never coerced', () => {
     const cases: [string, unknown][] = [
       ['answers', null], ['answers', []], ['answers', 'x'],
-      ['age', {...COMPLETE, age: '12_17'}], ['occupation', {...COMPLETE, occupation: 'Student'}],
+      ['timeBudget', {...COMPLETE, timeBudget: 'min10'}], ['timeBudget', {...COMPLETE, timeBudget: undefined}],
+      ['occupation', {...COMPLETE, occupation: 'Student'}],
       ['habitsFeel', {...COMPLETE, habitsFeel: undefined}],
       ['focus', {...COMPLETE, focus: []}], ['focus', {...COMPLETE, focus: ['health', 'mental', 'career', 'education']}],
       ['focus', {...COMPLETE, focus: ['health', 'health']}], ['focus', {...COMPLETE, focus: 'health'}],
@@ -172,9 +173,12 @@ describe('validateAnswers', () => {
     }
   });
 
-  test('stored answers never include Q10, even when the input has it', () => {
-    const result = f.validateStoredAnswers({...COMPLETE, badHabit: 'alcohol'});
+  test('Q1 is the time question; age is gone (the age gate is on the sign-up form)', () => {
+    assert.equal(f.STEPS[0], 'timeBudget');
+    assert.deepEqual(t.TIME_BUDGETS, ['min5', 'min15', 'min30', 'min60']);
+    assert.equal('age' in f.emptyAnswers(), false);
+    const result = f.validateAnswers({...COMPLETE, age: '25_34'});
     assert.ok(result.valid);
-    assert.equal('badHabit' in result.value, false);
+    assert.equal('age' in result.value, false);
   });
 });

@@ -2,11 +2,11 @@
 // under onboarding:v1:<uid>, never synced, never sent anywhere. Pure; the AsyncStorage read and write live in a
 // service. Like the other per-uid local data (insight:v1, celebrated:v1, sync:), it is kept on sign-out.
 //
-// It never holds Q10: serialiseRecord writes the known fields one by one, and the answers go through
-// validateStoredAnswers, which has no badHabit field. addedTemplateIds holds catalog ids only.
+// It holds no answers: `answers` is always written as null (the field stays so the shape is unchanged). Records
+// saved before that decision may still carry answers; the parser accepts and ignores them, so no migration is
+// needed and those records keep their addedTemplateIds. addedTemplateIds holds catalog ids only.
 
-import {validateStoredAnswers} from '@/utils/onboarding/flow';
-import {TEMPLATE_IDS, isOneOf, type CompleteAnswers, type StoredAnswers, type TemplateId} from '@/utils/onboarding/types';
+import {TEMPLATE_IDS, isOneOf, type TemplateId} from '@/utils/onboarding/types';
 
 export const RECORD_VERSION = 1;
 export const recordKey = (uid: string) => `onboarding:v1:${uid}`;
@@ -14,7 +14,7 @@ export const recordKey = (uid: string) => `onboarding:v1:${uid}`;
 export type OnboardingRecord = {
   version: typeof RECORD_VERSION;
   skipped: boolean;// "Skip setup" on the first run
-  answers: StoredAnswers | null;// the last finished run (first or retake), without Q10
+  answers: null;// never stored (kept as null for older readers of the same shape)
   completedAt: number | null;// ms
   addedTemplateIds: TemplateId[];// catalog templates created by any run, for retake dedupe
 };
@@ -28,7 +28,7 @@ function templateIds(ids: readonly unknown[]): TemplateId[] {
   return [...new Set(ids.filter((id): id is TemplateId => isOneOf(TEMPLATE_IDS, id)))];
 }
 
-// Never throws. Unknown fields are dropped; unknown or repeated template ids are dropped.
+// Never throws. Unknown fields and any stored answers are dropped; unknown or repeated template ids are dropped.
 export function parseRecord(raw: string | null): ParsedRecord {
   if (raw === null) return {kind: 'none'};
   let v: unknown;
@@ -42,24 +42,18 @@ export function parseRecord(raw: string | null): ParsedRecord {
   if (o.version !== RECORD_VERSION || typeof o.skipped !== 'boolean') return {kind: 'corrupt'};
   if (o.completedAt !== null && !isTime(o.completedAt)) return {kind: 'corrupt'};
   if (!Array.isArray(o.addedTemplateIds)) return {kind: 'corrupt'};
-  let answers: StoredAnswers | null = null;
-  if (o.answers !== null) {
-    const result = validateStoredAnswers(o.answers);
-    if (!result.valid) return {kind: 'corrupt'};
-    answers = result.value;
-  }
   return {
     kind: 'ok',
-    record: {version: RECORD_VERSION, skipped: o.skipped, answers, completedAt: o.completedAt, addedTemplateIds: templateIds(o.addedTemplateIds)},
+    record: {version: RECORD_VERSION, skipped: o.skipped, answers: null, completedAt: o.completedAt, addedTemplateIds: templateIds(o.addedTemplateIds)},
   };
 }
 
+// Writes the known fields one by one, so nothing else (answers, Q10) can ever reach storage
 export function serialiseRecord(record: OnboardingRecord): string {
-  const answers = record.answers ? validateStoredAnswers(record.answers) : null;
   return JSON.stringify({
     version: RECORD_VERSION,
     skipped: record.skipped,
-    answers: answers?.valid ? answers.value : null,
+    answers: null,
     completedAt: record.completedAt,
     addedTemplateIds: templateIds(record.addedTemplateIds),
   });
@@ -70,13 +64,12 @@ export function skippedRecord(): OnboardingRecord {
   return {version: RECORD_VERSION, skipped: true, answers: null, completedAt: null, addedTemplateIds: []};
 }
 
-// A finished run (first or retake): the new answers without Q10; templates added earlier are kept
-export function completedRecord(previous: OnboardingRecord | null, answers: CompleteAnswers, now: number): OnboardingRecord {
-  const {badHabit: _q10, ...stored} = answers;
+// A finished run (first or retake): templates added earlier are kept
+export function completedRecord(previous: OnboardingRecord | null, now: number): OnboardingRecord {
   return {
     version: RECORD_VERSION,
     skipped: false,
-    answers: stored,
+    answers: null,
     completedAt: now,
     addedTemplateIds: previous?.addedTemplateIds ?? [],
   };

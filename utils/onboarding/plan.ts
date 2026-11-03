@@ -7,7 +7,10 @@
 // - right after the FIRST habit is created (a finished record), then again after each further habit, each time
 //   with that habit's template id added to addedTemplateIds (catalog ids only; never the Q10 replace pick);
 // - if nothing was selected (or nothing was left to pick), when the user presses Start / Done: the user
-//   deliberately created none;
+//   deliberately created none. "Add your own habit" creates the selected cards but never writes this
+//   "chose none" record (writeIfNone: false): the user may still back out of the habit form;
+// - when the user's own habit (from the habit form) is seen on returning to the routine, and nothing was saved
+//   yet: that first habit writes the finished record (recordAfterOwnHabit);
 // - a failed creation stops the run before anything else is saved, so no path leaves a finished record with
 //   zero habits unless the user chose none. The app being killed before the first habit saves nothing.
 
@@ -66,6 +69,7 @@ export async function createPlannedHabits(deps: CreateDeps, input: {
   selected: ReadonlySet<string>;
   reminderTime: string | null;
   session: CreateSession;
+  writeIfNone?: boolean;// default true; false for "Add your own habit" (see the header)
 }): Promise<CreateResult> {
   const created = new Set(input.session.created);
   let saved = input.session.saved;
@@ -81,14 +85,25 @@ export async function createPlannedHabits(deps: CreateDeps, input: {
     created.add(pick.id);
     createdNow += 1;
     deps.onCreated?.(pick.id);
-    saved = withAddedTemplates(saved ?? completedRecord(input.plan.previous, input.plan.answers, deps.now()), addedTemplateIdsOf([pick]));
+    saved = withAddedTemplates(saved ?? completedRecord(input.plan.previous, deps.now()), addedTemplateIdsOf([pick]));
     await deps.saveRecord(saved);
   }
 
-  if (!saved) {
+  if (!saved && (input.writeIfNone ?? true)) {
     // reached only when no card was selected (or none was left to pick): the user chose to create none
-    saved = completedRecord(input.plan.previous, input.plan.answers, deps.now());
+    saved = completedRecord(input.plan.previous, deps.now());
     await deps.saveRecord(saved);
   }
   return {created, saved, failed: false, createdNow};
+}
+
+// The user's own habit, made in the habit form over this screen: the record to save, or null when this run
+// has already saved one (an own habit has no template id, so a saved record needs no change)
+export function recordAfterOwnHabit(plan: Pick<Plan, 'previous'>, session: CreateSession, now: number): OnboardingRecord | null {
+  return session.saved ? null : completedRecord(plan.previous, now);
+}
+
+// Active habit ids that appeared since `before` (the ids read just before the habit form opened)
+export function newHabitIds(before: ReadonlySet<string>, after: readonly string[]): string[] {
+  return after.filter((id) => !before.has(id));
 }

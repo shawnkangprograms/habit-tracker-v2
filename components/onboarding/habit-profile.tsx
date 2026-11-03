@@ -21,7 +21,7 @@ export function HabitProfile({scores, focus}: {scores: Scores; focus: Axis}) {
 
 const styles = StyleSheet.create({
   wrap: {gap: spacing.lg},
-  title: {fontFamily: fonts.title, fontSize: 28, lineHeight: 34, color: colors.text},
+  title: {fontFamily: fonts.title, fontSize: 28, lineHeight: 36, color: colors.text},// see app/onboarding.tsx
   card: {
     gap: spacing.xs,
     padding: spacing.lg,

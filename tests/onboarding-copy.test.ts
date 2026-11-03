@@ -58,7 +58,7 @@ const toRecord = (rows: string[][], value = 1) => Object.fromEntries(rows.map((r
 describe('every enum value has a line', () => {
   test('option labels: one per value, in the enum order', () => {
     const lists: [Record<string, string>, readonly string[]][] = [
-      [c.AGE_LABELS, t.AGE_RANGES], [c.OCCUPATION_LABELS, t.OCCUPATIONS], [c.HABITS_FEEL_LABELS, t.HABITS_FEEL],
+      [c.TIME_BUDGET_LABELS, t.TIME_BUDGETS], [c.OCCUPATION_LABELS, t.OCCUPATIONS], [c.HABITS_FEEL_LABELS, t.HABITS_FEEL],
       [c.FOCUS_LABELS, t.FOCUS_AREAS], [c.CHALLENGE_LABELS, t.CHALLENGES], [c.DERAIL_LABELS, t.DERAILS],
       [c.SLEEP_LABELS, t.SLEEP], [c.DAYS_LABELS, t.DAYS], [c.VALUE_LABELS, t.VALUES], [c.BAD_HABIT_LABELS, t.BAD_HABITS],
     ];
@@ -168,7 +168,8 @@ describe('matches docs/ONBOARDING_COPY.md section 7', () => {
     const fromCode = {
       TOLD_US_TITLE: c.TOLD_US_TITLE, DAY1_TITLE: c.DAY1_TITLE, PROFILE_TITLE: c.PROFILE_TITLE,
       ROUTINE_TITLE: c.ROUTINE_TITLE, ROUTINE_HINT: c.ROUTINE_HINT, ROUTINE_REMINDER_LABEL: c.ROUTINE_REMINDER_LABEL,
-      DONE: c.DONE, ADDED: c.ADDED, NOTHING_LEFT: c.NOTHING_LEFT, CREATE_FAILED: c.CREATE_FAILED,
+      DONE: c.DONE, ADDED: c.ADDED, OWN_HABIT_REASON: c.OWN_HABIT_REASON, NOTHING_LEFT: c.NOTHING_LEFT,
+      CREATE_FAILED: c.CREATE_FAILED,
     };
     assert.deepEqual(toRecord(rows), fromCode);
     // every row names a real export holding exactly that text
@@ -181,9 +182,19 @@ describe('matches docs/ONBOARDING_COPY.md section 7', () => {
 });
 
 describe('matches docs/ONBOARDING_SPEC.md', () => {
-  test('catalog ids, axes and names in order (section 4)', () => {
+  test('catalog ids, axes, names and minutes in order (section 4)', () => {
     const [rows] = tables(section(SPEC_DOC, '4.'));
-    assert.deepEqual(rows, st.CATALOG.map((tpl) => [tpl.id, tpl.axis, tpl.habitName]));
+    assert.deepEqual(rows, st.CATALOG.map((tpl) => [tpl.id, tpl.axis, tpl.habitName, String(tpl.minutes)]));
+  });
+
+  test('replace habit minutes and the time budget caps (section 4)', () => {
+    const text = section(SPEC_DOC, '4.');
+    const line = text.split(/\r?\n/).find((l) => l.startsWith('Replace habit minutes:'))!;
+    const minutes = Object.fromEntries([...line.matchAll(/(\w+) (\d+)/g)].map((m) => [m[1], Number(m[2])]));
+    assert.deepEqual(minutes, st.REPLACE_MINUTES);
+    const [, caps] = tables(text);
+    const cap = (n: number) => (Number.isFinite(n) ? String(n) : 'no cap');
+    assert.deepEqual(caps, t.TIME_BUDGETS.map((b) => [b, cap(st.BUDGET_CAPS[b].single), cap(st.BUDGET_CAPS[b].total)]));
   });
 
   test('replace habit names (section 4)', () => {
@@ -208,7 +219,7 @@ describe('matches docs/ONBOARDING_SPEC.md', () => {
     const [rows] = tables(section(SPEC_DOC, '8.'));
     const byStep = new Map(rows.map(([step, title, hint, options]) => [step, {title, hint, options}]));
     const labelsFor: Record<string, Record<string, string>> = {
-      age: c.AGE_LABELS, occupation: c.OCCUPATION_LABELS, habitsFeel: c.HABITS_FEEL_LABELS, focus: c.FOCUS_LABELS,
+      timeBudget: c.TIME_BUDGET_LABELS, occupation: c.OCCUPATION_LABELS, habitsFeel: c.HABITS_FEEL_LABELS, focus: c.FOCUS_LABELS,
       derails: c.DERAIL_LABELS, sleep: c.SLEEP_LABELS, days: c.DAYS_LABELS, values: c.VALUE_LABELS, badHabit: c.BAD_HABIT_LABELS,
     };
     const split = (cell: string) => cell.replace(/\s*\(plus a "Skip this one" text button\)$/, '').split(' / ');

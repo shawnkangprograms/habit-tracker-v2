@@ -18,7 +18,7 @@ const {validateHabitInput} = await import('../validation/validators.ts');
 
 // Picks: skill15, plan_top1, focus25, plus the replace habit for Q10
 const ANSWERS: CompleteAnswers = {
-  age: '25_34', occupation: 'early_career', habitsFeel: 'thriving', focus: ['career'], challenge: 'focus',
+  timeBudget: 'min60', occupation: 'early_career', habitsFeel: 'thriving', focus: ['career'], challenge: 'focus',
   derails: 'boredom', sleep: 'good', days: 'predictable', values: ['freedom'], badHabit: 'alcohol', confidence: 5,
 };
 const NOW = 1_762_000_000_000;
@@ -144,7 +144,7 @@ describe('createPlannedHabits: when the record is written', () => {
   });
 
   test('retake with nothing left: Done saves the finished record and keeps the earlier ids', async () => {
-    const previous = {...r.completedRecord(null, ANSWERS, 1), addedTemplateIds: [...st.CATALOG.map((c) => c.id)]};
+    const previous = {...r.completedRecord(null, 1), addedTemplateIds: [...st.CATALOG.map((c) => c.id)]};
     const pl = p.buildPlan({...ANSWERS, badHabit: null}, {kind: 'ok', record: previous}, []);
     const h = harness();
     const result = await p.createPlannedHabits(h.deps, {plan: pl, selected: allIds(pl), reminderTime: '20:00', session: EMPTY});
@@ -154,7 +154,7 @@ describe('createPlannedHabits: when the record is written', () => {
   });
 
   test('retake: the ids from earlier runs are kept and the new ones added', async () => {
-    const previous = {...r.completedRecord(null, ANSWERS, 1), addedTemplateIds: ['walk20' as const]};
+    const previous = {...r.completedRecord(null, 1), addedTemplateIds: ['walk20' as const]};
     const pl = p.buildPlan(ANSWERS, {kind: 'ok', record: previous}, []);
     const h = harness();
     const result = await p.createPlannedHabits(h.deps, {plan: pl, selected: allIds(pl), reminderTime: null, session: EMPTY});
@@ -200,6 +200,42 @@ describe('createPlannedHabits: failures and retry', () => {
     assert.equal(g.recordOnSkip('auto', true), null);
     assert.equal(g.recordOnSkip('settings', true), null);
     assert.equal(g.recordOnSkip('settings', false), null);
+  });
+});
+
+describe('"Add your own habit": the habit form over the routine', () => {
+  test('the selected cards are created first, but "chose none" is never written (the user may back out)', async () => {
+    const pl = plan();
+    const none = harness();
+    const result = await p.createPlannedHabits(none.deps, {plan: pl, selected: new Set(), reminderTime: null, session: EMPTY, writeIfNone: false});
+    assert.equal(none.events.length, 0);
+    assert.equal(result.saved, null);
+    assert.equal(result.failed, false);
+
+    const some = harness();
+    const after = await p.createPlannedHabits(some.deps, {plan: pl, selected: new Set(['skill15']), reminderTime: null, session: EMPTY, writeIfNone: false});
+    assert.deepEqual(some.adds(), ['Practise a skill 15 minutes']);
+    assert.deepEqual(after.saved?.addedTemplateIds, ['skill15']);// a created card still writes the record
+  });
+
+  test('an own habit as the first habit of the run writes the finished record; after that, nothing', () => {
+    const pl = plan();
+    const first = p.recordAfterOwnHabit(pl, EMPTY, NOW);
+    assert.deepEqual(first, r.completedRecord(null, NOW));
+    const saved = r.withAddedTemplates(r.completedRecord(null, NOW - 5), ['skill15']);
+    assert.equal(p.recordAfterOwnHabit(pl, {created: new Set(['skill15']), saved}, NOW), null);
+  });
+
+  test('a retake keeps the earlier addedTemplateIds in the record an own habit writes', () => {
+    const previous = {...r.completedRecord(null, 1), addedTemplateIds: ['walk20' as const]};
+    const pl = p.buildPlan(ANSWERS, {kind: 'ok', record: previous}, []);
+    assert.deepEqual(p.recordAfterOwnHabit(pl, EMPTY, NOW)?.addedTemplateIds, ['walk20']);
+  });
+
+  test('new habits are the active ids that were not there when the form opened', () => {
+    assert.deepEqual(p.newHabitIds(new Set(['a', 'b']), ['a', 'b', 'c']), ['c']);
+    assert.deepEqual(p.newHabitIds(new Set(['a', 'b']), ['a', 'b']), []);
+    assert.deepEqual(p.newHabitIds(new Set(['a', 'b']), ['b']), []);// a habit deleted meanwhile is not "new"
   });
 });
 

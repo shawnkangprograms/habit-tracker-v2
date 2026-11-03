@@ -10,6 +10,8 @@ import type {Axis, CompleteAnswers} from '@/utils/onboarding/types';
 
 // "What you told us" (docs/ONBOARDING_SPEC.md, section 5): three first-person cards reflecting the challenge,
 // the rhythm of the days and what derails the user, then the focus axis's three day-1 moves (copy doc section 5).
+// Each move's WHEN label sits above its title, in the cards' label style, so no fixed-width column can split
+// a word at larger system font sizes.
 // Motion (stage 4): the six items fade and rise in, 60 ms apart (the last starts at 300 ms). Enter only; none
 // under reduced motion.
 
@@ -50,11 +52,9 @@ export function ToldUs({answers, focus, reduceMotion}: {
       <View style={styles.moves}>
         {DAY1_MOVES[focus].map((move, i) => (
           <Animated.View key={move.when} style={styles.move} entering={entering(cards.length + i)}>
-            <Text style={styles.when}>{move.when.toUpperCase()}</Text>
-            <View style={styles.moveText}>
-              <Text style={styles.moveTitle}>{move.title}</Text>
-              <Text style={styles.moveLine}>{move.line}</Text>
-            </View>
+            <Text style={styles.label}>{move.when.toUpperCase()}</Text>
+            <Text style={styles.moveTitle}>{move.title}</Text>
+            <Text style={styles.moveLine}>{move.line}</Text>
           </Animated.View>
         ))}
       </View>
@@ -64,7 +64,7 @@ export function ToldUs({answers, focus, reduceMotion}: {
 
 const styles = StyleSheet.create({
   wrap: {gap: spacing.lg},
-  title: {fontFamily: fonts.title, fontSize: 28, lineHeight: 34, color: colors.text},
+  title: {fontFamily: fonts.title, fontSize: 28, lineHeight: 36, color: colors.text},// see app/onboarding.tsx
   cards: {gap: spacing.sm},
   card: {
     gap: spacing.xs,
@@ -77,10 +77,8 @@ const styles = StyleSheet.create({
   label: {fontFamily: fonts.bold, fontSize: 11, letterSpacing: 0.9, color: colors.accent},
   line: {fontFamily: fonts.semiBold, fontSize: 16, lineHeight: 22, color: colors.text},
   subtitle: {fontFamily: fonts.title, fontSize: 18, color: colors.text, marginTop: spacing.sm},
-  moves: {gap: spacing.md},
-  move: {flexDirection: 'row', gap: spacing.md},
-  when: {width: 84, paddingTop: 2, fontFamily: fonts.bold, fontSize: 11, letterSpacing: 0.9, color: colors.muted},
-  moveText: {flex: 1, gap: 2},
+  moves: {gap: spacing.lg},
+  move: {gap: 2},
   moveTitle: {fontFamily: fonts.semiBold, fontSize: 15, color: colors.text},
   moveLine: {fontFamily: fonts.regular, fontSize: 13, color: colors.muted},
 });

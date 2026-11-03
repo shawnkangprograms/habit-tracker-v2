@@ -153,7 +153,7 @@ export function BuildingProfile({reduceMotion, ready, onDone}: {
 
 const styles = StyleSheet.create({
   wrap: {gap: spacing.xl, alignItems: 'center'},
-  title: {alignSelf: 'stretch', fontFamily: fonts.title, fontSize: 28, lineHeight: 34, color: colors.text},
+  title: {alignSelf: 'stretch', fontFamily: fonts.title, fontSize: 28, lineHeight: 36, color: colors.text},// see app/onboarding.tsx
   ring: {alignItems: 'center', justifyContent: 'center'},
   percent: {fontFamily: fonts.title, fontSize: 40, color: colors.text},
   status: {fontFamily: fonts.bold, fontSize: 11, letterSpacing: 0.9, color: colors.accent},

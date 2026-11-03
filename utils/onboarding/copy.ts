@@ -3,8 +3,8 @@
 // the length limits, and that every enum value has a line, so change the docs and this file together.
 
 import type {
-  AgeRange, Axis, BadHabit, Challenge, DaysPattern, Derail, FocusArea, HabitsFeel, Occupation, ReplaceAnswer, Sleep,
-  TemplateId, Value,
+  Axis, BadHabit, Challenge, DaysPattern, Derail, FocusArea, HabitsFeel, Occupation, ReplaceAnswer, Sleep,
+  TemplateId, TimeBudget, Value,
 } from '@/utils/onboarding/types';
 import type {StepKey} from '@/utils/onboarding/flow';
 
@@ -23,7 +23,7 @@ export function stepLabel(n: number, count: number): string {
 }
 
 export const STEP_TITLES: Record<StepKey, string> = {
-  age: 'How old are you?',
+  timeBudget: 'How much time can you give to habits on a normal day?',
   occupation: 'What best describes you right now?',
   habitsFeel: 'How do your habits feel right now?',
   focus: 'What needs the most attention right now?',
@@ -38,6 +38,7 @@ export const STEP_TITLES: Record<StepKey, string> = {
 export const STUDENT_CHALLENGE_TITLE = "What's your biggest learning challenge?";
 
 export const STEP_HINTS: Partial<Record<StepKey, string>> = {
+  timeBudget: "We'll keep your plan small enough to stick.",
   focus: 'Pick up to 3.',
   values: 'Pick up to 2.',
   badHabit: 'Optional.',
@@ -47,8 +48,11 @@ export const STEP_HINTS: Partial<Record<StepKey, string>> = {
 export const CONFIDENCE_LOW_LABEL = 'Not confident';
 export const CONFIDENCE_HIGH_LABEL = 'Very confident';
 
-export const AGE_LABELS: Record<AgeRange, string> = {
-  '18_24': '18-24', '25_34': '25-34', '35_44': '35-44', '45_54': '45-54', '55_plus': '55+',
+export const TIME_BUDGET_LABELS: Record<TimeBudget, string> = {
+  min5: 'About 5 minutes',
+  min15: '10 to 15 minutes',
+  min30: '20 to 30 minutes',
+  min60: 'An hour or more',
 };
 
 export const OCCUPATION_LABELS: Record<Occupation, string> = {
@@ -316,6 +320,7 @@ export const ADD_OWN_HABIT = 'Add your own habit';
 export const START = 'Start';
 export const DONE = 'Done';
 export const ADDED = 'Added';
+export const OWN_HABIT_REASON = 'Your own habit';// the reason line of a habit the user made in the habit form
 export const NOTHING_LEFT = "You already have every habit we'd suggest for these answers.";
 export const CREATE_FAILED = "Couldn't add every habit. The ones marked Added are saved. Tap Start to try the rest.";
 

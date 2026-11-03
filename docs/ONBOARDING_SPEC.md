@@ -4,7 +4,7 @@ Status: LOCKED 2026-11-02. Source of truth for look and feel: the user's Figma f
 
 ## 1. Shape of the flow
 
-Shown once, after first sign-up. A "Skip setup" link sits top-right on every step. Skipping goes straight to Home with no starter habits. Retake lives in Settings and only ADDS habits (never deletes or edits existing ones).
+Shown once, after a sign-up on this phone (a local pending flag per uid, set by the sign-up success path and cleared when the record is written; existing accounts and later sign-ins never see it on their own). A "Skip setup" link sits top-right on every step. Skipping goes straight to Home with no starter habits. Retake lives in Settings and only ADDS habits (never deletes or edits existing ones).
 
 11 steps, a fixed count. Progress reads "STEP n OF 11". Step 10 is optional and skippable; every other step needs an answer to continue.
 
@@ -12,7 +12,7 @@ First-step notice (small text under the title, step 1 only): "Your answers stay 
 
 | #   | Question                                                                             | Type                       | Enum values                                                                                              |
 | --- | ------------------------------------------------------------------------------------ | -------------------------- | -------------------------------------------------------------------------------------------------------- |
-| 1   | How old are you?                                                                     | single                     | 18_24, 25_34, 35_44, 45_54, 55_plus                                                                      |
+| 1   | How much time can you give to habits on a normal day?                                | single                     | min5, min15, min30, min60                                                                                |
 | 2   | What best describes you right now?                                                   | single                     | student, early_career, mid_career, self_employed, between_jobs                                           |
 | 3   | How do your habits feel right now?                                                   | single                     | thriving, alright, struggling, overwhelmed                                                               |
 | 4   | What needs the most attention right now? (Pick up to 3.)                             | multi, 1-3                 | health, mental, career, discipline, relationships, education                                             |
@@ -38,13 +38,14 @@ Changing Q2 after answering Q5 clears Q5 (the list changed).
 
 ## 2. Data handling (hard rules)
 
-- Answers are stored ONLY on the device: AsyncStorage key `onboarding:v1:<uid>`, JSON with a `version`, the answers EXCEPT Q10, `completedAt`, and `addedTemplateIds` (catalog ids only, for retake dedupe).
+- The answers are held in memory only and are not stored anywhere. The local record (AsyncStorage key `onboarding:v1:<uid>`) is JSON with a `version`, `skipped`, `answers` (always written as null), `completedAt`, and `addedTemplateIds` (catalog ids only, for retake dedupe). Records saved before this rule may still carry answers: the parser accepts and ignores them, so there is no migration and those records keep their `addedTemplateIds`.
+- The sign-up pending flag (`onboarding:pending:v1:<uid>`) is local too: set by the sign-up success path, cleared when the record is written (finish or skip).
 - Follow whatever the app already does with other per-uid local data on sign-out (for example the insight cache) and apply the same to this record. Report what that behaviour is.
 - Never written to Firestore, never added to the sync payload, never sent to the Gemini function. Onboarding modules must not import firebase/firestore or firebase/functions (extend the existing ESLint no-restricted-imports rule to cover the onboarding folder).
 - Q10 is sensitive. It is held in memory only long enough to build the plan and is NEVER persisted: not in the local record, not on any habit row, not in any id. Replace habits for the sensitive answers (porn, smoking_vaping, alcohol) use neutral names, so a synced habit never reveals them. Replace habits are deduped on retake by comparing names with the user's existing habits, not by a stored id.
 - No free-text input anywhere in onboarding. "Something else" just shows an "Add your own habit" button on the routine screen.
 - The "1M+ members" badge in Figma is NOT built. Remove it or replace it with a true line.
-- Age gate: Q1 starts at 18-24, matching the 18+ rule. No under-18 option exists.
+- Age gate: handled on the sign-up form (validated 18-99 before the account is created). Onboarding does not ask age, and age does not affect scoring.
 
 ## 3. Scoring (pure function, unit-tested)
 
@@ -67,24 +68,35 @@ How many: confidence 1-3 gives 2 habits, 4-7 gives 3, 8-10 gives 4. Add 1 more i
 
 Pick order: one template from each of the top axes by score (skip axes at 1), then fill from the focus axis. If sleep is struggle or irregular, force one sleep template. Never pick two templates with the same id. Every template carries a fixed one-line reason of at most 60 characters shown on its card.
 
+Time budget (Q1): every template has a `minutes` value (habits that take no real time are 1). No single catalog pick may be longer than the budget's single cap, and the catalog picks together may not exceed its total cap (twice the budget). A template that does not fit is skipped and picking continues down the same order, so a small budget can give fewer picks than the count. The Q10 replace pick is exempt from both caps. The forced sleep pick (1 minute) takes a free slot if it fits, otherwise the last one.
+
 Catalog (ids stable; names are final unless a limit forces a rewrite):
 
-| id             | Axis       | Name                           |
-| -------------- | ---------- | ------------------------------ |
-| walk20         | Health     | Walk for 20 minutes            |
-| stretch10      | Health     | Stretch for 10 minutes         |
-| water_meals    | Health     | Drink water with each meal     |
-| lights_out     | Health     | Lights out at a set time       |
-| screens_off    | Health     | No screens 30 min before bed   |
-| breathe5       | Mind       | Breathe for 5 minutes          |
-| journal3       | Mind       | Write 3 lines in a journal     |
-| plan_top1      | Discipline | Plan tomorrow's top task       |
-| focus25        | Discipline | One 25-minute focus block      |
-| study25        | Learning   | Study for 25 minutes           |
-| review10       | Learning   | Review notes for 10 minutes    |
-| skill15        | Career     | Practise a skill 15 minutes    |
-| message_friend | Relations  | Message someone you care about |
-| family_time    | Relations  | Family meal or call            |
+| id             | Axis       | Name                           | Minutes |
+| -------------- | ---------- | ------------------------------ | ------- |
+| walk20         | Health     | Walk for 20 minutes            | 20      |
+| stretch10      | Health     | Stretch for 10 minutes         | 10      |
+| water_meals    | Health     | Drink water with each meal     | 1       |
+| lights_out     | Health     | Lights out at a set time       | 1       |
+| screens_off    | Health     | No screens 30 min before bed   | 1       |
+| breathe5       | Mind       | Breathe for 5 minutes          | 5       |
+| journal3       | Mind       | Write 3 lines in a journal     | 5       |
+| plan_top1      | Discipline | Plan tomorrow's top task       | 5       |
+| focus25        | Discipline | One 25-minute focus block      | 25      |
+| study25        | Learning   | Study for 25 minutes           | 25      |
+| review10       | Learning   | Review notes for 10 minutes    | 10      |
+| skill15        | Career     | Practise a skill 15 minutes    | 15      |
+| message_friend | Relations  | Message someone you care about | 5       |
+| family_time    | Relations  | Family meal or call            | 30      |
+
+| Budget | Single cap | Total cap |
+| ------ | ---------- | --------- |
+| min5   | 5          | 10        |
+| min15  | 15         | 30        |
+| min30  | 30         | 60        |
+| min60  | no cap     | no cap    |
+
+Replace habit minutes: phone_social 1, porn 1, smoking_vaping 5, gaming 1, junk_food 30, alcohol 1, procrastination 5
 
 Habit names must be 30 characters or fewer (validateHabitName). The copy-table test enforces this for every catalog and replace name.
 
@@ -136,7 +148,7 @@ Style: dark screen, small orange "STEP n OF 11" top right, "Back" top left (not 
 
 | Step        | Title                                          | Hint                                | Option labels, in order                                                                                                                                                           |
 | ----------- | ---------------------------------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1           | How old are you?                               |                                     | 18-24 / 25-34 / 35-44 / 45-54 / 55+                                                                                                                                               |
+| 1           | How much time can you give to habits on a normal day? | We'll keep your plan small enough to stick. | About 5 minutes / 10 to 15 minutes / 20 to 30 minutes / An hour or more                                                                                                   |
 | 2           | What best describes you right now?             |                                     | Student / Early in my career / Mid-career / Self-employed or building something / Between jobs                                                                                    |
 | 3           | How do your habits feel right now?             |                                     | On track and thriving / Doing alright, not great / Struggling to keep up / Overwhelmed and need help                                                                              |
 | 4           | What needs the most attention right now?       | Pick up to 3.                       | Health & fitness / Mental wellbeing / Career & productivity / Discipline & habits / Relationships & social life / Education & learning                                            |
@@ -164,3 +176,11 @@ Option labels map to enum values in the order of the enum lists in section 1 (Q5
 - Offline first sign-up: onboarding waits for the restore signal (Addendum A). Accepted as a known gap.
 - Route cost: compare home:usable before and after on the Itel (5 launches each, same method as the insight card). It must not regress beyond noise.
 - All other assumptions in the plan are approved.
+
+## 10. Decisions from the Itel session (2026-11-03)
+
+- Q1 asks for the daily time budget instead of age (section 1); the age gate is on the sign-up form. Starter picks respect the budget caps (section 4); the pool stays the 14 templates above.
+- The record no longer stores answers (section 2); no migration.
+- Auto-show only after a sign-up on this phone (section 1). The offline-first-sign-up rule (wait for the restore signal) and "a relaunch reopens it if killed before the first habit" still hold.
+- "Add your own habit" opens the habit form over the routine; Back returns to the routine, a habit made there shows as added with the reason "Your own habit", and the first habit of the run writes the finished record.
+- Layout: the radar fills the content width and sizes itself so every label fits; day-1 move labels sit above their titles; routine card names take up to two lines; 28 px titles use a 36 px line height (at least the font's natural 35.7 px).

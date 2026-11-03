@@ -2,8 +2,9 @@
 // Firebase imports (eslint.config.js blocks them in every onboarding file). Enum lists are in the spec's order,
 // which is also the order the option labels are shown in.
 
-export const AGE_RANGES = ['18_24', '25_34', '35_44', '45_54', '55_plus'] as const;// no under-18 option (18+ rule)
-export type AgeRange = (typeof AGE_RANGES)[number];
+// Q1: time a normal day allows for habits. The age gate is on the sign-up form, so onboarding never asks age.
+export const TIME_BUDGETS = ['min5', 'min15', 'min30', 'min60'] as const;
+export type TimeBudget = (typeof TIME_BUDGETS)[number];
 
 export const OCCUPATIONS = ['student', 'early_career', 'mid_career', 'self_employed', 'between_jobs'] as const;
 export type Occupation = (typeof OCCUPATIONS)[number];
@@ -63,7 +64,7 @@ export const VALUES_MAX = 2;
 
 // In progress: null = not answered yet. focus and values keep the order they were picked in (ties use it).
 export type Answers = {
-  age: AgeRange | null;
+  timeBudget: TimeBudget | null;
   occupation: Occupation | null;
   habitsFeel: HabitsFeel | null;
   focus: FocusArea[];
@@ -78,7 +79,7 @@ export type Answers = {
 
 // Every required step answered and valid
 export type CompleteAnswers = {
-  age: AgeRange;
+  timeBudget: TimeBudget;
   occupation: Occupation;
   habitsFeel: HabitsFeel;
   focus: FocusArea[];
@@ -90,9 +91,6 @@ export type CompleteAnswers = {
   badHabit: BadHabit | null;
   confidence: number;
 };
-
-// What the local record keeps: everything except Q10
-export type StoredAnswers = Omit<CompleteAnswers, 'badHabit'>;
 
 export function isOneOf<T extends string>(list: readonly T[], value: unknown): value is T {
   return typeof value === 'string' && (list as readonly string[]).includes(value);

@@ -1,4 +1,5 @@
-// The local onboarding record (utils/onboarding/record.ts): parse, serialise, version, and Q10 never stored.
+// The local onboarding record (utils/onboarding/record.ts): parse, serialise, version, and no answers stored
+// (Q10 included). Records saved before answers stopped being stored still parse, keeping their addedTemplateIds.
 /// <reference types="node" />
 import {describe, test} from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,14 +13,19 @@ const st = await import('../utils/onboarding/starters.ts');
 
 // challenge 'time', so no answer here shares a string with a Q10 value
 const ANSWERS: CompleteAnswers = {
-  age: '35_44', occupation: 'mid_career', habitsFeel: 'struggling', focus: ['discipline', 'health'], challenge: 'time',
+  timeBudget: 'min30', occupation: 'mid_career', habitsFeel: 'struggling', focus: ['discipline', 'health'], challenge: 'time',
   derails: 'stress', sleep: 'irregular', days: 'chaotic', values: ['peace_of_mind', 'freedom'], badHabit: null, confidence: 8,
 };
-const {badHabit: _none, ...STORED} = ANSWERS;
 const NOW = 1_762_000_000_000;
 
-const completed = (over: Partial<OnboardingRecord> = {}): OnboardingRecord =>
-  ({...r.completedRecord(null, ANSWERS, NOW), ...over});
+// A record as the app saved it before answers stopped being stored (age was Q1 then)
+const OLD_ANSWERS = {
+  age: '35_44', occupation: 'mid_career', habitsFeel: 'struggling', focus: ['discipline', 'health'], challenge: 'time',
+  derails: 'stress', sleep: 'irregular', days: 'chaotic', values: ['peace_of_mind', 'freedom'], confidence: 8,
+};
+const OLD_RECORD = {version: 1, skipped: false, answers: OLD_ANSWERS, completedAt: NOW, addedTemplateIds: ['walk20', 'plan_top1']};
+
+const completed = (over: Partial<OnboardingRecord> = {}): OnboardingRecord => ({...r.completedRecord(null, NOW), ...over});
 
 describe('key and version', () => {
   test('one key per uid, version 1', () => {
@@ -51,24 +57,39 @@ describe('parseRecord', () => {
       JSON.stringify({...good, skipped: 'no'}), JSON.stringify({...good, skipped: undefined}),
       JSON.stringify({...good, completedAt: -1}), JSON.stringify({...good, completedAt: '2026-11-02'}),
       JSON.stringify({...good, addedTemplateIds: 'walk20'}),
-      JSON.stringify({...good, answers: {...STORED, age: '12_17'}}),
-      JSON.stringify({...good, answers: {...STORED, focus: []}}),
     ];
     for (const raw of cases) assert.deepEqual(r.parseRecord(raw), {kind: 'corrupt'}, raw);
   });
 
-  test('unknown fields, unknown or repeated template ids, and a stored Q10 are dropped', () => {
+  test('an old record with answers (age, no time budget) still parses: answers ignored, template ids kept', () => {
+    assert.deepEqual(r.parseRecord(JSON.stringify(OLD_RECORD)), {
+      kind: 'ok', record: {version: 1, skipped: false, answers: null, completedAt: NOW, addedTemplateIds: ['walk20', 'plan_top1']},
+    });
+    // whatever the old answers hold, even invalid or Q10, never makes the record corrupt and is never kept
+    for (const answers of [{...OLD_ANSWERS, age: '12_17'}, {...OLD_ANSWERS, focus: []}, {...OLD_ANSWERS, badHabit: 'porn'}, 'x', 7]) {
+      const parsed = r.parseRecord(JSON.stringify({...OLD_RECORD, answers}));
+      assert.ok(parsed.kind === 'ok' && parsed.record.answers === null, JSON.stringify(answers));
+    }
+  });
+
+  test('re-saving an old record drops its answers', () => {
+    const parsed = r.parseRecord(JSON.stringify(OLD_RECORD));
+    assert.ok(parsed.kind === 'ok');
+    const json = r.serialiseRecord(parsed.record);
+    assert.doesNotMatch(json, /age|35_44|mid_career|occupation/);
+    assert.equal(JSON.parse(json).answers, null);
+  });
+
+  test('unknown fields and unknown or repeated template ids are dropped', () => {
     const raw = JSON.stringify({
       ...JSON.parse(r.serialiseRecord(completed())),
       extra: 1,
-      answers: {...STORED, badHabit: 'porn'},
       addedTemplateIds: ['walk20', 'walk20', 'replace', 'smoking_vaping', 7, 'focus25'],
     });
     const parsed = r.parseRecord(raw);
     assert.equal(parsed.kind, 'ok');
     if (parsed.kind !== 'ok') return;
     assert.deepEqual(Object.keys(parsed.record).sort(), ['addedTemplateIds', 'answers', 'completedAt', 'skipped', 'version']);
-    assert.deepEqual(parsed.record.answers, STORED);
     assert.deepEqual(parsed.record.addedTemplateIds, ['walk20', 'focus25']);
   });
 });
@@ -78,13 +99,12 @@ describe('building records', () => {
     assert.deepEqual(r.skippedRecord(), {version: 1, skipped: true, answers: null, completedAt: null, addedTemplateIds: []});
   });
 
-  test('a finished run stores the answers without Q10 and keeps templates added before', () => {
+  test('a finished run stores no answers and keeps templates added before', () => {
     const previous = completed({addedTemplateIds: ['walk20']});
-    const next = r.completedRecord(previous, {...ANSWERS, badHabit: 'alcohol', confidence: 3}, NOW + 1);
-    assert.deepEqual(next, {
-      version: 1, skipped: false, answers: {...STORED, confidence: 3}, completedAt: NOW + 1, addedTemplateIds: ['walk20'],
+    assert.deepEqual(r.completedRecord(previous, NOW + 1), {
+      version: 1, skipped: false, answers: null, completedAt: NOW + 1, addedTemplateIds: ['walk20'],
     });
-    assert.equal(r.completedRecord(r.skippedRecord(), ANSWERS, NOW).skipped, false);
+    assert.equal(r.completedRecord(r.skippedRecord(), NOW).skipped, false);
   });
 
   test('withAddedTemplates: a union of catalog ids, nothing else', () => {
@@ -93,24 +113,27 @@ describe('building records', () => {
   });
 });
 
-describe('Q10 is never stored', () => {
-  test('for every Q10 answer, the serialised record has no Q10 field and no Q10 value', () => {
+describe('no answers are ever stored', () => {
+  test('for every Q10 answer and time budget, the serialised record holds no answer value', () => {
     for (const badHabit of t.BAD_HABITS) {
-      const answers: CompleteAnswers = {...ANSWERS, badHabit};
-      const picks = st.pickStarters(answers, {});
-      let record = r.completedRecord(null, answers, NOW);
-      record = r.withAddedTemplates(record, picks.map((p) => p.id));
-      const json = r.serialiseRecord(record);
-      assert.doesNotMatch(json, /badHabit/, badHabit);
-      assert.equal(json.includes(badHabit), false, `${badHabit} in ${json}`);
-      assert.equal(json.includes(st.REPLACE_PICK_ID), false, badHabit);
+      for (const timeBudget of t.TIME_BUDGETS) {
+        const answers: CompleteAnswers = {...ANSWERS, badHabit, timeBudget};
+        const picks = st.pickStarters(answers, {});
+        const record = r.withAddedTemplates(r.completedRecord(null, NOW), picks.map((p) => p.id));
+        const json = r.serialiseRecord(record);
+        assert.doesNotMatch(json, /badHabit|timeBudget|occupation|mid_career|struggling/, badHabit);
+        assert.equal(json.includes(badHabit), false, `${badHabit} in ${json}`);
+        assert.equal(json.includes(timeBudget), false, `${timeBudget} in ${json}`);
+        assert.equal(json.includes(st.REPLACE_PICK_ID), false, badHabit);
+      }
     }
   });
 
-  test('even a record built by hand with Q10 in its answers is serialised without it', () => {
-    const tampered = completed({answers: {...STORED, badHabit: 'smoking_vaping'} as unknown as OnboardingRecord['answers']});
+  test('even a record built by hand with answers in it is serialised without them', () => {
+    const tampered = completed({answers: {...ANSWERS, badHabit: 'smoking_vaping'}} as unknown as Partial<OnboardingRecord>);
     const json = r.serialiseRecord(tampered);
     assert.equal(json.includes('smoking_vaping'), false);
-    assert.doesNotMatch(json, /badHabit/);
+    assert.doesNotMatch(json, /badHabit|occupation/);
+    assert.equal(JSON.parse(json).answers, null);
   });
 });

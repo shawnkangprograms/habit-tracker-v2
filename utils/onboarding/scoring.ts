@@ -2,12 +2,13 @@
 // Six axes, each starting at 1, capped at 5. The radar plots score / 5 against a fixed 2 / 5 baseline.
 
 import {
-  AXES, STUDENT_ONLY_CHALLENGES, type Axis, type FocusArea, type StoredAnswers,
+  AXES, STUDENT_ONLY_CHALLENGES, type Axis, type CompleteAnswers, type FocusArea,
 } from '@/utils/onboarding/types';
 
 export type Scores = Record<Axis, number>;
+// Q1 (timeBudget) and Q10 never score: the time budget only caps the starter picks
 export type ScoringInput = Pick<
-  StoredAnswers, 'occupation' | 'habitsFeel' | 'focus' | 'challenge' | 'derails' | 'sleep' | 'days' | 'values'
+  CompleteAnswers,'occupation' | 'habitsFeel' | 'focus' | 'challenge' | 'derails' | 'sleep' | 'days' | 'values'
 >;
 
 export const AXIS_MIN = 1;

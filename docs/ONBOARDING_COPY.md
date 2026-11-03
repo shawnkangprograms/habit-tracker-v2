@@ -182,5 +182,6 @@ Titles, labels and messages on the screens after Q11, keyed by their constant na
 | ROUTINE_REMINDER_LABEL | Daily reminder                                                                        |
 | DONE                   | Done                                                                                  |
 | ADDED                  | Added                                                                                 |
+| OWN_HABIT_REASON       | Your own habit                                                                        |
 | NOTHING_LEFT           | You already have every habit we'd suggest for these answers.                          |
 | CREATE_FAILED          | Couldn't add every habit. The ones marked Added are saved. Tap Start to try the rest. |
