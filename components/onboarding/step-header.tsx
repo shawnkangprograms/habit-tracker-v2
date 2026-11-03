@@ -4,18 +4,18 @@ import {colors, fonts, spacing} from '@/constants/theme';
 import {BACK, SKIP_SETUP, stepLabel} from '@/utils/onboarding/copy';
 import {ProgressBar} from '@/components/onboarding/progress-bar';
 
-// Top of every onboarding step: Back (not on step 1) and "Skip setup", then "STEP n OF 11" and the progress bar
-export function StepHeader({stepIndex, count, onBack, onSkip}: {
-  stepIndex: number;// 0-based
-  count: number;
+// Top of every onboarding screen: Back (when allowed) and "Skip setup". On the questions, also "STEP n OF 11"
+// and the progress bar; the result screens pass progress={null}.
+export function StepHeader({progress, canGoBack, onBack, onSkip}: {
+  progress: {index: number; count: number} | null;// index is 0-based
+  canGoBack: boolean;
   onBack: () => void;
   onSkip: () => void;
 }) {
-  const label = stepLabel(stepIndex + 1, count);
   return (
     <View style={styles.wrap}>
       <View style={styles.topRow}>
-        {stepIndex > 0 ? (
+        {canGoBack ? (
           <Pressable style={styles.back} onPress={onBack} hitSlop={12} accessibilityRole="button" accessibilityLabel={BACK}>
             <MaterialCommunityIcons name="chevron-left" size={22} color={colors.muted} />
             <Text style={styles.backText}>{BACK}</Text>
@@ -25,8 +25,14 @@ export function StepHeader({stepIndex, count, onBack, onSkip}: {
           <Text style={styles.skip}>{SKIP_SETUP}</Text>
         </Pressable>
       </View>
-      <Text style={styles.step} accessibilityLabel={`Step ${stepIndex + 1} of ${count}`}>{label}</Text>
-      <ProgressBar progress={(stepIndex + 1) / count} />
+      {progress && (
+        <>
+          <Text style={styles.step} accessibilityLabel={`Step ${progress.index + 1} of ${progress.count}`}>
+            {stepLabel(progress.index + 1, progress.count)}
+          </Text>
+          <ProgressBar progress={(progress.index + 1) / progress.count} />
+        </>
+      )}
     </View>
   );
 }

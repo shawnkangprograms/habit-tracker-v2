@@ -31,8 +31,9 @@ export function entryFromParam(param: unknown): OnboardingEntry {
   return param === 'settings' ? 'settings' : 'auto';
 }
 
-// "Skip setup": the first run writes a skip record so it never opens on its own again. From Settings, Skip
-// writes nothing and leaves any earlier record as it was.
-export function recordOnSkip(entry: OnboardingEntry): OnboardingRecord | null {
-  return entry === 'auto' ? skippedRecord() : null;
+// "Skip setup", on any question or result screen: the first run writes a skip record so it never opens on its
+// own again. From Settings, Skip writes nothing and leaves any earlier record as it was. Once this run has
+// saved a finished record (a habit was created), Skip writes nothing, so that record and its habits stand.
+export function recordOnSkip(entry: OnboardingEntry, savedThisRun = false): OnboardingRecord | null {
+  return entry === 'auto' && !savedThisRun ? skippedRecord() : null;
 }

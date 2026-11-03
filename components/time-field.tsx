@@ -27,6 +27,12 @@ function loadPicker(): PickerModule | null {
   return picker;
 }
 
+// Whether TimeField can show the native picker. Onboarding has no free-text input, so without it onboarding
+// shows fixed time choices instead of TimeField's HH:MM text field.
+export function timePickerAvailable(): boolean {
+  return loadPicker() !== null;
+}
+
 export function TimeField({value, onChange, error}: {
   value: string;
   onChange: (time: string) => void;

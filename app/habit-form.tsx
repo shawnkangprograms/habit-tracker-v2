@@ -19,11 +19,9 @@ import {
 import {StarterIdeas, type StarterIdea} from '@/components/starter-ideas';
 import {SwitchRow} from '@/components/switch-row';
 import {TimeField} from '@/components/time-field';
-import {loadNotificationPrefs, useNotificationPrefs} from '@/services/notificationPrefs';
-import {
-  getNotificationPermission, notificationsAvailable, requestNotificationPermission, type PermissionState,
-} from '@/services/notifications';
-import {shouldAskOnReminderSave} from '@/utils/notificationPrefs';
+import {useNotificationPrefs} from '@/services/notificationPrefs';
+import {getNotificationPermission, notificationsAvailable, type PermissionState} from '@/services/notifications';
+import {askForReminderPermission} from '@/services/reminderPermission';
 import {DEFAULT_REMINDER_TIME, LEAD_LABELS, reminderTimingNote, timingNoteText} from '@/utils/reminderForm';
 
 // For the timing line under the chips: a plain function so the React Compiler lint doesn't treat it as a render-time read
@@ -99,14 +97,6 @@ export default function HabitFormScreen() {
     if (available) getNotificationPermission().then(setPermission);
   }, [available]);
 
-  // After a save with a reminder time: the in-context permission request (Android 13+ and iOS), only while
-  // reminders are on and the app has never asked. Never throws; a denial just leaves reminders silent.
-  async function askForReminderPermission() {
-    if (!available) return;
-    const [prefs, current] = await Promise.all([loadNotificationPrefs(), getNotificationPermission()]);
-    if (shouldAskOnReminderSave(prefs, current)) await requestNotificationPermission();
-  }
-
   function goBack() {
     if (router.canGoBack()) router.back();
     else router.replace('/');
@@ -168,7 +158,7 @@ export default function HabitFormScreen() {
     try {
       if (habitId) await updateHabit(userId, habitId, input.value);
       else await addHabit(userId, input.value);
-      if (reminderTime !== null) await askForReminderPermission();
+      if (reminderTime !== null) await askForReminderPermission();// services/reminderPermission.ts; never throws
       goBack();
     } catch (err) {
       Alert.alert("Couldn't save habit", err instanceof Error ? err.message : 'Something went wrong. Please try again.');

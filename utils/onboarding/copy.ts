@@ -302,6 +302,23 @@ export const DAY1_MOVES: Record<Axis, Day1Move[]> = {
   ],
 };
 
+// ---------- Result screens: strings the docs don't define yet ----------
+// Short, factual, no claims. "Add your own habit" and "Start" are from the spec (section 5). The rest are
+// proposed here until they are added to docs/ONBOARDING_COPY.md.
+
+export const TOLD_US_TITLE = 'What you told us';
+export const DAY1_TITLE = 'Your first moves';
+export const PROFILE_TITLE = 'Your habit profile';
+export const ROUTINE_TITLE = 'Your recommended routine';
+export const ROUTINE_HINT = 'Tap a habit to leave it out.';
+export const ROUTINE_REMINDER_LABEL = 'Daily reminder';
+export const ADD_OWN_HABIT = 'Add your own habit';
+export const START = 'Start';
+export const DONE = 'Done';
+export const ADDED = 'Added';
+export const NOTHING_LEFT = "You already have every habit we'd suggest for these answers.";
+export const CREATE_FAILED = "Couldn't add every habit. The ones marked Added are saved. Tap Start to try the rest.";
+
 // ---------- Loading quotes ----------
 
 // A Swahili proverb has its English line, shown underneath in smaller text
