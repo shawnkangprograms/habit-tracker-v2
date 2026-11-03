@@ -162,6 +162,24 @@ describe('matches docs/ONBOARDING_COPY.md', () => {
   });
 });
 
+describe('matches docs/ONBOARDING_COPY.md section 7', () => {
+  test('result screen strings: the doc table and copy.ts hold the same constants with the same text', () => {
+    const [rows] = tables(section(COPY_DOC, '7.'));
+    const fromCode = {
+      TOLD_US_TITLE: c.TOLD_US_TITLE, DAY1_TITLE: c.DAY1_TITLE, PROFILE_TITLE: c.PROFILE_TITLE,
+      ROUTINE_TITLE: c.ROUTINE_TITLE, ROUTINE_HINT: c.ROUTINE_HINT, ROUTINE_REMINDER_LABEL: c.ROUTINE_REMINDER_LABEL,
+      DONE: c.DONE, ADDED: c.ADDED, NOTHING_LEFT: c.NOTHING_LEFT, CREATE_FAILED: c.CREATE_FAILED,
+    };
+    assert.deepEqual(toRecord(rows), fromCode);
+    // every row names a real export holding exactly that text
+    for (const [name, text] of rows) assert.equal((c as Record<string, unknown>)[name], text, name);
+  });
+
+  test('"Add your own habit" and "Start" come from the spec', () => {
+    assert.ok(section(SPEC_DOC, '5.').includes(`"${c.ADD_OWN_HABIT}" and "${c.START}"`));
+  });
+});
+
 describe('matches docs/ONBOARDING_SPEC.md', () => {
   test('catalog ids, axes and names in order (section 4)', () => {
     const [rows] = tables(section(SPEC_DOC, '4.'));

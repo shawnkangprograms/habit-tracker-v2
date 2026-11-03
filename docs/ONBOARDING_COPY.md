@@ -167,3 +167,20 @@ Swahili proverbs, shown with the English line underneath in smaller text:
 | Bandu bandu huisha gogo.    | Chip by chip, the log is finished.        |
 | Subira huvuta heri.         | Patience draws good fortune.              |
 | Mwanzo wa ngoma ni lele.    | Every big dance starts with a small step. |
+
+## 7. Result screen strings
+
+Titles, labels and messages on the screens after Q11, keyed by their constant name in utils/onboarding/copy.ts. "Add your own habit" and "Start" are defined in the spec (section 5) and are not repeated here.
+
+| constant               | text                                                                                  |
+| ---------------------- | ------------------------------------------------------------------------------------- |
+| TOLD_US_TITLE          | What you told us                                                                      |
+| DAY1_TITLE             | Your first moves                                                                      |
+| PROFILE_TITLE          | Your habit profile                                                                    |
+| ROUTINE_TITLE          | Your recommended routine                                                              |
+| ROUTINE_HINT           | Tap a habit to leave it out.                                                          |
+| ROUTINE_REMINDER_LABEL | Daily reminder                                                                        |
+| DONE                   | Done                                                                                  |
+| ADDED                  | Added                                                                                 |
+| NOTHING_LEFT           | You already have every habit we'd suggest for these answers.                          |
+| CREATE_FAILED          | Couldn't add every habit. The ones marked Added are saved. Tap Start to try the rest. |
