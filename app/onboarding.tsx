@@ -1,9 +1,13 @@
-import {useCallback, useRef, useState} from 'react';
+import {useCallback, useEffect, useRef, useState} from 'react';
 import {BackHandler, Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {router, useFocusEffect, useLocalSearchParams} from 'expo-router';
+import Animated, {
+  Easing, Keyframe, ReduceMotion, useAnimatedStyle, useSharedValue, withTiming,
+} from 'react-native-reanimated';
 
 import {addHabit, getActiveHabitsWithDays} from '@/db/habits';
+import {selectionHaptic} from '@/services/haptics';
 import {useSessionUid} from '@/services/session';
 import {onboardingStore} from '@/services/onboardingStore';
 import {askForReminderPermission} from '@/services/reminderPermission';
@@ -31,6 +35,10 @@ import {entryFromParam, recordOnSkip} from '@/utils/onboarding/gate';
 import {
   ROUTINE_REMINDER_DEFAULT, buildPlan, createPlannedHabits, type CreateSession, type Plan,
 } from '@/utils/onboarding/plan';
+import {
+  BUTTON_PRESS_IN_MS, BUTTON_PRESS_OUT_MS, BUTTON_PRESS_SCALE, STEP_ENTER_MS, enterOffsetX, shouldAnimate,
+  stepDirection, type Direction,
+} from '@/utils/onboarding/motion';
 import type {ParsedRecord} from '@/utils/onboarding/record';
 import type {Answers, CompleteAnswers} from '@/utils/onboarding/types';
 
@@ -42,6 +50,10 @@ import type {Answers, CompleteAnswers} from '@/utils/onboarding/types';
 // The record is written only by "Skip setup" (utils/onboarding/gate.ts) or by the routine's habit creation
 // (utils/onboarding/plan.ts: after the first habit, or on Start with nothing selected). Leaving any other way,
 // including the app being killed before the first habit, writes nothing.
+//
+// Motion (stage 4, timings in utils/onboarding/motion.ts): a new question slides and fades in from the side it
+// came from (enter only; nothing on the first step), and the buttons scale slightly while pressed. Answer
+// changes play a light haptic. No motion under reduced motion; haptics stay.
 
 type Phase = 'questions' | 'building' | 'toldUs' | 'profile' | 'routine';
 
@@ -62,6 +74,17 @@ const NO_RECORD: ParsedRecord = {kind: 'none'};
 
 function isMulti(step: string): step is MultiKey {
   return step === 'focus' || step === 'values';
+}
+
+const SYSTEM = ReduceMotion.System;// a backstop for the first render, before useReduceMotion has read the setting
+
+// The new step's content: from 16 px on the side it came from, fading in. undefined = no animation.
+function stepEntering(direction: Direction | null, animate: boolean) {
+  if (!animate || direction === null) return undefined;
+  return new Keyframe({
+    0: {opacity: 0, transform: [{translateX: enterOffsetX(direction)}]},
+    100: {opacity: 1, transform: [{translateX: 0}], easing: Easing.out(Easing.cubic)},
+  }).duration(STEP_ENTER_MS).reduceMotion(SYSTEM);
 }
 
 function closeFlow() {
@@ -92,10 +115,12 @@ export default function OnboardingScreen() {
   const entry = entryFromParam(params.entry);
   const userId = useSessionUid();
   const reduceMotion = useReduceMotion();
+  const animate = shouldAnimate(reduceMotion);
 
   const [phase, setPhase] = useState<Phase>('questions');
   const [answers, setAnswers] = useState<Answers>(emptyAnswers);
   const [stepIndex, setStepIndex] = useState(0);
+  const [direction, setDirection] = useState<Direction | null>(null);// how the questions last moved
   const [plan, setPlan] = useState<Plan | null>(null);
   const planRequest = useRef(0);// id of the newest plan load; an older one finishing later is ignored
 
@@ -116,22 +141,33 @@ export default function OnboardingScreen() {
   const canGoBack = phase === 'questions' ? stepIndex > 0
     : phase === 'toldUs' || phase === 'profile' || (phase === 'routine' && !anyCreated && !running);
 
-  const goBack = useCallback(() => {
-    if (phase === 'questions') setStepIndex((i) => Math.max(0, i - 1));
-    else if (phase === 'toldUs') setPhase('questions');// back to Q11, answers kept
-    else if (phase === 'profile') setPhase('toldUs');
+  // Not wrapped in useCallback: the React Compiler memoizes it (a manual list here fails its lint)
+  const goBack = () => {
+    if (phase === 'questions') {
+      const previous = Math.max(0, stepIndex - 1);
+      setDirection(stepDirection(stepIndex, previous));
+      setStepIndex(previous);
+    } else if (phase === 'toldUs') {
+      setDirection('back');// Q11 comes back in from the left, answers kept
+      setPhase('questions');
+    } else if (phase === 'profile') setPhase('toldUs');
     else if (phase === 'routine' && !anyCreated && !running) setPhase('profile');
-  }, [phase, anyCreated, running]);
+  };
 
   // Android hardware Back: one step back. Nothing on step 1 or Building Profile, and nothing on the routine once
   // a habit exists; skipping is only "Skip setup".
+  // The listener is added once per focus and calls the latest goBack through a ref.
+  const goBackRef = useRef(goBack);
+  useEffect(() => {
+    goBackRef.current = goBack;
+  });
   useFocusEffect(useCallback(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      goBack();
+      goBackRef.current();
       return true;
     });
     return () => sub.remove();
-  }, [goBack]));
+  }, []));
 
   // On any screen. Ignored while habits are being created.
   const skipSetup = async () => {
@@ -156,18 +192,33 @@ export default function OnboardingScreen() {
     });
   };
 
-  const onBuilt = useCallback(() => setPhase('toldUs'), []);
+  const onBuilt = () => setPhase('toldUs');// stable: the React Compiler memoizes it
 
   const nextQuestion = () => {
     if (!canContinue(answers, step)) return;
     if (stepIndex === STEP_COUNT - 1) startResults();
-    else setStepIndex((i) => i + 1);
+    else forward();
+  };
+
+  const forward = () => {
+    setDirection(stepDirection(stepIndex, stepIndex + 1));
+    setStepIndex(stepIndex + 1);
   };
 
   // Q10's "Skip this one": no answer, on to the next step
   const skipQuestion = () => {
     setAnswers((a) => selectSingle(a, 'badHabit', null));
-    setStepIndex((i) => i + 1);
+    forward();
+  };
+
+  // A light haptic only when the answer actually changes (a tap on the picked option, or on a dimmed one, doesn't)
+  const pickSingle = (key: SingleKey, value: string) => {
+    if (answers[key] !== value) selectionHaptic();
+    setAnswers((a) => selectSingle(a, key, value));
+  };
+  const pickMulti = (key: MultiKey, value: string) => {
+    if ((answers[key] as string[]).includes(value) || !isAtMax(answers, key)) selectionHaptic();
+    setAnswers((a) => toggleMulti(a, key, value));
   };
 
   const toggleCard = (id: string) => {
@@ -233,7 +284,7 @@ export default function OnboardingScreen() {
       {/* keyed by step or screen, so each starts scrolled to the top */}
       <ScrollView key={phase === 'questions' ? step : phase} contentContainerStyle={styles.content}>
         {phase === 'questions' && (
-          <>
+          <Animated.View entering={stepEntering(direction, animate)}>
             <Text style={styles.title} accessibilityRole="header">{title}</Text>
             {hint && <Text style={styles.hint}>{hint}</Text>}
             {stepIndex === 0 && <Text style={styles.notice}>{FIRST_STEP_NOTICE}</Text>}
@@ -243,6 +294,7 @@ export default function OnboardingScreen() {
                 value={answers.confidence}
                 onChange={(n) => setAnswers((a) => setConfidence(a, n))}
                 label={title}
+                reduceMotion={reduceMotion}
               />
             ) : isMulti(step) ? (
               <View style={styles.options}>
@@ -255,7 +307,8 @@ export default function OnboardingScreen() {
                       selected={isSelected}
                       multi
                       dimmed={!isSelected && isAtMax(answers, step)}
-                      onPress={() => setAnswers((a) => toggleMulti(a, step, value))}
+                      reduceMotion={reduceMotion}
+                      onPress={() => pickMulti(step, value)}
                     />
                   );
                 })}
@@ -268,17 +321,18 @@ export default function OnboardingScreen() {
                     label={LABELS[step][value]}
                     selected={answers[step] === value}
                     multi={false}
-                    onPress={() => setAnswers((a) => selectSingle(a, step, value))}
+                    reduceMotion={reduceMotion}
+                    onPress={() => pickSingle(step, value)}
                   />
                 ))}
               </View>
             )}
-          </>
+          </Animated.View>
         )}
 
         {phase === 'building' && <BuildingProfile reduceMotion={reduceMotion} ready={plan !== null} onDone={onBuilt} />}
 
-        {phase === 'toldUs' && plan && <ToldUs answers={plan.answers} focus={plan.focus} />}
+        {phase === 'toldUs' && plan && <ToldUs answers={plan.answers} focus={plan.focus} reduceMotion={reduceMotion} />}
 
         {phase === 'profile' && plan && <HabitProfile scores={plan.scores} focus={plan.focus} />}
 
@@ -289,13 +343,15 @@ export default function OnboardingScreen() {
               <>
                 <Text style={styles.hint}>{ROUTINE_HINT}</Text>
                 <View style={styles.cards}>
-                  {plan.picks.map((pick) => (
+                  {plan.picks.map((pick, i) => (
                     <RoutineCard
                       key={pick.id}
                       pick={pick}
+                      index={i}
                       selected={selected.has(pick.id)}
                       added={created.has(pick.id)}
                       disabled={running}
+                      reduceMotion={reduceMotion}
                       onToggle={() => toggleCard(pick.id)}
                     />
                   ))}
@@ -320,7 +376,7 @@ export default function OnboardingScreen() {
         <View style={styles.footer}>
           {phase === 'questions' && (
             <>
-              <PrimaryButton label={CONTINUE} enabled={continueOn} onPress={nextQuestion} />
+              <PressButton label={CONTINUE} enabled={continueOn} reduceMotion={reduceMotion} onPress={nextQuestion} />
               {canSkip(step) && (
                 <Pressable style={styles.textButton} onPress={skipQuestion} hitSlop={8} accessibilityRole="button">
                   <Text style={styles.textButtonText}>{SKIP_THIS_ONE}</Text>
@@ -329,21 +385,14 @@ export default function OnboardingScreen() {
             </>
           )}
 
-          {phase === 'toldUs' && <PrimaryButton label={CONTINUE} enabled onPress={() => setPhase('profile')} />}
-          {phase === 'profile' && <PrimaryButton label={CONTINUE} enabled onPress={() => setPhase('routine')} />}
+          {phase === 'toldUs' && <PressButton label={CONTINUE} enabled reduceMotion={reduceMotion} onPress={() => setPhase('profile')} />}
+          {phase === 'profile' && <PressButton label={CONTINUE} enabled reduceMotion={reduceMotion} onPress={() => setPhase('routine')} />}
 
           {phase === 'routine' && plan && (
             <>
               {createFailed && <Text style={styles.error} accessibilityLiveRegion="polite">{CREATE_FAILED}</Text>}
-              <PrimaryButton label={plan.picks.length > 0 ? START : DONE} enabled={!running} onPress={start} />
-              <Pressable
-                style={({pressed}) => [styles.secondary, running && styles.off, pressed && !running && styles.pressed]}
-                onPress={addOwnHabit}
-                disabled={running}
-                accessibilityRole="button"
-                accessibilityState={{disabled: running}}>
-                <Text style={styles.secondaryText}>{ADD_OWN_HABIT}</Text>
-              </Pressable>
+              <PressButton label={plan.picks.length > 0 ? START : DONE} enabled={!running} reduceMotion={reduceMotion} onPress={start} />
+              <PressButton label={ADD_OWN_HABIT} variant="secondary" enabled={!running} reduceMotion={reduceMotion} onPress={addOwnHabit} />
             </>
           )}
         </View>
@@ -352,15 +401,34 @@ export default function OnboardingScreen() {
   );
 }
 
-function PrimaryButton({label, enabled, onPress}: {label: string; enabled: boolean; onPress: () => void}) {
+// Continue, Start, Done (primary) and Add your own habit (secondary): scale to 0.97 while pressed
+function PressButton({label, enabled, onPress, reduceMotion, variant = 'primary'}: {
+  label: string;
+  enabled: boolean;
+  onPress: () => void;
+  reduceMotion: boolean;
+  variant?: 'primary' | 'secondary';
+}) {
+  const scale = useSharedValue(1);
+  const pressTo = (down: boolean) => {
+    if (!shouldAnimate(reduceMotion) || !enabled) return;
+    scale.set(withTiming(down ? BUTTON_PRESS_SCALE : 1, {
+      duration: down ? BUTTON_PRESS_IN_MS : BUTTON_PRESS_OUT_MS, easing: Easing.out(Easing.quad), reduceMotion: SYSTEM,
+    }));
+  };
+  const style = useAnimatedStyle(() => ({transform: [{scale: scale.get()}]}));
+  const primary = variant === 'primary';
   return (
     <Pressable
-      style={({pressed}) => [styles.primary, !enabled && styles.primaryOff, pressed && enabled && styles.pressed]}
       onPress={onPress}
+      onPressIn={() => pressTo(true)}
+      onPressOut={() => pressTo(false)}
       disabled={!enabled}
       accessibilityRole="button"
       accessibilityState={{disabled: !enabled}}>
-      <Text style={styles.primaryText}>{label}</Text>
+      <Animated.View style={[primary ? styles.primary : styles.secondary, !enabled && (primary ? styles.primaryOff : styles.off), style]}>
+        <Text style={primary ? styles.primaryText : styles.secondaryText}>{label}</Text>
+      </Animated.View>
     </Pressable>
   );
 }
@@ -401,7 +469,6 @@ const styles = StyleSheet.create({
   },
   secondaryText: {fontFamily: fonts.semiBold, fontSize: 15, color: colors.accent},
   off: {opacity: 0.4},
-  pressed: {opacity: 0.85},
   textButton: {alignSelf: 'center', paddingVertical: spacing.sm},
   textButtonText: {fontFamily: fonts.semiBold, fontSize: 14, color: colors.muted},
   error: {fontFamily: fonts.medium, fontSize: 13, color: colors.error, textAlign: 'center'},

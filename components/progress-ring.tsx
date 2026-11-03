@@ -7,22 +7,25 @@ import {colors} from '@/constants/theme';
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 // Circular progress (0..1) that animates to new values. Under the system reduce-motion setting it jumps instead.
+// durationMs: how long each change animates (Home uses the default; onboarding's Building Profile matches its
+// 100 ms counter step so the ring keeps up with the number).
 export function ProgressRing(props: {
   progress: number;
   size: number;
   strokeWidth: number;
   color: string;
+  durationMs?: number;
   children?: React.ReactNode; // centred label
 }) {
-  const {size, strokeWidth, color} = props;
+  const {size, strokeWidth, color, durationMs = 400} = props;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const target = Math.min(1, Math.max(0, props.progress));
   const progress = useSharedValue(target);
 
   useEffect(() => {
-    progress.value = withTiming(target, {duration: 400, reduceMotion: ReduceMotion.System});
-  }, [target, progress]);
+    progress.value = withTiming(target, {duration: durationMs, reduceMotion: ReduceMotion.System});
+  }, [target, progress, durationMs]);
 
   const arcProps = useAnimatedProps(() => ({
     strokeDashoffset: circumference * (1 - progress.value),

@@ -9,3 +9,14 @@ export function successHaptic(): void {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
   }
 }
+
+// A light tick when a choice changes (onboarding answers, the confidence slider, routine cards). Android uses
+// Clock_Tick, which every Android version supports (Segment_Tick needs API 34). Follows the phone's touch
+// feedback setting. Never throws.
+export function selectionHaptic(): void {
+  if (process.env.EXPO_OS === 'android') {
+    Haptics.performAndroidHapticsAsync(Haptics.AndroidHaptics.Clock_Tick).catch(() => {});
+  } else {
+    Haptics.selectionAsync().catch(() => {});
+  }
+}
