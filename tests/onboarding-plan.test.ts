@@ -16,7 +16,7 @@ const st = await import('../utils/onboarding/starters.ts');
 const radar = await import('../utils/onboarding/radar.ts');
 const {validateHabitInput} = await import('../validation/validators.ts');
 
-// Picks: skill15, plan_top1, focus25, plus the replace habit for Q10
+// Packs Career Builder and Steady Energy. Picks: focus25, walk20, skill15, plus the replace habit for Q10
 const ANSWERS: CompleteAnswers = {
   timeBudget: 'min60', occupation: 'early_career', habitsFeel: 'thriving', focus: ['career'], challenge: 'focus',
   derails: 'boredom', sleep: 'good', days: 'predictable', values: ['freedom'], badHabit: 'alcohol', confidence: 5,
@@ -56,8 +56,9 @@ describe('buildPlan', () => {
   test('first run: the starters for the answers, scores, radar and focus axis; no earlier record', () => {
     const pl = plan();
     assert.deepEqual(pl.picks, st.pickStarters(ANSWERS));
-    assert.deepEqual(pl.picks.map((pick) => pick.id), ['skill15', 'plan_top1', 'focus25', 'replace']);
+    assert.deepEqual(pl.picks.map((pick) => pick.id), ['focus25', 'walk20', 'skill15', 'replace']);
     assert.equal(pl.focus, 'Career');
+    assert.deepEqual(pl.packs, ['career_builder', 'steady_energy']);
     assert.equal(pl.radar.length, 6);
     assert.equal(pl.previous, null);
   });
@@ -65,7 +66,7 @@ describe('buildPlan', () => {
   test('retake: templates in addedTemplateIds are left out before picking', () => {
     const stored = {kind: 'ok' as const, record: {...r.skippedRecord(), addedTemplateIds: ['skill15' as const]}};
     const pl = p.buildPlan(ANSWERS, stored, []);
-    assert.deepEqual(pl.picks.map((pick) => pick.id), ['plan_top1', 'focus25', 'walk20', 'replace']);
+    assert.deepEqual(pl.picks.map((pick) => pick.id), ['focus25', 'walk20', 'stretch10', 'replace']);
     assert.deepEqual(pl.previous, stored.record);
   });
 
@@ -96,20 +97,20 @@ describe('createPlannedHabits: when the record is written', () => {
     const h = harness();
     const result = await p.createPlannedHabits(h.deps, {plan: pl, selected: allIds(pl), reminderTime: '20:00', session: EMPTY});
     assert.deepEqual(h.events.map((e) => e.type), ['add', 'save', 'add', 'save', 'add', 'save', 'add', 'save']);
-    assert.deepEqual(h.adds(), ['Practise a skill 15 minutes', "Plan tomorrow's top task", 'One 25-minute focus block', 'Clear-headed evening']);
-    assert.deepEqual(h.saves()[0].addedTemplateIds, ['skill15']);
+    assert.deepEqual(h.adds(), ['One 25-minute focus block', 'Walk for 20 minutes', 'Practise a skill 15 minutes', 'Clear-headed evening']);
+    assert.deepEqual(h.saves()[0].addedTemplateIds, ['focus25']);
     assert.equal(h.saves()[0].skipped, false);
     assert.equal(h.saves()[0].completedAt, NOW);
     assert.equal(result.failed, false);
     assert.equal(result.createdNow, 4);
-    assert.deepEqual([...result.created], ['skill15', 'plan_top1', 'focus25', 'replace']);
+    assert.deepEqual([...result.created], ['focus25', 'walk20', 'skill15', 'replace']);
   });
 
   test('addedTemplateIds gets catalog ids only, never the replace habit; Q10 is never in a saved record', async () => {
     const pl = plan();
     const h = harness();
     const result = await p.createPlannedHabits(h.deps, {plan: pl, selected: allIds(pl), reminderTime: null, session: EMPTY});
-    assert.deepEqual(result.saved?.addedTemplateIds, ['skill15', 'plan_top1', 'focus25']);
+    assert.deepEqual(result.saved?.addedTemplateIds, ['focus25', 'walk20', 'skill15']);
     for (const record of h.saves()) {
       const json = r.serialiseRecord(record);
       assert.doesNotMatch(json, /alcohol|badHabit|replace/);
@@ -128,9 +129,9 @@ describe('createPlannedHabits: when the record is written', () => {
   test('toggled-off cards are not created', async () => {
     const pl = plan();
     const h = harness();
-    await p.createPlannedHabits(h.deps, {plan: pl, selected: new Set(['plan_top1']), reminderTime: null, session: EMPTY});
-    assert.deepEqual(h.adds(), ["Plan tomorrow's top task"]);
-    assert.deepEqual(h.saves().at(-1)?.addedTemplateIds, ['plan_top1']);
+    await p.createPlannedHabits(h.deps, {plan: pl, selected: new Set(['walk20']), reminderTime: null, session: EMPTY});
+    assert.deepEqual(h.adds(), ['Walk for 20 minutes']);
+    assert.deepEqual(h.saves().at(-1)?.addedTemplateIds, ['walk20']);
   });
 
   test('every card toggled off: no habit, and the finished record is saved on Start (a deliberate none)', async () => {
@@ -158,37 +159,56 @@ describe('createPlannedHabits: when the record is written', () => {
     const pl = p.buildPlan(ANSWERS, {kind: 'ok', record: previous}, []);
     const h = harness();
     const result = await p.createPlannedHabits(h.deps, {plan: pl, selected: allIds(pl), reminderTime: null, session: EMPTY});
-    assert.deepEqual(result.saved?.addedTemplateIds, ['walk20', 'skill15', 'plan_top1', 'focus25']);
+    assert.deepEqual(result.saved?.addedTemplateIds, ['walk20', 'focus25', 'skill15', 'stretch10']);
+  });
+});
+
+describe('createPlannedHabits: onCreated', () => {
+  test('gets each pick id with the new habit id, before that habit\'s record save', async () => {
+    const pl = plan();
+    const h = harness();
+    const seen: [string, string | null, number][] = [];
+    let n = 0;
+    await p.createPlannedHabits({
+      ...h.deps,
+      addHabit: async (input: HabitInput) => {
+        await h.deps.addHabit(input);
+        n += 1;
+        return n === 2 ? undefined : `id-${n}`;// an add that gives no id passes null
+      },
+      onCreated: (pickId, habitId) => seen.push([pickId, habitId, h.saves().length]),
+    }, {plan: pl, selected: allIds(pl), reminderTime: null, session: EMPTY});
+    assert.deepEqual(seen, [['focus25', 'id-1', 0], ['walk20', null, 1], ['skill15', 'id-3', 2], ['replace', 'id-4', 3]]);
   });
 });
 
 describe('createPlannedHabits: failures and retry', () => {
   test('a failure stops the run, keeps what was created, and saves nothing more', async () => {
     const pl = plan();
-    const h = harness(["Plan tomorrow's top task"]);
+    const h = harness(['Walk for 20 minutes']);
     const result = await p.createPlannedHabits(h.deps, {plan: pl, selected: allIds(pl), reminderTime: null, session: EMPTY});
     assert.equal(result.failed, true);
-    assert.deepEqual(h.adds(), ['Practise a skill 15 minutes']);
-    assert.deepEqual([...result.created], ['skill15']);
-    assert.deepEqual(result.saved?.addedTemplateIds, ['skill15']);
+    assert.deepEqual(h.adds(), ['One 25-minute focus block']);
+    assert.deepEqual([...result.created], ['focus25']);
+    assert.deepEqual(result.saved?.addedTemplateIds, ['focus25']);
     assert.equal(h.saves().length, 1);
   });
 
   test('retrying creates only the rest, never the same card twice', async () => {
     const pl = plan();
-    const first = harness(["Plan tomorrow's top task"]);
+    const first = harness(['Walk for 20 minutes']);
     const failed = await p.createPlannedHabits(first.deps, {plan: pl, selected: allIds(pl), reminderTime: null, session: EMPTY});
     const second = harness();
     const result = await p.createPlannedHabits(second.deps, {plan: pl, selected: allIds(pl), reminderTime: null, session: failed});
-    assert.deepEqual(second.adds(), ["Plan tomorrow's top task", 'One 25-minute focus block', 'Clear-headed evening']);
+    assert.deepEqual(second.adds(), ['Walk for 20 minutes', 'Practise a skill 15 minutes', 'Clear-headed evening']);
     assert.equal(result.failed, false);
-    assert.deepEqual(result.saved?.addedTemplateIds, ['skill15', 'plan_top1', 'focus25']);
+    assert.deepEqual(result.saved?.addedTemplateIds, ['focus25', 'walk20', 'skill15']);
     assert.equal(result.saved?.completedAt, NOW);// the first save's time is kept
   });
 
   test('the very first creation failing saves nothing, so Skip (first run) still writes a skip record', async () => {
     const pl = plan();
-    const h = harness(['Practise a skill 15 minutes']);
+    const h = harness(['One 25-minute focus block']);
     const result = await p.createPlannedHabits(h.deps, {plan: pl, selected: allIds(pl), reminderTime: null, session: EMPTY});
     assert.equal(result.failed, true);
     assert.equal(result.saved, null);

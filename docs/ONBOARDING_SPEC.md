@@ -66,28 +66,38 @@ The radar plots score/5. The inner dashed polygon is a fixed baseline of 2/5. (L
 
 How many: confidence 1-3 gives 2 habits, 4-7 gives 3, 8-10 gives 4. Add 1 more if Q10 was answered (the "replace" habit below), up to a maximum of 5.
 
-Pick order: one template from each of the top axes by score (skip axes at 1), then fill from the focus axis. If sleep is struggle or irregular, force one sleep template. Never pick two templates with the same id. Every template carries a fixed one-line reason of at most 60 characters shown on its card.
+Pick order (since Stage 1a, docs/PACKS_REPORTS_SPEC.md sections 1 and 3): two built-in packs are chosen from the scores (the focus axis's pack, then the highest remaining score, ties in the order Health, Mind, Discipline, Career, Learning, Relations), and their templates are taken in turn: the focus pack's first, the second pack's first, the focus pack's second, and so on, in card order. Only when every template left in both packs is already picked (a retake) does the rest of the catalog fill in, by area rank. If sleep is struggle or irregular, force one sleep template (from Calm Mind, even when that pack was not chosen). Never pick two templates with the same id. Every template carries a fixed one-line reason of at most 60 characters shown on its card. Before Stage 1a the pool was the first 14 templates, one per top axis, then the focus axis.
 
 Time budget (Q1): every template has a `minutes` value (habits that take no real time are 1). No single catalog pick may be longer than the budget's single cap, and the catalog picks together may not exceed its total cap (twice the budget). A template that does not fit is skipped and picking continues down the same order, so a small budget can give fewer picks than the count. The Q10 replace pick is exempt from both caps. The forced sleep pick (1 minute) takes a free slot if it fits, otherwise the last one.
 
-Catalog (ids stable; names are final unless a limit forces a rewrite):
+Catalog (ids stable; names are final unless a limit forces a rewrite). Axis is the onboarding axis each template was first given; Area is its pack's area (docs/PACKS_REPORTS_SPEC.md, section 1), which packs, the fill-in rank and the later radar use. The last 10 rows arrived in Stage 1a.
 
-| id             | Axis       | Name                           | Minutes |
-| -------------- | ---------- | ------------------------------ | ------- |
-| walk20         | Health     | Walk for 20 minutes            | 20      |
-| stretch10      | Health     | Stretch for 10 minutes         | 10      |
-| water_meals    | Health     | Drink water with each meal     | 1       |
-| lights_out     | Health     | Lights out at a set time       | 1       |
-| screens_off    | Health     | No screens 30 min before bed   | 1       |
-| breathe5       | Mind       | Breathe for 5 minutes          | 5       |
-| journal3       | Mind       | Write 3 lines in a journal     | 5       |
-| plan_top1      | Discipline | Plan tomorrow's top task       | 5       |
-| focus25        | Discipline | One 25-minute focus block      | 25      |
-| study25        | Learning   | Study for 25 minutes           | 25      |
-| review10       | Learning   | Review notes for 10 minutes    | 10      |
-| skill15        | Career     | Practise a skill 15 minutes    | 15      |
-| message_friend | Relations  | Message someone you care about | 5       |
-| family_time    | Relations  | Family meal or call            | 30      |
+| id                 | Axis       | Area       | Name                           | Minutes |
+| ------------------ | ---------- | ---------- | ------------------------------ | ------- |
+| walk20             | Health     | Health     | Walk for 20 minutes            | 20      |
+| stretch10          | Health     | Health     | Stretch for 10 minutes         | 10      |
+| water_meals        | Health     | Health     | Drink water with each meal     | 1       |
+| lights_out         | Health     | Mind       | Lights out at a set time       | 1       |
+| screens_off        | Health     | Mind       | No screens 30 min before bed   | 1       |
+| breathe5           | Mind       | Mind       | Breathe for 5 minutes          | 5       |
+| journal3           | Mind       | Mind       | Write 3 lines in a journal     | 5       |
+| plan_top1          | Discipline | Discipline | Plan tomorrow's top task       | 5       |
+| focus25            | Discipline | Career     | One 25-minute focus block      | 25      |
+| study25            | Learning   | Learning   | Study for 25 minutes           | 25      |
+| review10           | Learning   | Learning   | Review notes for 10 minutes    | 10      |
+| skill15            | Career     | Career     | Practise a skill 15 minutes    | 15      |
+| message_friend     | Relations  | Relations  | Message someone you care about | 5       |
+| family_time        | Relations  | Relations  | Family meal or call            | 30      |
+| eat_produce        | Health     | Health     | Eat one fruit or vegetable     | 1       |
+| make_bed           | Discipline | Discipline | Make your bed                  | 2       |
+| tidy5              | Discipline | Discipline | Tidy your space for 5 minutes  | 5       |
+| set_out_essentials | Discipline | Discipline | Set out tomorrow's essentials  | 5       |
+| work_win           | Career     | Career     | Track one work win             | 2       |
+| reach_out          | Career     | Career     | Reach out to one contact       | 5       |
+| read15             | Learning   | Learning   | Read for 15 minutes            | 15      |
+| teach_back         | Learning   | Learning   | Teach what you learned         | 5       |
+| thank_someone      | Relations  | Relations  | Thank someone today            | 1       |
+| kind_act           | Relations  | Relations  | Do one kind thing              | 5       |
 
 | Budget | Single cap | Total cap |
 | ------ | ---------- | --------- |
@@ -188,3 +198,9 @@ Option labels map to enum values in the order of the enum lists in section 1 (Q5
 - "Skip setup" asks first, on every question and result screen: "Skip setup?" (or "Leave setup?" once a habit exists in this run). "Yes" shows "Taking you home..." with "Go home", which moves on by itself after about 2 s; the skip behaviour itself is unchanged. Copy in ONBOARDING_COPY.md section 7.
 - Building Profile quotes swap every 1.2 s, and only while a swap can finish before the count reaches 100%: one swap per visit, none as the screen moves on (none under reduced motion).
 - The Q11 slider is one pan that starts on touch-down, so drag and tap are the same gesture; a vertical scroll can't start on the slider strip.
+
+## 11. Decisions from Stage 1a (2026-11-04, habit packs)
+
+- The catalog has 24 templates (section 4), each with an area. Starters come from two built-in packs chosen from the scores (section 4; docs/PACKS_REPORTS_SPEC.md, sections 1 and 3); the time caps, count, sleep force and Q10 rules are unchanged. This replaces the "pool stays the 14 templates" line in section 10.
+- The Recommended Routine groups its cards under the pack each will join, then "Other habits" (the forced sleep pick from another pack, a retake fill-in, the Q10 replace pick, and habits made with "Add your own habit"). Copy in ONBOARDING_COPY.md section 7.
+- Every run writes the pack record (only the two pack ids and their names) right after each onboarding record save; never on Skip. The two packs are created once the run has made a habit and the user has no packs (no record, or an empty one), including a Settings run after a skip. When packs exist, a run only adds starters to packs the user already has. The pack record's failure never blocks onboarding, and onboarding never checks the habit or pack limits.

@@ -161,7 +161,7 @@ describe('the name kept on this phone', () => {
 
   test('read in the same native call as the sign-in marker (no extra startup read)', () => {
     const marker = source('services/authMarker.ts');
-    assert.match(marker, /AsyncStorage\.multiGet\(\[KEY, PROFILE_NAME_KEY\]\)/);
+    assert.match(marker, /AsyncStorage\.multiGet\(\[KEY, PROFILE_NAME_KEY, PACKS_MIRROR_KEY\]\)/);
     assert.doesNotMatch(marker, /AsyncStorage\.getItem\(/);
   });
 });

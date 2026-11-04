@@ -169,7 +169,7 @@ describe('matches docs/ONBOARDING_COPY.md section 7', () => {
       TOLD_US_TITLE: c.TOLD_US_TITLE, DAY1_TITLE: c.DAY1_TITLE, PROFILE_TITLE: c.PROFILE_TITLE,
       ROUTINE_TITLE: c.ROUTINE_TITLE, ROUTINE_HINT: c.ROUTINE_HINT, ROUTINE_REMINDER_LABEL: c.ROUTINE_REMINDER_LABEL,
       DONE: c.DONE, ADDED: c.ADDED, OWN_HABIT_REASON: c.OWN_HABIT_REASON, NOTHING_LEFT: c.NOTHING_LEFT,
-      CREATE_FAILED: c.CREATE_FAILED,
+      CREATE_FAILED: c.CREATE_FAILED, ROUTINE_OTHER_GROUP: c.ROUTINE_OTHER_GROUP,
       SKIP_TITLE: c.SKIP_TITLE, SKIP_BODY: c.SKIP_BODY, SKIP_YES: c.SKIP_YES, SKIP_NO: c.SKIP_NO,
       LEAVE_TITLE: c.LEAVE_TITLE, LEAVE_BODY: c.LEAVE_BODY, LEAVE_YES: c.LEAVE_YES, LEAVE_NO: c.LEAVE_NO,
       LEAVING_NOTICE: c.LEAVING_NOTICE, GO_HOME: c.GO_HOME,
@@ -179,15 +179,20 @@ describe('matches docs/ONBOARDING_COPY.md section 7', () => {
     for (const [name, text] of rows) assert.equal((c as Record<string, unknown>)[name], text, name);
   });
 
+  test('the routine subtitle', () => {
+    assert.ok(section(COPY_DOC, '7.').includes(`"${c.routineSubtitle('{pack A}', '{pack B}')}"`));
+    assert.equal(c.routineSubtitle('Steady Energy', 'Calm Mind'), 'Built from your packs: Steady Energy and Calm Mind.');
+  });
+
   test('"Add your own habit" and "Start" come from the spec', () => {
     assert.ok(section(SPEC_DOC, '5.').includes(`"${c.ADD_OWN_HABIT}" and "${c.START}"`));
   });
 });
 
 describe('matches docs/ONBOARDING_SPEC.md', () => {
-  test('catalog ids, axes, names and minutes in order (section 4)', () => {
+  test('catalog ids, axes, areas, names and minutes in order (section 4)', () => {
     const [rows] = tables(section(SPEC_DOC, '4.'));
-    assert.deepEqual(rows, st.CATALOG.map((tpl) => [tpl.id, tpl.axis, tpl.habitName, String(tpl.minutes)]));
+    assert.deepEqual(rows, st.CATALOG.map((tpl) => [tpl.id, tpl.axis, tpl.area, tpl.habitName, String(tpl.minutes)]));
   });
 
   test('replace habit minutes and the time budget caps (section 4)', () => {

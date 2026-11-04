@@ -149,6 +149,16 @@ export const TEMPLATE_NAMES: Record<TemplateId, string> = {
   skill15: 'Practise a skill 15 minutes',
   message_friend: 'Message someone you care about',
   family_time: 'Family meal or call',
+  eat_produce: 'Eat one fruit or vegetable',
+  make_bed: 'Make your bed',
+  tidy5: 'Tidy your space for 5 minutes',
+  set_out_essentials: "Set out tomorrow's essentials",
+  work_win: 'Track one work win',
+  reach_out: 'Reach out to one contact',
+  read15: 'Read for 15 minutes',
+  teach_back: 'Teach what you learned',
+  thank_someone: 'Thank someone today',
+  kind_act: 'Do one kind thing',
 };
 
 export const TEMPLATE_REASONS: Record<TemplateId, string> = {
@@ -166,6 +176,16 @@ export const TEMPLATE_REASONS: Record<TemplateId, string> = {
   skill15: 'Small daily practice compounds into real skill.',
   message_friend: 'Connection grows from small, regular check-ins.',
   family_time: 'Time together is easy to skip and hard to regret.',
+  eat_produce: 'One small swap that adds up over a week.',
+  make_bed: 'A finished task before the day even starts.',
+  tidy5: 'A clear space makes starting easier.',
+  set_out_essentials: 'Fewer decisions in the morning rush.',
+  work_win: 'Small wins are easy to forget. Write one down.',
+  reach_out: 'One message keeps your network warm.',
+  read15: 'A few pages a day add up to books a year.',
+  teach_back: 'Explaining it is the fastest way to remember.',
+  thank_someone: 'Saying thanks out loud lifts you both.',
+  kind_act: 'Small kindness builds closer ties.',
 };
 
 // Neutral names for the sensitive answers (porn, smoking_vaping, alcohol), so a synced habit never reveals them
@@ -323,6 +343,12 @@ export const ADDED = 'Added';
 export const OWN_HABIT_REASON = 'Your own habit';// the reason line of a habit the user made in the habit form
 export const NOTHING_LEFT = "You already have every habit we'd suggest for these answers.";
 export const CREATE_FAILED = "Couldn't add every habit. The ones marked Added are saved. Tap Start to try the rest.";
+export const ROUTINE_OTHER_GROUP = 'Other habits';// picks that join no pack, and the user's own habits
+
+// Under the routine title when the run uses both chosen packs (utils/packs/choose.ts)
+export function routineSubtitle(packA: string, packB: string): string {
+  return `Built from your packs: ${packA} and ${packB}.`;
+}
 
 // The "Skip setup" confirmation (utils/onboarding/skipDialog.ts): Skip before any habit exists, Leave after
 export const SKIP_TITLE = 'Skip setup?';

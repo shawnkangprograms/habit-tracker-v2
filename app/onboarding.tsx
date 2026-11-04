@@ -23,6 +23,11 @@ import {ToldUs} from '@/components/onboarding/told-us';
 import {HabitProfile} from '@/components/onboarding/habit-profile';
 import {RoutineCard} from '@/components/onboarding/routine-card';
 import {RoutineReminder} from '@/components/onboarding/routine-reminder';
+import {RoutineGroup} from '@/components/onboarding/routine-group';
+import {packsStore} from '@/services/packsStore';
+import {packsAfterRun, routineGroups, runPacks, type RunJoin} from '@/utils/packs/choose';
+import type {HabitRef} from '@/utils/packs/membership';
+import type {ParsedPacks} from '@/utils/packs/record';
 import {
   STEPS, STEP_COUNT, canContinue, canSkip, emptyAnswers, isAtMax, multiOptions, selectSingle, setConfidence,
   singleOptions, toggleMulti, validateAnswers, type MultiKey, type SingleKey,
@@ -30,8 +35,8 @@ import {
 import {
   ADD_OWN_HABIT, BAD_HABIT_LABELS, CHALLENGE_LABELS, CONTINUE, CREATE_FAILED, DAYS_LABELS, DERAIL_LABELS,
   DONE, FIRST_STEP_NOTICE, FOCUS_LABELS, HABITS_FEEL_LABELS, NOTHING_LEFT, OCCUPATION_LABELS, OWN_HABIT_REASON,
-  ROUTINE_HINT, ROUTINE_TITLE, SKIP_THIS_ONE, SLEEP_LABELS, START, STEP_HINTS, STEP_TITLES, STUDENT_CHALLENGE_TITLE,
-  TIME_BUDGET_LABELS, VALUE_LABELS,
+  ROUTINE_HINT, ROUTINE_OTHER_GROUP, ROUTINE_TITLE, SKIP_THIS_ONE, SLEEP_LABELS, START, STEP_HINTS, STEP_TITLES,
+  STUDENT_CHALLENGE_TITLE, TIME_BUDGET_LABELS, VALUE_LABELS, routineSubtitle,
 } from '@/utils/onboarding/copy';
 import {entryFromParam, recordOnSkip, shouldCloseForSession} from '@/utils/onboarding/gate';
 import {
@@ -43,12 +48,13 @@ import {
   ROUTINE_REMINDER_DEFAULT, buildPlan, createPlannedHabits, newHabitIds, recordAfterOwnHabit, type CreateSession,
   type Plan,
 } from '@/utils/onboarding/plan';
+import type {StarterPick} from '@/utils/onboarding/starters';
 import {
   BUTTON_PRESS_IN_MS, BUTTON_PRESS_OUT_MS, BUTTON_PRESS_SCALE, STEP_ENTER_MS, enterOffsetX, shouldAnimate,
   stepDirection, type Direction,
 } from '@/utils/onboarding/motion';
 import type {ParsedRecord} from '@/utils/onboarding/record';
-import type {Answers, CompleteAnswers} from '@/utils/onboarding/types';
+import {TEMPLATE_IDS, isOneOf, type Answers, type CompleteAnswers} from '@/utils/onboarding/types';
 
 // Onboarding (docs/ONBOARDING_SPEC.md, sections 1, 5, 8 and 9): the 11 questions, then Building Profile,
 // "What you told us", Habit Profile and the Recommended Routine, all in one route, so the answers (Q10
@@ -62,7 +68,13 @@ import type {Answers, CompleteAnswers} from '@/utils/onboarding/types';
 //
 // "Add your own habit" pushes the habit form over this screen, so its Back returns to the routine. The active
 // habit ids are read just before it opens; on returning, any new id is the user's own habit, shown as an added
-// card (and it counts as "a habit exists": no way back from the routine).
+// card under "Other habits" (and it counts as "a habit exists": no way back from the routine).
+//
+// Packs (docs/PACKS_REPORTS_SPEC.md, section 3; utils/packs/choose.ts): the starters come from the two packs
+// chosen from the scores, and the cards are grouped under the pack each will join, then "Other habits". The pack
+// record is written at every moment the onboarding record is (right after it), never on Skip; the two packs are
+// created once the run has made a habit and the user has no packs (any run, first or from Settings). Its failure is
+// swallowed and never blocks onboarding, and onboarding never checks the habit or pack limits.
 //
 // Motion (stage 4, timings in utils/onboarding/motion.ts): a new question fades in, and its options also slide in
 // from the side it came from (enter only; nothing on the first step). The title only fades, so no transform ever
@@ -85,6 +97,10 @@ const LABELS: Record<SingleKey | MultiKey, Record<string, string>> = {
 };
 
 const NO_RECORD: ParsedRecord = {kind: 'none'};
+const NO_PACKS: ParsedPacks = {kind: 'none'};
+
+// What the routine's pack write needs besides the plan: the pack record and the active habits at plan time
+type RunContext = {packs: ParsedPacks; existing: HabitRef[]};
 
 function isMulti(step: string): step is MultiKey {
   return step === 'focus' || step === 'values';
@@ -127,17 +143,19 @@ function clockNow(): number {
   return Date.now();
 }
 
-// The plan for these answers: the local record (retake: templates added before) and the names of the user's
-// active habits (retake: a replace habit they already have). A failed habits read only means no name dedupe.
-async function loadPlan(userId: string | null, answers: CompleteAnswers): Promise<Plan> {
-  if (!userId) return buildPlan(answers, NO_RECORD, []);
-  const [stored, names] = await Promise.all([
+// The plan for these answers: the local record (retake: templates added before) and the user's active habits
+// (retake: a replace habit they already have; adoption into new packs). A failed habits read only means no name
+// dedupe and no adoption. The pack record says which packs the starters can join.
+async function loadPlan(userId: string | null, answers: CompleteAnswers): Promise<{plan: Plan; context: RunContext}> {
+  if (!userId) return {plan: buildPlan(answers, NO_RECORD, []), context: {packs: NO_PACKS, existing: []}};
+  const [stored, existing, packs] = await Promise.all([
     onboardingStore.read(userId),
-    (getActiveHabitsWithDays(userId) as Promise<{habitName: string}[]>)
-      .then((rows) => rows.map((row) => row.habitName))
-      .catch(() => [] as string[]),
+    activeHabits(userId)
+      .then((rows): HabitRef[] => rows.map(({habitId, habitName}) => ({habitId, habitName})))
+      .catch((): HabitRef[] => []),
+    packsStore.read(userId),
   ]);
-  return buildPlan(answers, stored, names);
+  return {plan: buildPlan(answers, stored, existing.map((h) => h.habitName)), context: {packs, existing}};
 }
 
 export default function OnboardingScreen() {
@@ -152,7 +170,10 @@ export default function OnboardingScreen() {
   const [stepIndex, setStepIndex] = useState(0);
   const [direction, setDirection] = useState<Direction | null>(null);// how the questions last moved
   const [plan, setPlan] = useState<Plan | null>(null);
+  const [context, setContext] = useState<RunContext>({packs: NO_PACKS, existing: []});
   const planRequest = useRef(0);// id of the newest plan load; an older one finishing later is ignored
+  const joins = useRef<RunJoin[]>([]);// starters created in this run, for the pack record
+  const madeHabit = useRef(false);// this run created a habit (a starter or the user's own): packs may be created
 
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [created, setCreated] = useState<ReadonlySet<string>>(new Set());
@@ -247,10 +268,18 @@ export default function OnboardingScreen() {
     setPhase('building');
     loadPlan(userId, result.value).then((next) => {
       if (request !== planRequest.current) return;
-      setPlan(next);
-      setSelected(new Set(next.picks.map((p) => p.id)));
+      setPlan(next.plan);
+      setContext(next.context);
+      setSelected(new Set(next.plan.picks.map((p) => p.id)));
     });
   };
+
+  // The pack record, written right after each onboarding record save (utils/packs/choose.ts): the packs are created
+  // once this run has made a habit and the user has none. Never throws.
+  const existing = context.existing;
+  const savePacks = useCallback((uid: string, current: Plan) => packsStore.update(uid, (parsed) => packsAfterRun(parsed, {
+    chosen: current.packs, create: madeHabit.current, joins: joins.current, existing, now: clockNow(),
+  })), [existing]);
 
   const onBuilt = () => setPhase('toldUs');// stable: the React Compiler memoizes it
 
@@ -302,9 +331,16 @@ export default function OnboardingScreen() {
     try {
       const result = await createPlannedHabits({
         addHabit: (input) => addHabit(userId, input),
-        saveRecord: (record) => onboardingStore.write(userId, record),
+        saveRecord: async (record) => {
+          await onboardingStore.write(userId, record);
+          await savePacks(userId, plan);
+        },
         now: clockNow,
-        onCreated: (id) => setCreated((c) => new Set(c).add(id)),
+        onCreated: (id, habitId) => {
+          setCreated((c) => new Set(c).add(id));
+          madeHabit.current = true;
+          if (habitId && isOneOf(TEMPLATE_IDS, id)) joins.current.push({templateId: id, habitId});
+        },
       }, {plan, selected, reminderTime: reminderOn ? reminderTime : null, session: session.current, writeIfNone});
       session.current = {created: result.created, saved: result.saved};
       if (result.failed) {
@@ -344,13 +380,32 @@ export default function OnboardingScreen() {
       const fresh = newHabitIds(before, rows.map((h) => h.habitId));
       if (fresh.length === 0) return;
       setOwnHabits((own) => [...own, ...rows.filter((h) => fresh.includes(h.habitId))]);
+      madeHabit.current = true;
       const record = recordAfterOwnHabit(plan, session.current, clockNow());
       if (record) {
         session.current = {...session.current, saved: record};
         await onboardingStore.write(userId, record);
+        await savePacks(userId, plan);
       }
     }).catch(() => {});
-  }, [userId, plan]));
+  }, [userId, plan, savePacks]));
+
+  // The routine's groups: each card under the pack it will join (runPacks previews the packs this run joins, or
+  // creates once a card is added), the rest under "Other habits". The stagger runs down the cards in that order.
+  const groups = plan ? routineGroups(plan.picks, runPacks(context.packs, plan.packs, true, 0), plan.packs) : null;
+  const cardOrder = groups ? [...groups.packs.flatMap((g) => g.picks), ...groups.other] : [];
+  const pickCard = (pick: StarterPick) => (
+    <RoutineCard
+      key={pick.id}
+      pick={pick}
+      index={cardOrder.indexOf(pick)}
+      selected={selected.has(pick.id)}
+      added={created.has(pick.id)}
+      disabled={running}
+      reduceMotion={reduceMotion}
+      onToggle={() => toggleCard(pick.id)}
+    />
+  );
 
   const continueOn = canContinue(answers, step);
   const title = step === 'challenge' && answers.occupation === 'student' ? STUDENT_CHALLENGE_TITLE : STEP_TITLES[step];
@@ -427,37 +482,18 @@ export default function OnboardingScreen() {
         {phase === 'routine' && plan && (
           <View style={styles.routine}>
             <Text style={styles.title} accessibilityRole="header">{ROUTINE_TITLE}</Text>
-            {plan.picks.length > 0 ? (
-              <>
-                <Text style={styles.hint}>{ROUTINE_HINT}</Text>
-                <View style={styles.cards}>
-                  {plan.picks.map((pick, i) => (
-                    <RoutineCard
-                      key={pick.id}
-                      pick={pick}
-                      index={i}
-                      selected={selected.has(pick.id)}
-                      added={created.has(pick.id)}
-                      disabled={running}
-                      reduceMotion={reduceMotion}
-                      onToggle={() => toggleCard(pick.id)}
-                    />
-                  ))}
-                </View>
-                <RoutineReminder
-                  on={reminderOn}
-                  time={reminderTime}
-                  pickerAvailable={pickerAvailable}
-                  disabled={running}
-                  onToggle={setReminderOn}
-                  onTime={setReminderTime}
-                />
-              </>
-            ) : (
-              <Text style={styles.nothingLeft}>{NOTHING_LEFT}</Text>
+            {groups?.subtitle && plan.picks.length > 0 && (
+              <Text style={styles.hint}>{routineSubtitle(...groups.subtitle)}</Text>
             )}
-            {ownHabits.length > 0 && (
-              <View style={styles.cards}>
+            {plan.picks.length > 0 ? <Text style={styles.hint}>{ROUTINE_HINT}</Text> : <Text style={styles.nothingLeft}>{NOTHING_LEFT}</Text>}
+            {groups?.packs.map((group) => (
+              <RoutineGroup key={group.packId} label={group.name}>
+                {group.picks.map((pick) => pickCard(pick))}
+              </RoutineGroup>
+            ))}
+            {(groups && groups.other.length > 0) || ownHabits.length > 0 ? (
+              <RoutineGroup label={ROUTINE_OTHER_GROUP}>
+                {groups?.other.map((pick) => pickCard(pick))}
                 {ownHabits.map((habit, i) => (
                   <RoutineCard
                     key={habit.habitId}
@@ -470,6 +506,18 @@ export default function OnboardingScreen() {
                     onToggle={() => {}}
                   />
                 ))}
+              </RoutineGroup>
+            ) : null}
+            {plan.picks.length > 0 && (
+              <View style={styles.reminder}>
+                <RoutineReminder
+                  on={reminderOn}
+                  time={reminderTime}
+                  pickerAvailable={pickerAvailable}
+                  disabled={running}
+                  onToggle={setReminderOn}
+                  onTime={setReminderTime}
+                />
               </View>
             )}
           </View>
@@ -548,7 +596,7 @@ const styles = StyleSheet.create({
   notice: {fontFamily: fonts.regular, fontSize: 12, color: colors.muted, marginTop: spacing.sm},
   options: {gap: spacing.sm, marginTop: spacing.xl},
   routine: {gap: spacing.sm},
-  cards: {gap: spacing.sm, marginTop: spacing.md, marginBottom: spacing.lg},
+  reminder: {marginTop: spacing.lg},
   nothingLeft: {fontFamily: fonts.regular, fontSize: 15, lineHeight: 22, color: colors.muted, marginTop: spacing.md},
   footer: {paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.lg, gap: spacing.sm},
   primary: {

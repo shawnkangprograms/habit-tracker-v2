@@ -54,7 +54,7 @@ describe('onboarding modules', () => {
   });
 
   test('the pure logic in utils/onboarding imports only pure modules', () => {
-    const allowed = /^(@\/utils\/onboarding\/[\w]+|@\/validation\/validators|@\/constants\/habits)$/;
+    const allowed = /^(@\/utils\/(onboarding|packs)\/[\w]+|@\/validation\/validators|@\/constants\/habits)$/;
     for (const file of files('utils/onboarding')) {
       for (const spec of specifiers(readFileSync(file, 'utf8'))) assert.match(spec, allowed, `${rel(file)} imports ${spec}`);
     }

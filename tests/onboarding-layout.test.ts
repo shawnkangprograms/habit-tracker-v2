@@ -67,19 +67,11 @@ describe('radar labels', () => {
   });
 });
 
-// The ten Stage 1 templates (docs/PACKS_REPORTS_SPEC.md, section 1): not in the catalog yet, checked now so the
-// card already fits them
-const STAGE1_NAMES = [
-  'Eat one fruit or vegetable', 'Make your bed', 'Tidy your space for 5 minutes', "Set out tomorrow's essentials",
-  'Track one work win', 'Reach out to one contact', 'Read for 15 minutes', 'Teach what you learned',
-  'Thank someone today', 'Do one kind thing',
-];
-
 describe('routine card names', () => {
-  test('every catalog, replace and Stage 1 name fits in two lines on a 360 dp screen', () => {
+  test('every catalog name (all 24) and replace name fits in two lines on a 360 dp screen', () => {
     const width = layout.routineNameWidth(360);
     assert.ok(width > 150, `name width ${width}`);
-    const names = [...Object.values(c.TEMPLATE_NAMES), ...Object.values(c.REPLACE_NAMES), ...STAGE1_NAMES, c.OWN_HABIT_REASON];
+    const names = [...Object.values(c.TEMPLATE_NAMES), ...Object.values(c.REPLACE_NAMES), c.OWN_HABIT_REASON];
     for (const name of names) {
       const lines = layout.wrappedLines(name, width, layout.ROUTINE_CARD.nameSize);
       assert.ok(lines <= layout.ROUTINE_NAME_LINES, `${name}: ${lines} lines in ${width} px`);

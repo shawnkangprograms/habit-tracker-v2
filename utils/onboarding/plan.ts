@@ -19,6 +19,8 @@ import {completedRecord, withAddedTemplates, type OnboardingRecord, type ParsedR
 import {focusAxis, radarValues, scoreAxes, type Scores} from '@/utils/onboarding/scoring';
 import {addedTemplateIdsOf, pickStarters, toHabitInput, type StarterPick} from '@/utils/onboarding/starters';
 import type {Axis, CompleteAnswers} from '@/utils/onboarding/types';
+import type {BuiltinPackId} from '@/utils/packs/builtin';
+import {chooseOnboardingPacks} from '@/utils/packs/choose';
 
 // The routine's reminder: on by default at 20:00 (the app shows 24-hour times). Without the native time picker,
 // these fixed choices replace the picker, since onboarding has no free-text input.
@@ -30,6 +32,7 @@ export type Plan = {
   scores: Scores;
   radar: number[];
   focus: Axis;
+  packs: [BuiltinPackId, BuiltinPackId];// the two packs the starters come from (only these ids are ever stored)
   picks: StarterPick[];
   previous: OnboardingRecord | null;// the record before this run (retake keeps its addedTemplateIds)
 };
@@ -44,6 +47,7 @@ export function buildPlan(answers: CompleteAnswers, stored: ParsedRecord, existi
     scores,
     radar: radarValues(scores),
     focus: focusAxis(scores, answers.focus),
+    packs: chooseOnboardingPacks(scores, answers.focus),
     picks: pickStarters(answers, {excludeIds: previous?.addedTemplateIds ?? [], existingHabitNames}),
     previous,
   };
@@ -53,7 +57,8 @@ export type CreateDeps = {
   addHabit: (input: HabitInput) => Promise<unknown>;
   saveRecord: (record: OnboardingRecord) => Promise<void>;
   now: () => number;
-  onCreated?: (pickId: string) => void;// after each success, before its record save
+  // after each success, before its record save; habitId is the new habit's id (null if addHabit gave none)
+  onCreated?: (pickId: string, habitId: string | null) => void;
 };
 
 // What this screen has done so far: pick ids created, and the record as last saved (null = nothing saved yet)
@@ -77,14 +82,15 @@ export async function createPlannedHabits(deps: CreateDeps, input: {
 
   for (const pick of input.plan.picks) {
     if (!input.selected.has(pick.id) || created.has(pick.id)) continue;
+    let habitId: unknown;
     try {
-      await deps.addHabit(toHabitInput(pick, input.reminderTime));
+      habitId = await deps.addHabit(toHabitInput(pick, input.reminderTime));
     } catch {
       return {created, saved, failed: true, createdNow};
     }
     created.add(pick.id);
     createdNow += 1;
-    deps.onCreated?.(pick.id);
+    deps.onCreated?.(pick.id, typeof habitId === 'string' && habitId.length > 0 ? habitId : null);
     saved = withAddedTemplates(saved ?? completedRecord(input.plan.previous, deps.now()), addedTemplateIdsOf([pick]));
     await deps.saveRecord(saved);
   }

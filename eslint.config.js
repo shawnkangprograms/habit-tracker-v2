@@ -55,4 +55,31 @@ module.exports = defineConfig([
       }],
     },
   },
+  {
+    // Habit packs stay on the phone (docs/PACKS_REPORTS_SPEC.md, section 7): the same bans as onboarding, plus
+    // nothing from the startup path (the marker read hands the mirror in; packs never reach back into startup).
+    // tests/packs-isolation.test.ts also scans these files for require() and import() calls.
+    files: ['utils/packs/**', 'services/packsStore*.ts', 'components/packs/**', 'hooks/use-packs.ts', 'app/packs/**'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        paths: [
+          { name: 'firebase/firestore', message: 'Packs never leave the phone.' },
+          { name: '@firebase/firestore', message: 'Packs never leave the phone.' },
+          { name: 'firebase/functions', message: 'Packs never leave the phone.' },
+          { name: '@firebase/functions', message: 'Packs never leave the phone.' },
+          { name: '@/services/firestore', message: 'Packs never leave the phone.' },
+          { name: '@/services/insights', message: 'Packs are never sent to the insight function.' },
+          { name: '@/services/insightCache', message: 'Packs are never sent to the insight function.' },
+          { name: '@/utils/insightInput', message: 'Packs are never sent to the insight function.' },
+          { name: '@/services/authMarker', message: 'Packs stay off the startup path.' },
+          { name: '@/services/authInit', message: 'Packs stay off the startup path.' },
+          { name: '@/services/firebaseInit', message: 'Packs stay off the startup path.' },
+        ],
+        patterns: [
+          { group: ['firebase', 'firebase/*', '@firebase/*'], message: 'Packs never leave the phone.' },
+          { group: ['@/sync/*', '@/db/sync', '@/db/syncCore'], message: 'Packs are never synced.' },
+        ],
+      }],
+    },
+  },
 ]);

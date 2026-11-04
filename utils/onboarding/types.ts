@@ -50,9 +50,12 @@ export const SENSITIVE_BAD_HABITS = ['porn', 'smoking_vaping', 'alcohol'] as con
 export const AXES = ['Learning', 'Mind', 'Career', 'Discipline', 'Relations', 'Health'] as const;
 export type Axis = (typeof AXES)[number];
 
+// The first 14 are the original catalog; the last 10 arrived with the habit packs (docs/PACKS_REPORTS_SPEC.md)
 export const TEMPLATE_IDS = [
   'walk20', 'stretch10', 'water_meals', 'lights_out', 'screens_off', 'breathe5', 'journal3',
   'plan_top1', 'focus25', 'study25', 'review10', 'skill15', 'message_friend', 'family_time',
+  'eat_produce', 'make_bed', 'tidy5', 'set_out_essentials', 'work_win', 'reach_out', 'read15', 'teach_back',
+  'thank_someone', 'kind_act',
 ] as const;
 export type TemplateId = (typeof TEMPLATE_IDS)[number];
 

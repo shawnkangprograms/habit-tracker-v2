@@ -59,6 +59,16 @@ Shown on each routine card.
 | skill15        | Small daily practice compounds into real skill.   |
 | message_friend | Connection grows from small, regular check-ins.   |
 | family_time    | Time together is easy to skip and hard to regret. |
+| eat_produce    | One small swap that adds up over a week.          |
+| make_bed       | A finished task before the day even starts.       |
+| tidy5          | A clear space makes starting easier.              |
+| set_out_essentials | Fewer decisions in the morning rush.          |
+| work_win       | Small wins are easy to forget. Write one down.    |
+| reach_out      | One message keeps your network warm.              |
+| read15         | A few pages a day add up to books a year.         |
+| teach_back     | Explaining it is the fastest way to remember.     |
+| thank_someone  | Saying thanks out loud lifts you both.            |
+| kind_act       | Small kindness builds closer ties.                |
 
 Replace habits from Q10 (generic on purpose):
 
@@ -185,6 +195,7 @@ Titles, labels and messages on the screens after Q11, keyed by their constant na
 | OWN_HABIT_REASON       | Your own habit                                                                        |
 | NOTHING_LEFT           | You already have every habit we'd suggest for these answers.                          |
 | CREATE_FAILED          | Couldn't add every habit. The ones marked Added are saved. Tap Start to try the rest. |
+| ROUTINE_OTHER_GROUP    | Other habits                                                                          |
 | SKIP_TITLE             | Skip setup?                                                                           |
 | SKIP_BODY              | We won't be able to generate habits for you.                                          |
 | SKIP_YES               | Yes, skip                                                                             |
@@ -195,3 +206,5 @@ Titles, labels and messages on the screens after Q11, keyed by their constant na
 | LEAVE_NO               | No, stay                                                                              |
 | LEAVING_NOTICE         | Taking you home. You can set up your plan any time in Settings.                       |
 | GO_HOME                | Go home                                                                               |
+
+Routine subtitle (routineSubtitle), under the title when the run uses both chosen packs: "Built from your packs: {pack A} and {pack B}." The group labels are the pack names (docs/PACKS_REPORTS_SPEC.md, section 1) and ROUTINE_OTHER_GROUP.
