@@ -46,6 +46,3 @@ app-example
 # generated native folders
 /ios
 /android
-
-# local test scripts that call live services, never commit
-scripts/insight-call-test.mjs
