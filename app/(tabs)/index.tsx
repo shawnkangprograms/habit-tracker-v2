@@ -42,6 +42,8 @@ import {nextStatusChangeAt, rowTimeStatus, type TimeStatus} from '@/utils/timeSt
 import {mark} from '@/utils/startupTrace';// startup trace (preview build only)
 import {homeUsable} from '@/services/startupSignals';// deferred startup work waits for Home's first list
 import {onboardingLaunch} from '@/services/onboardingLaunch';// onboarding straight after a sign-up
+import {useProfileName} from '@/services/profileName';// the greeting's name, kept on this phone
+import {firstNameFor, greetingFor} from '@/utils/greeting';
 
 type Habit = {// one row from getHabitsWithTodayStatus: an active habit scheduled today, with today's status
   habitId: string;
@@ -106,11 +108,9 @@ function formatToday(): string {
   return `${DAY_NAMES[weekday]}, ${MONTH_NAMES[month - 1]} ${day}`;
 }
 
-function greeting(): string {
-  const hour = new Date().getHours();
-  if (hour < 12) return 'Good morning';
-  if (hour < 17) return 'Good afternoon';
-  return 'Good evening';
+// The phone's local hour, for the greeting (utils/greeting.ts)
+function currentHour(): number {
+  return new Date().getHours();
 }
 
 // Read aloud after the time; colour is never the only signal
@@ -146,7 +146,10 @@ export default function HomeScreen() {// default export, becomes the "index" tab
   // from auth.currentUser, which is null at launch until Firebase's network check has answered.
   const userId = useSessionUid() ?? undefined;
   const user = getFirebaseAuth().currentUser;
-  const firstName = user?.uid === userId ? user?.displayName?.trim().split(/\s+/)[0] : undefined;// only if auth already has a displayName
+  // The name kept on this phone (read with the sign-in marker, so it's here on the first render with no network),
+  // else the first word of Auth's displayName once auth has it
+  const profileName = useProfileName(userId);
+  const firstName = firstNameFor(profileName?.firstName, user?.uid === userId ? user?.displayName : null);
 
   useEffect(() => mark('home:mount'), []);
 
@@ -448,7 +451,7 @@ export default function HomeScreen() {// default export, becomes the "index" tab
 
         <View style={styles.greeting}>
           <Text style={styles.date}>{formatToday()}</Text>
-          <Text style={styles.hello}>{firstName ? `${greeting()}, ${firstName}` : greeting()}</Text>
+          <Text style={styles.hello}>{greetingFor(currentHour(), firstName)}</Text>
         </View>
 
         {stats && loaded && (

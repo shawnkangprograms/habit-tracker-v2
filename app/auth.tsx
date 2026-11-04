@@ -8,9 +8,12 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
 import {resetPassword, signUp, signIn} from '@/services/authActions';
 import {colors, fonts, radii, spacing} from '@/constants/theme';
-import {validateAge, validateConfirmPassword, validateEmail, validatePassword} from '@/validation/validators';
+import {
+  validateAge, validateConfirmPassword, validateEmail, validatePassword, validatePersonName,
+} from '@/validation/validators';
+import {visibleError} from '@/utils/profileName';
 
-type Field = 'email' | 'password' | 'confirmPassword' | 'age';
+type Field = 'email' | 'password' | 'confirmPassword' | 'age' | 'firstName' | 'lastName';
 type FieldErrors = Partial<Record<Field, string>>;
 type Mode = 'signUp' | 'signIn' | 'reset';
 
@@ -51,10 +54,13 @@ function AuthInput(props: {
   error?: string;
   secure?: boolean;
   keyboardType?: KeyboardTypeOptions;
-  textContentType?: 'emailAddress' | 'password' | 'newPassword' | 'none';
+  textContentType?: 'emailAddress' | 'password' | 'newPassword' | 'givenName' | 'familyName' | 'none';
   editable: boolean;
+  onBlur?: () => void;
 }) {
   const isEmail = props.textContentType === 'emailAddress';
+  const nameField = props.textContentType === 'givenName' ? 'name-given'
+    : props.textContentType === 'familyName' ? 'name-family' : null;
   return (
     <View style={styles.field}>
       <View style={[styles.input, props.error && styles.inputError]}>
@@ -69,11 +75,13 @@ function AuthInput(props: {
           secureTextEntry={props.secure}
           keyboardType={props.keyboardType}
           textContentType={props.textContentType}
-          autoComplete={isEmail ? 'email' : props.textContentType === 'none' ? 'off' : props.secure ? 'password' : undefined}
-          autoCapitalize="none"
+          autoComplete={nameField ?? (isEmail ? 'email' : props.textContentType === 'none' ? 'off' : props.secure ? 'password' : undefined)}
+          autoCapitalize={nameField ? 'words' : 'none'}
           autoCorrect={false}
           editable={props.editable}
           returnKeyType="done"
+          onBlur={props.onBlur}
+          accessibilityLabel={props.placeholder}
         />
       </View>
       {props.error ? <Text style={styles.errorText}>{props.error}</Text> : null}
@@ -88,6 +96,13 @@ export default function AuthScreen() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [age, setAge] = useState('');
+  // First and last name: their messages follow the value once the field has been left or the form submitted
+  // (utils/profileName.ts visibleError), never while typing the first character
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [nameTouched, setNameTouched] = useState({first: false, last: false});
+  const firstResult = validatePersonName(firstName, 'first');
+  const lastResult = validatePersonName(lastName, 'last');
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitError, setSubmitError] = useState('');
   const [submitting, setSubmitting] = useState(false); // drives the button's loading state
@@ -123,6 +138,7 @@ export default function AuthScreen() {
     setMode(next);
     setPassword('');
     setConfirmPassword('');
+    setNameTouched({first: false, last: false});
     setErrors({});
     setSubmitError('');
     setResetSent(false);
@@ -176,16 +192,17 @@ export default function AuthScreen() {
       confirmPassword: confirmResult && !confirmResult.valid ? confirmResult.error : undefined,
       age: ageResult && !ageResult.valid ? ageResult.error : undefined,
     });
+    if (isSignUp) setNameTouched({first: true, last: true});
     if (!emailResult.valid || !passwordResult.valid) return;
     // the age gate: checked before createUserWithEmailAndPassword, so no under-18 account is ever created
     const ageValue = ageResult?.valid ? ageResult.value : null;
-    if (isSignUp && (!confirmResult?.valid || ageValue === null)) return;
+    if (isSignUp && (!confirmResult?.valid || ageValue === null || !firstResult.valid || !lastResult.valid)) return;
 
     submittingRef.current = true;
     setSubmitting(true);
     try {
-      if (isSignUp && ageValue !== null) {
-        await signUp(emailResult.value, passwordResult.value, ageValue);
+      if (isSignUp && ageValue !== null && firstResult.valid && lastResult.valid) {
+        await signUp(emailResult.value, passwordResult.value, ageValue, {firstName: firstResult.value, lastName: lastResult.value});
       } else {
         await signIn(emailResult.value, passwordResult.value);
       }
@@ -229,6 +246,30 @@ export default function AuthScreen() {
             </View>
           )}
 
+          {isSignUp && (
+            <>
+              <AuthInput
+                icon="account-outline"
+                value={firstName}
+                onChangeText={edit('firstName', setFirstName)}
+                onBlur={() => setNameTouched((t) => ({...t, first: true}))}
+                placeholder="First name"
+                error={visibleError(firstResult, nameTouched.first)}
+                textContentType="givenName"
+                editable={!submitting}
+              />
+              <AuthInput
+                icon="account-outline"
+                value={lastName}
+                onChangeText={edit('lastName', setLastName)}
+                onBlur={() => setNameTouched((t) => ({...t, last: true}))}
+                placeholder="Last name"
+                error={visibleError(lastResult, nameTouched.last)}
+                textContentType="familyName"
+                editable={!submitting}
+              />
+            </>
+          )}
           <AuthInput
             icon="email-outline"
             value={email}

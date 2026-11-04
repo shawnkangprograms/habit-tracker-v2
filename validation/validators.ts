@@ -161,3 +161,23 @@ export function validateAge(input: unknown): Result<number> {
   if (age > AGE_MAX) return fail(`Please enter an age between ${AGE_MIN} and ${AGE_MAX}.`);
   return ok(age);
 }
+
+// ---------- Profile: first and last name ----------
+
+export const PERSON_NAME_MAX = 40;
+// Any Unicode letter (with its combining marks, for scripts that need them), spaces, hyphens and both apostrophes:
+// iOS types ’ by default, so Kang’ethe must pass as well as Kang'ethe. Names are stored as typed.
+const PERSON_NAME_CHARS = /^[\p{L}\p{M} '’-]+$/u;
+const HAS_LETTER = /\p{L}/u;
+
+// Trims, and collapses runs of spaces inside to one. 1 to 40 characters, counted in code points like habit names.
+export function validatePersonName(input: unknown, which: 'first' | 'last'): Result<string> {
+  const label = which === 'first' ? 'first name' : 'last name';
+  const name = typeof input === 'string' ? input.trim().replace(/\s+/g, ' ') : '';
+  if (name.length === 0) return fail(`Please enter your ${label}.`);
+  if (Array.from(name).length > PERSON_NAME_MAX) {
+    return fail(`${which === 'first' ? 'First' : 'Last'} name must be ${PERSON_NAME_MAX} characters or fewer.`);
+  }
+  if (!PERSON_NAME_CHARS.test(name) || !HAS_LETTER.test(name)) return fail('Use letters, spaces, hyphens and apostrophes only.');
+  return ok(name);
+}

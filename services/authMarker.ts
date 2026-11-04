@@ -1,8 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {createEndSession} from '@/utils/authSession';
+import {PROFILE_NAME_KEY} from '@/utils/profileName';
+import {profileNameStore} from '@/services/profileName';
 
 // The sign-in marker (see utils/authSession.ts): the uid Firebase last confirmed on this phone. Local only, no
 // network. Writes and clears run one at a time in call order, so a clear issued after a write always lands last.
+// The greeting's name (utils/profileName.ts) is read in the same native call, so it is there for Home's first
+// render at no extra cost.
 
 const KEY = 'auth:lastUid:v1';
 
@@ -17,7 +21,9 @@ function inOrder<T>(task: () => Promise<T>): Promise<T> {
 // Never throws: a failed or empty read is "no marker", so the app waits for Firebase as before
 export async function readMarker(): Promise<string | null> {
   try {
-    const uid = await AsyncStorage.getItem(KEY);
+    const values = new Map(await AsyncStorage.multiGet([KEY, PROFILE_NAME_KEY]));
+    profileNameStore.load(values.get(PROFILE_NAME_KEY) ?? null);// used only if its uid matches (services/profileName.ts)
+    const uid = values.get(KEY);
     return uid && uid.length > 0 ? uid : null;
   } catch {
     return null;

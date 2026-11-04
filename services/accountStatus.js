@@ -6,13 +6,21 @@ import {withTimeout} from '@/services/admin';
 // Never throws. Returns 'disabled' ONLY when the server says users/{uid}.disabled === true
 // and the user is not an admin. Offline, a timeout, any error or a missing doc is 'unknown' or 'ok',
 // so nobody is ever signed out because the check couldn't run.
+// The same read refreshes the greeting's name on this phone (onProfile), so that costs no extra read.
 /** @returns {Promise<'disabled' | 'ok' | 'unknown'>} */
-export async function checkIsDisabled(uid) {
+export async function checkIsDisabled(uid, onProfile) {
     try {
         const {doc, getDocFromServer} = firestore();
         const db = getFirestoreDb();
         // from the server: a cached copy could still say disabled after an admin re-enabled the account
         const user = await withTimeout(getDocFromServer(doc(db, 'users', uid)));
+        if (user.exists() && onProfile) {
+            try {
+                onProfile({firstName: user.get('firstName'), lastName: user.get('lastName')});
+            } catch {
+                // the name refresh never affects the status check
+            }
+        }
         if (!user.exists() || user.get('disabled') !== true) return 'ok';
 
         // admins are never signed out by this check (one extra read, only for disabled accounts)

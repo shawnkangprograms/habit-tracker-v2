@@ -19,6 +19,7 @@ import {colors, fonts, radii, spacing} from '@/constants/theme';
 import {SwitchRow} from '@/components/switch-row';
 import {TRACE_ON} from '@/utils/startupTrace';
 import {SETTINGS_ROW} from '@/utils/onboarding/copy';
+import {NAME_ROW} from '@/utils/profileName';
 
 // DEV ONLY: long-press the title to seed early-praise history (logs first, a second long press confirms)
 const devSeed = devSeedEarlyPraise;
@@ -184,6 +185,16 @@ export default function SettingsScreen (){
                     </Pressable>
                   </View>
                 )}
+
+                {/* first and last name, for the greeting on Home */}
+                <Pressable
+                  style={({pressed}) => [styles.row, pressed && styles.pressed]}
+                  onPress={() => router.push('/profile-name')}
+                  accessibilityRole="button">
+                  <MaterialCommunityIcons name="account-edit-outline" size={22} color={colors.accent} />
+                  <Text style={styles.rowText}>{NAME_ROW}</Text>
+                  <MaterialCommunityIcons name="chevron-right" size={22} color={colors.muted} />
+                </Pressable>
 
                 {/* onboarding for everyone, any time: never opens on its own for users who already have habits */}
                 <Pressable

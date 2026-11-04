@@ -3,6 +3,8 @@ import {Alert, AppState} from 'react-native';
 import {checkIsDisabled} from '@/services/accountStatus';
 import {getFirebaseAuth} from '@/services/authInit';
 import {signOut} from '@/services/authActions';
+import {profileNameStore} from '@/services/profileName';
+import {profileNameFromDoc} from '@/utils/profileName';
 import {mark} from '@/utils/startupTrace';
 
 // Signs the user out if an admin has disabled their account. Runs after each sign-in (or launch with a
@@ -17,7 +19,12 @@ export function useDisabledCheck(uid: string | null) {
     const run = () => {
       if (running) return;
       running = true;
-      checkIsDisabled(uid)
+      // the users doc read here also refreshes the greeting's name (no extra read)
+      checkIsDisabled(uid, (doc: {firstName?: unknown; lastName?: unknown}) => {
+        const auth = getFirebaseAuth().currentUser;
+        if (!active || auth?.uid !== uid) return;
+        void profileNameStore.set(profileNameFromDoc(uid, doc, auth.displayName));
+      })
         .then(async (status: 'disabled' | 'ok' | 'unknown') => {
           if (!active || status !== 'disabled') return; // 'ok' or 'unknown' (offline/error): stay signed in
           if (getFirebaseAuth().currentUser?.uid !== uid) return; // a different user is signed in now

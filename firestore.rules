@@ -74,23 +74,33 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // firstName and lastName: optional, so a phone on an older build (which writes only age) still signs up.
+    // Safety net only: the app allows 1 to 40 characters (code points); size() counts UTF-16 units, so 80.
+    function userNameOk(d, field) {
+      return !(field in d) || (d[field] is string && d[field].size() >= 1 && d[field].size() <= 80);
+    }
+
     match /users/{userId} {
       allow read: if signedIn() && (request.auth.uid == userId || isAdmin());
 
       allow create: if signedIn() && request.auth.uid == userId
-        && request.resource.data.keys().hasOnly(['age', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['age', 'createdAt', 'firstName', 'lastName'])
         && (!('createdAt' in request.resource.data) || request.resource.data.createdAt == request.time)
         && request.resource.data.age is int
         && request.resource.data.age >= 18
-        && request.resource.data.age <= 99;
+        && request.resource.data.age <= 99
+        && userNameOk(request.resource.data, 'firstName')
+        && userNameOk(request.resource.data, 'lastName');
 
       allow update: if signedIn() && request.auth.uid == userId
-        && request.resource.data.keys().hasOnly(['age', 'disabled', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['age', 'disabled', 'createdAt', 'firstName', 'lastName'])
         && request.resource.data.get('disabled', false) == resource.data.get('disabled', false)
         && request.resource.data.get('createdAt', null) == resource.data.get('createdAt', null)
         && request.resource.data.age is int
         && request.resource.data.age >= 18
-        && request.resource.data.age <= 99;
+        && request.resource.data.age <= 99
+        && userNameOk(request.resource.data, 'firstName')
+        && userNameOk(request.resource.data, 'lastName');
 
       // Admins can change only the disabled flag, and never on themselves.
       allow update: if isAdmin() && userId != request.auth.uid

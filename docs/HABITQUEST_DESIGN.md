@@ -48,7 +48,7 @@ Full Figma prototype scope: Sign In/Up, 10-question onboarding, building-profile
 - Naming: keep the existing camelCase in code and SQLite (habitId, habitName, reminderTime). The snake_case names in the validation doc are descriptive only
 - Conflict rule: last-write-wins on updatedAt (see Architecture)
 - Age gate: a required age field on the signup form, validated 18-99 BEFORE calling createUserWithEmailAndPassword, so no account is ever created for an under-18 user. Store age as a number. If onboarding includes an age-range question, it must not offer an under-18 option
-- firstName/lastName: remove from signup and from the Firestore users document (not in the design; data minimisation)
+- firstName/lastName (revised 2026-11-04, replaces "remove from signup and from the users document"): asked at sign-up (required; trimmed, 1-40 characters, letters in any script, spaces, hyphens and apostrophes) and editable in Settings > Your name. Stored on the user's own Firestore users document (firstName, lastName; optional in the rules so older builds still sign up), as Auth displayName "First Last", and as a copy on the device (AsyncStorage profile:name:v1, read with the sign-in marker) so Home's greeting has it on the first render offline. Reason: used only for the greeting; never sent to Gemini or any analytics, and never shown in the admin screens. The privacy policy and the Play Data safety form must list "Name"
 - Dates: one shared helper that returns the LOCAL date as YYYY-MM-DD (never toISOString().split('T')[0], which is UTC and wrong from 00:00-03:00 in Kenya). Use it everywhere a date is created or compared
 
 ## Decisions made after the second audit
