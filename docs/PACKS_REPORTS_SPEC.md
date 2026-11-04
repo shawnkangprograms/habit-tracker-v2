@@ -1,12 +1,12 @@
 # HabitQuest: habit packs, reports and report notifications (spec v1, locked)
 
-Companion to ONBOARDING_SPEC.md. Everything here ships as OTA-only changes on Build 2 (fingerprint must stay `d820d50154d72f636213ae4251d04c3f0beb8f8a`): no native dependency, app.json, eas.json or package changes. Packs and reports are on-device only; the only thing that ever leaves the phone is the narrative request in stage 6 (section 8).
+Companion to ONBOARDING_SPEC.md. Everything here ships as OTA-only changes on Build 2 (fingerprint must stay `d820d50154d72f636213ae4251d04c3f0beb8f8a`, checked right before every publish; `.gitignore` and line endings are fingerprint inputs): no native dependency, app.json, eas.json or package changes. Packs, reports, areas, notes, Vitality and checkups are on-device only; the only things that ever leave the phone are the narrative request in stage 9 (section 8) and, only with the user's consent, short note excerpts (section 12).
 
 ## 1. Catalog: 24 habit templates
 
 The 14 existing templates keep their ids and names. Ten are new (names max 30 characters, each with a reason line max 60 characters, written in the stage plan and approved before use). New habits use icon ids from the existing icon set; no new icon assets.
 
-| Pack id | Pack name | Axis | Templates |
+| Pack id | Pack name | Area | Templates |
 |---|---|---|---|
 | steady_energy | Steady Energy | Health | walk20, stretch10, water_meals, **Eat one fruit or vegetable** |
 | calm_mind | Calm Mind | Mind | breathe5, journal3, lights_out, screens_off |
@@ -15,7 +15,10 @@ The 14 existing templates keep their ids and names. Ten are new (names max 30 ch
 | study_sprint | Study Sprint | Learning | study25, review10, **Read for 15 minutes**, **Teach what you learned** |
 | close_circle | Close Circle | Relations | message_friend, family_time, **Thank someone today**, **Do one kind thing** |
 
-Rules: a template is in exactly one pack. The Q10 replace habit is in no pack (it is an "other habit" and never counts in pack numbers or reports). The starter picker from onboarding is unchanged.
+Rules: a template is in exactly one pack. The Q10 replace habit is in no pack (it is an "other habit" and never counts in pack numbers or reports).
+
+- **Area tag:** every template carries an `area`, which is always its pack's area (the six areas are the six radar axes, section 11). Three templates have an area that differs from the onboarding scoring axis they were given in ONBOARDING_SPEC section 4: lights_out and screens_off (onboarding axis Health, area Mind) and focus25 (onboarding axis Discipline, area Career). The onboarding axis stays as it is for scoring and starter picking; the area is what the radar, packs and reports use.
+- **Starter picker (Stage 1):** starters come from the two chosen packs (section 3) instead of the 14-template pool, with the same time-budget caps and count rules as ONBOARDING_SPEC section 4.
 
 ## 2. Pack record (on-device only)
 
@@ -86,6 +89,7 @@ Rules:
   - Otherwise a plain "Keep going" line.
 - **Where they live:** a Reports screen (newest first) reachable from Home and from Summary, and from each pack screen. Home shows a "New report" card while any report is unread. This replaces the earlier idea of a weekly/monthly insight in Summary.
 - The per-habit streak calendar is as designed earlier: 5 weeks, faded non-scheduled days, streaks count scheduled days only.
+- The weekly report ends with "Start checkup" (section 14).
 
 ## 6. Notifications (local only)
 
@@ -93,31 +97,93 @@ Rules:
 - **Weekly:** packs in `order`, one per day starting Monday 18:00, then the combined report the day after the last notified pack. Only the first 4 packs by order are notified (a user with more packs still gets all their reports in the app). With 2 packs: Monday, Tuesday, and Wednesday for combined; at most Friday with 4 notified packs. Monthly and yearly use the same stagger starting on the 1st and on the anniversary.
 - **Permission:** asked once, in context, right after packs are first chosen, and only if never asked before. Settings has a "Report reminders" switch (default on). Without permission or with the switch off nothing is scheduled; reports still appear in the app.
 - Deleting a pack cancels its notifications; renaming refreshes them.
-- **Copy rules:** no data, no numbers, no habit names; the pack name only (it stays on the phone). At most 90 characters. The wording varies, picked in rotation and never the same line twice in a row for the same pack. Copy is in a separate copy table approved before stage 4.
+- **Copy rules:** no data, no numbers, no habit names; the pack name only (it stays on the phone). At most 90 characters. The wording varies, picked in rotation and never the same line twice in a row for the same pack. Copy is in a separate copy table approved before stage 8.
+- **Checkups (section 14):** a weekly checkup is announced inside the weekly report notification (no extra notification). A daily checkup has its own optional local notification.
 - The Itel may delay or drop scheduled notifications through battery optimisation; this is a device check, not a code gap.
 
 ## 7. Isolation and privacy (extends the onboarding rules)
 
-- A new ESLint no-restricted-imports block covers the packs and reports modules (utils/packs, utils/reports, services/packs*, components/packs): no `firebase/*`, no `@/sync/*`, no `@/services/insights`, nothing from the startup path. The one exception is the stage 6 narrative module, which may import the callable client and nothing else.
-- Nothing from packs or reports runs during cold start. Home reads packs after `home:usable`.
-- Pack names, custom habit names, onboarding answers and Q10 never go to Firestore or Gemini.
+- A new ESLint no-restricted-imports block covers the packs and reports modules (utils/packs, utils/reports, services/packs*, components/packs) and, as they arrive, the areas, notes, Vitality and checkup modules: no `firebase/*`, no `@/sync/*`, no `@/services/insights`, nothing from the startup path. The one exception is the stage 9 narrative module, which may import the callable client and nothing else.
+- Nothing from packs, reports, the radar, Vitality or checkups runs during cold start. Home reads them after `home:usable`.
+- Pack names, custom habit names, onboarding answers, Q10, first and last names and the areas map never go to Firestore or Gemini. Note free text goes to Gemini only under the consent rule in section 12.
 
-## 8. Gemini narrative (stage 6)
+## 8. Gemini narrative (stage 9)
 
 - Rules compute every number and suggestion. Gemini writes only a short narrative (target about 300 characters, server hard limit 450) for a report that already exists, once per report, and the result is stored with the report.
-- Sent: report kind and period, the built-in pack name (a custom pack is sent as "your pack"), counts and streaks. Template habits are sent by their template name; other habits as "a habit you added". No user id, no free text, no questionnaire answers.
+- Sent: report kind and period, the built-in pack name (a custom pack is sent as "your pack"), counts and streaks, and note tags (section 12). Template habits are sent by their template name; other habits as "a habit you added". No user id, no questionnaire answers, and no free text except consented note excerpts (section 12).
+- Checkup narratives (section 14) use the same function and fallback.
 - A new `kind` in the existing `generateInsight` function with its own daily limit per user and the same refusal handling; deployed with `firebase deploy --only functions:generateInsight` before the client uses it.
 - If offline, over limit, busy or failing, the report shows a template sentence and retries later (the existing 30-minute and 60-minute backoff rules). Reports never wait on the network.
 
 ## 9. Build stages (each its own OTA, plan first, I review each plan)
 
-1. Catalog (24 templates) and built-in packs: pure logic, the pack record and store, Home "Your packs" section, choosing packs (onboarding hook and the Home card), pack screen read-only with "Add the rest". Also the pure limits-by-level module and the limit message, enforced in "Add the rest" only.
+Renumbered 2026-11-04 (earlier numbering: 1 packs, 2 management, 3 calendar, 4 reports, 5 notifications, 6 Gemini).
+
+1. Catalog (24 templates, each with its `area` tag) and built-in packs: pure logic, the pack record and store, choosing packs (onboarding hook and the Home card), the pack-based routine screen in onboarding, and the Home "Habit packs" and "Habits" sections with "Add the rest". Also the pure limits-by-level module and the limit message, enforced in "Add the rest" only.
 2. Pack management: create, edit and delete packs, Manage packs in Settings, the habit form pack row, and limit enforcement on every other add path (Create a habit, pack creation, suggestions) with the caption under the add controls.
-3. Per-habit streak calendar.
-4. Report engine (stats, rules, template sentences), Reports screen and the Home "New report" card.
-5. Notification scheduling, copy table, Settings switch.
-6. Gemini narrative: function change and deploy first, then the client with its fallback.
+3. Notes and note XP (section 12), including the additive migration and the Settings consent switch (off; nothing is sent before stage 9).
+4. Vitality (section 13) on the Home stats card, with the shared per-day completion module.
+5. Live radar (section 11): area tags in use, the habit form Area row, the Home card and the Summary radar.
+6. Per-habit streak calendar.
+7. Report engine (stats, rules, template sentences), Reports screen, the Home "New report" card, and the merged weekly flow with the checkup (section 14).
+8. Notification scheduling (reports and the daily checkup), copy table, Settings switches.
+9. Gemini narrative (reports and checkups): function change and deploy first, then the client with its fallback.
 
 ## 10. Tests
 
 Pure modules in `utils/packs` and `utils/reports` are tested under Node like the onboarding ones: pack selection and tie-breaks, limits by level (table values, next-level lookup, grandfathering users above a limit, onboarding never blocked), name validation, adoption and "Add the rest" with injected add-habit (failure and retry, never twice), removal and `dropped`, membership after habit deletion, period boundaries (Monday weeks, month ends, anniversary with faked dates including the leap day), suggestion thresholds, freezing, notification schedule stagger and rotation, and the privacy rule that no packs or reports module imports forbidden code.
+
+Also, as each stage lands: every template has exactly one area and it equals its pack's area; habit-to-area resolution (packed, unpacked with a stored area, icon pre-fill, "Not counted"); radar scores over the Week and Month windows (scheduled days only, no data, empty area); note validation, note XP (once per habit per day, the 10-character rule) and the AI filter (consent off, replace habits never, 7 excerpts of at most 200 characters); Vitality deltas, clamping, today excluded, creation-day rule and recompute after past edits; checkup question selection, the first-checkup trigger and the schedule settings.
+
+## 11. Live radar
+
+- **Axes:** the six built-in pack areas, in the onboarding radar's order: Learning (study_sprint), Mind (calm_mind), Career (career_builder), Discipline (daily_discipline), Relations (close_circle), Health (steady_energy).
+- **Score per area:** the completion rate over the window, counting only scheduled days (the streak calendar's rule): completed scheduled days / scheduled days, over every active habit in that area. Window switch Week (last 7 days, default) / Month (last 28 days); whether today's open day counts is settled in the stage 5 plan. The per-day completion data comes from the same module as Vitality (section 13).
+- **Empty states:** an area with habits but no scheduled day in the window shows no data (a gap at that axis, not zero). An area with no habits sits at the centre with "No habits here yet", and tapping it suggests one habit from that area's pack.
+- **Habit to area:** a packed habit uses its pack's area (a custom pack's area is chosen when it is created, stage 2). An unpacked habit has an "Area" row in the habit form: the six areas plus "Not counted", pre-filled from its icon (table below), changeable by the user. Stored on the device only as `areas:v1:<uid>` = `{habitId: area | 'none'}`, for unpacked habits only; never Firestore, sync or Gemini. A habit pulled from another device has no stored area and uses the icon pre-fill until the user picks one.
+- **Icon to area pre-fill (proposed, awaiting approval):**
+
+| Icon | Area |
+|---|---|
+| run, water, food, sleep | Health |
+| meditate, music | Mind |
+| work, money | Career |
+| book, study | Learning |
+| heart | Relations |
+| star | Not counted |
+
+  Discipline has no icon of its own (none of the 12 fits it), so it is only ever chosen by hand or through a pack.
+- **Starting outline:** a faint outline of the onboarding Habit Profile behind the live shape, stored as six rounded numbers only (the profile scores, 1 to 5) under `profile:outline:v1:<uid>`. Local, never synced, kept or cleared exactly like the onboarding record (currently kept on sign-out). The answers are still never stored. A retake replaces the outline.
+- **The dashed shape today:** on the current onboarding radar the dashed inner polygon is a fixed reference at 2 of 5 on every axis (`RADAR_BASELINE` in utils/onboarding/scoring.ts). It is not user data. On the live radar the faint starting outline takes its place.
+- **Where:** a compact radar card on Home above Today (tappable, opens Summary); the full radar with the Week / Month switch on Summary.
+- **Motion and cost:** transforms and opacity only, plain fade or none under reduced motion. Computed when the screen is focused, never at cold start; on Home only after `home:usable`.
+
+## 12. Notes and note XP
+
+- **When:** after a habit is ticked, its card shows an inline "Add a note" chip. No modal on tick; the chip never blocks the list or ejects the user. Tapping it opens the note sheet.
+- **The sheet:** how it felt (Easy / OK / Hard); optional "what got in the way" chips (Tired, Busy, Forgot, Not in the mood, Other); optional free text up to 280 characters. One note per habit per day, editable that day.
+- **XP:** a note earns XP when it has at least one tag (feeling or obstacle) or free text of at least 10 characters (trimmed), once per habit per day. A completion is worth 10 XP (`XP_PER_COMPLETION` in utils/gamification.ts), so a note is worth **2 XP** (one fifth). Like all XP it is derived, never stored: it counts only while that day's completion is ticked, and it goes when the note does.
+- **Storage:** a new local SQLite table (additive migration through `PRAGMA user_version`, no change to existing tables): one row per habit per day, with the feeling, the obstacle tags, the text and timestamps. Never synced. Deleted when its habit is deleted. On sign-out it follows the same rule as the user's other local rows (kept per user id).
+- **AI rule:** tags always feed the analysis (counts only). Free text reaches Gemini only when the user turns on "Use my notes in AI summaries" in Settings (off by default), with consent wording that says the text is processed outside Kenya. Only recent short excerpts are sent: at most the last 7 notes, at most 200 characters each. Notes on replace habits (from Q10: phone and social, pornography, smoking or vaping, gaming, junk food, alcohol, procrastination, matched by name since Q10 is never stored) never go to AI, whatever the switch says. Habit names are still never sent.
+
+## 13. Vitality
+
+- A bar on the Home stats card, named Vitality (Health is a radar axis).
+- **Computed from history, never stored.** It starts at 50 on the first day after the first habit exists. For each closed day with at least one scheduled habit: delta = round(10 x share of scheduled habits done) - 4, so +6 for a full day, +1 for half, 0 at 40%, -4 for none. The value is clamped to 0 to 100 after each day.
+- Today does not count until it closes (local midnight). Days with no scheduled habit change nothing. A habit counts only from the day it was created. Edits to past days recompute it (it is derived).
+- No game over. A low bar shows "Low. Today is a fresh start."
+- It uses the same per-day completion module as the radar (section 11).
+- **Strings (proposed, awaiting approval):** label "Vitality"; value "{n} / 100"; low (under 25) "Low. Today is a fresh start."; steady (25 to 74) "Steady. Keep the days ticking."; high (75 and over) "Strong. You're on a roll."; before the first closed day "Starts after your first full day."; accessibility "Vitality {n} out of 100".
+
+## 14. Checkup (merged into the weekly report)
+
+- The weekly report ends with "Start checkup": at most 5 tap-to-answer questions.
+- Questions and recommendations come from local rules over note tags, missed days and streaks: shrink a habit, move its time, or add one from a pack. Gemini only writes the narrative, in stage 9, with the template fallback.
+- **First checkup:** a Home card (never a pop-up), shown the first time the user completes all of a day's habits, or 24 hours after sign-up, whichever comes first. It works from the chosen packs and habits, since the onboarding answers are not stored.
+- **Settings:** Checkup Off / Daily / Weekly (default Weekly), with time and weekday. Weekly checkups are announced inside the weekly report notification (no extra notification). Daily is one question as a Home card, with its own optional local notification.
+- **Storage:** answers stored locally as `checkups:v1:<uid>`, never synced.
+
+## 15. Names (shipped in Stage 0c)
+
+- First and last name are asked at sign-up and editable in Settings > Your name; stored on the user's own users document, as Auth displayName and as a copy on the device; used only for the Home greeting (docs/HABITQUEST_DESIGN.md).
+- **Backlog:** add "Name" to the privacy policy and to the Play Data safety form.
