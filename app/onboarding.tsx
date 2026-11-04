@@ -33,7 +33,12 @@ import {
   ROUTINE_HINT, ROUTINE_TITLE, SKIP_THIS_ONE, SLEEP_LABELS, START, STEP_HINTS, STEP_TITLES, STUDENT_CHALLENGE_TITLE,
   TIME_BUDGET_LABELS, VALUE_LABELS,
 } from '@/utils/onboarding/copy';
-import {entryFromParam, recordOnSkip} from '@/utils/onboarding/gate';
+import {entryFromParam, recordOnSkip, shouldCloseForSession} from '@/utils/onboarding/gate';
+import {
+  LEAVING_AUTO_MS, skipCopy, skipDialogNext, type SkipDialogEvent, type SkipDialogState,
+} from '@/utils/onboarding/skipDialog';
+import {onboardingLaunch} from '@/services/onboardingLaunch';
+import {SkipDialog} from '@/components/onboarding/skip-dialog';
 import {
   ROUTINE_REMINDER_DEFAULT, buildPlan, createPlannedHabits, newHabitIds, recordAfterOwnHabit, type CreateSession,
   type Plan,
@@ -196,14 +201,42 @@ export default function OnboardingScreen() {
     return () => sub.remove();
   }, []));
 
-  // On any screen. Ignored while habits are being created.
-  const skipSetup = async () => {
-    if (skippingRef.current || runningRef.current) return;
-    skippingRef.current = true;
-    const record = recordOnSkip(entry, session.current.saved !== null);
-    if (record && userId) await onboardingStore.write(userId, record);
-    closeFlow();
+  // "Skip setup", on any screen: a confirmation first (utils/onboarding/skipDialog.ts). Opening it is ignored while
+  // habits are being created. "Yes" writes what Skip always wrote (recordOnSkip: a skip record on the first run,
+  // nothing from Settings or once a habit exists) at once, so a kill during the notice still counts; the flow
+  // closes when the notice is done.
+  const [skipState, setSkipState] = useState<SkipDialogState>('closed');
+  const onSkipEvent = (event: SkipDialogEvent) => {
+    const busy = runningRef.current;
+    setSkipState((s) => skipDialogNext(s, event, busy));
   };
+  const skipSetup = () => onSkipEvent('open');
+
+  useEffect(() => {
+    if (skipState !== 'leaving') return;
+    if (!skippingRef.current) {
+      skippingRef.current = true;
+      const record = recordOnSkip(entry, session.current.saved !== null);
+      if (record && userId) onboardingStore.write(userId, record);// never throws
+    }
+    const timer = setTimeout(() => setSkipState((s) => skipDialogNext(s, 'timeout', false)), LEAVING_AUTO_MS);
+    return () => clearTimeout(timer);
+  }, [skipState, entry, userId]);
+
+  useEffect(() => {
+    if (skipState === 'done') closeFlow();
+  }, [skipState]);
+
+  // Open while mounted, so Home's sign-up launch and the gate never push a second copy
+  useEffect(() => {
+    onboardingLaunch.setOpen(true);
+    return () => onboardingLaunch.setOpen(false);
+  }, []);
+
+  // No one signed in (a sign-up rolled back after Home opened this): close
+  useEffect(() => {
+    if (shouldCloseForSession(userId)) closeFlow();
+  }, [userId]);
 
   // After Q11: Building Profile shows while the plan is built (a local read and pure maths)
   const startResults = () => {
@@ -468,6 +501,8 @@ export default function OnboardingScreen() {
           )}
         </View>
       )}
+
+      <SkipDialog state={skipState} copy={skipCopy(anyCreated)} reduceMotion={reduceMotion} onEvent={onSkipEvent} />
     </SafeAreaView>
   );
 }

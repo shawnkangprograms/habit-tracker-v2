@@ -1,4 +1,4 @@
-import {useEffect, useRef} from 'react';
+import {useCallback, useEffect, useMemo, useRef} from 'react';
 import {StyleSheet, Text, View, type AccessibilityActionEvent, type LayoutChangeEvent} from 'react-native';
 import {Gesture, GestureDetector, GestureHandlerRootView} from 'react-native-gesture-handler';
 import Animated, {
@@ -12,6 +12,7 @@ import {
   NUMBER_BUMP_DOWN_MS, NUMBER_BUMP_SCALE, NUMBER_BUMP_UP_MS, THUMB_GLIDE_MS, THUMB_HOLD_MS, THUMB_HOLD_SCALE,
   shouldAnimate,
 } from '@/utils/onboarding/motion';
+import {SLIDER_THUMB as THUMB, sliderValueAt} from '@/utils/onboarding/slider';
 import {CONFIDENCE_MAX, CONFIDENCE_MIN} from '@/utils/onboarding/types';
 
 // The Q11 slider, 1 to 10. Custom (no slider package in the build): gesture-handler for drag and tap, with the
@@ -20,9 +21,9 @@ import {CONFIDENCE_MAX, CONFIDENCE_MIN} from '@/utils/onboarding/types';
 // bumps on every change; under reduced motion the thumb jumps and nothing scales. Screen readers get one
 // adjustable element with increment and decrement actions.
 //
-// The app root has no GestureHandlerRootView, so the slider brings its own.
+// The app root has no GestureHandlerRootView, so the slider brings its own. The drag is one Pan that starts on
+// touch-down (see the gesture below); the touch-to-value mapping is utils/onboarding/slider.ts.
 
-const THUMB = 30;
 const RANGE = CONFIDENCE_MAX - CONFIDENCE_MIN;
 const SYSTEM = ReduceMotion.System;// a backstop for the first render, before useReduceMotion has read the setting
 const EASE = Easing.out(Easing.quad);
@@ -55,45 +56,47 @@ export function ConfidenceSlider({value, onChange, label, reduceMotion}: {
     lastValue.current = value;
   }, [value, animate, shown, position, bump]);
 
-  const changed = (next: number) => {
+  // Stable as long as onChange is (the parent's setter wrapper is); a new one only updates the gesture's
+  // callbacks in place (gesture-handler reattaches only when the gesture types change)
+  const changed = useCallback((next: number) => {
     selectionHaptic();
     onChange(next);
-  };
+  }, [onChange]);
 
-  // x is from the touch area's left edge, which sits half a thumb before the track's
-  const pick = (touchX: number) => {
-    'worklet';
-    if (width.get() <= 0) return;
-    const x = touchX - THUMB / 2;
-    const ratio = Math.min(1, Math.max(0, x / width.get()));
-    const next = CONFIDENCE_MIN + Math.round(ratio * RANGE);
-    if (next === shown.get()) return;
-    shown.set(next);
-    position.set(animate ? withTiming(next, {duration: THUMB_GLIDE_MS, easing: EASE, reduceMotion: SYSTEM}) : next);
-    scheduleOnRN(changed, next);
-  };
+  const animating = useSharedValue(animate);// read on the UI thread by the gesture
+  useEffect(() => {
+    animating.set(animate);
+  }, [animate, animating]);
 
-  const hold = (on: boolean) => {
-    'worklet';
-    if (!animate) return;
-    held.set(withTiming(on ? 1 : 0, {duration: THUMB_HOLD_MS, easing: EASE, reduceMotion: SYSTEM}));
-  };
-
-  // A horizontal drag picks as it moves; a vertical one is left to the scroll view. A tap picks where it lands.
-  const pan = Gesture.Pan()
-    .activeOffsetX([-6, 6])
-    .failOffsetY([-14, 14])
-    .onBegin(() => hold(true))
-    .onStart((e) => pick(e.x))
-    .onUpdate((e) => pick(e.x))
-    .onFinalize(() => hold(false));
-  const tap = Gesture.Tap()
-    .onBegin(() => hold(true))
-    .onEnd((e, success) => {
-      if (success) pick(e.x);
-    })
-    .onFinalize(() => hold(false));
-  const gesture = Gesture.Race(pan, tap);
+  // One Pan that starts on touch-down (minDistance 0): a tap and a drag are the same gesture, so there is no
+  // race with a Tap and no activation threshold, and once active it keeps its parents (the scroll view) from
+  // taking the touch. The trade-off: a vertical scroll can't start on the slider strip. Memoized: it reads only
+  // shared values and `changed`.
+  const gesture = useMemo(() => {
+    const pick = (touchX: number) => {
+      'worklet';
+      const next = sliderValueAt(touchX, width.get());
+      if (next === null || next === shown.get()) return;
+      shown.set(next);
+      position.set(animating.get()
+        ? withTiming(next, {duration: THUMB_GLIDE_MS, easing: EASE, reduceMotion: SYSTEM})
+        : next);
+      scheduleOnRN(changed, next);
+    };
+    const hold = (on: boolean) => {
+      'worklet';
+      if (!animating.get()) return;
+      held.set(withTiming(on ? 1 : 0, {duration: THUMB_HOLD_MS, easing: EASE, reduceMotion: SYSTEM}));
+    };
+    return Gesture.Pan()
+      .minDistance(0)
+      .shouldCancelWhenOutside(false)
+      .hitSlop({vertical: 8})
+      .onBegin(() => hold(true))
+      .onStart((e) => pick(e.x))
+      .onUpdate((e) => pick(e.x))
+      .onFinalize(() => hold(false));
+  }, [width, shown, position, held, animating, changed]);
 
   const thumbStyle = useAnimatedStyle(() => ({
     transform: [

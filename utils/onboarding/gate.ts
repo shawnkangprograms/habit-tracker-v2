@@ -36,6 +36,12 @@ export function parsePending(raw: string | null): boolean {
   return raw === PENDING_SET;
 }
 
+// Onboarding closes itself when no one is signed in: a sign-up whose profile write failed is rolled back (the
+// account deleted, signed out) after Home may already have opened it
+export function shouldCloseForSession(uid: string | null | undefined): boolean {
+  return !uid;
+}
+
 // How the flow was opened: by the gate on Home, or from the Settings row
 export type OnboardingEntry = 'auto' | 'settings';
 

@@ -70,7 +70,7 @@ describe('durations', () => {
     assert.equal(m.BUILDING_TICK_MS, 100);
     assert.equal(m.BUILDING_HOLD_MS, 300);
     assert.equal(m.BUILDING_REDUCED_HOLD_MS, 800);
-    assert.equal(m.QUOTE_MS, 2500);
+    assert.equal(m.QUOTE_MS, 1200);// one swap mid-count (tests/onboarding-0b.test.ts)
     assert.ok(m.READY_SETTLE_HALF_MS * 2 <= m.BUILDING_HOLD_MS);
   });
 });

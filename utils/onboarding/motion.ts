@@ -29,10 +29,16 @@ export const BUILDING_DURATION_MS = 2500;// the count to 100% (never stretched: 
 export const BUILDING_TICK_MS = 100;// the counter's step, and the ring's animation per step
 export const BUILDING_HOLD_MS = 300;// at 100%, so READY can be seen; the settle runs inside it
 export const BUILDING_REDUCED_HOLD_MS = 800;
-export const QUOTE_MS = 2500;
+export const QUOTE_MS = 1200;// one swap mid-count (at 1.2 s, finished by 1.65 s)
 export const ROW_TICK_HALF_MS = 110;
 export const QUOTE_IN_MS = 250;
 export const QUOTE_OUT_MS = 200;
+
+// A quote swap may start only while the count runs and only if its fade out and in end before the count does,
+// so no new quote appears as the screen moves on. Once it says no, rotation stops for good.
+export function canStartQuoteSwap(elapsedMs: number, complete: boolean): boolean {
+  return !complete && elapsedMs + QUOTE_OUT_MS + QUOTE_IN_MS <= BUILDING_DURATION_MS;
+}
 export const READY_SETTLE_HALF_MS = 130;
 export const READY_SCALE = 1.04;
 

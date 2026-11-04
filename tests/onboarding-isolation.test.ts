@@ -33,6 +33,7 @@ const ONBOARDING_FILES = [
   ...files('app/onboarding.tsx'),
   ...files('services/onboardingStore.ts'),
   ...files('services/onboardingStoreCore.ts'),
+  ...files('services/onboardingLaunch.ts'),
   ...files('services/reminderPermission.ts'),
   ...files('hooks/use-onboarding-gate.ts'),
 ];

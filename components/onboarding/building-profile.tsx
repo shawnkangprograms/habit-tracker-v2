@@ -9,7 +9,7 @@ import {ProgressRing} from '@/components/progress-ring';
 import {BUILDING_ROWS, BUILDING_TITLE, QUOTES, nextQuote, statusWord} from '@/utils/onboarding/copy';
 import {
   BUILDING_DURATION_MS, BUILDING_HOLD_MS, BUILDING_REDUCED_HOLD_MS, BUILDING_TICK_MS, QUOTE_IN_MS, QUOTE_MS,
-  QUOTE_OUT_MS, READY_SCALE, READY_SETTLE_HALF_MS, ROW_TICK_HALF_MS, shouldAnimate,
+  QUOTE_OUT_MS, READY_SCALE, READY_SETTLE_HALF_MS, ROW_TICK_HALF_MS, canStartQuoteSwap, shouldAnimate,
 } from '@/utils/onboarding/motion';
 
 // Building Profile (docs/ONBOARDING_SPEC.md, section 5): the ring counts 0 to 100% over about 2.5 s, the four
@@ -85,10 +85,20 @@ export function BuildingProfile({reduceMotion, ready, onDone}: {
     return () => clearInterval(id);
   }, [reduceMotion]);
 
+  // A new quote only while a swap can finish before the count does (canStartQuoteSwap); the first "no" ends it.
+  // Under reduced motion the count is already at 100%, so the first quote stays.
   useEffect(() => {
-    const id = setInterval(() => setQuote((q) => nextQuote(q)), QUOTE_MS);
+    if (reduceMotion) return;
+    const startedAt = clockNow();
+    const id = setInterval(() => {
+      if (!canStartQuoteSwap(clockNow() - startedAt, false)) {
+        clearInterval(id);
+        return;
+      }
+      setQuote((q) => nextQuote(q));
+    }, QUOTE_MS);
     return () => clearInterval(id);
-  }, []);
+  }, [reduceMotion]);
 
   // READY: one settle of the ring and a fade of the word, within the hold below (never extends it)
   useEffect(() => {

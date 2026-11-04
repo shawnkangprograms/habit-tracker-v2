@@ -41,6 +41,7 @@ import {
 import {nextStatusChangeAt, rowTimeStatus, type TimeStatus} from '@/utils/timeStatus';
 import {mark} from '@/utils/startupTrace';// startup trace (preview build only)
 import {homeUsable} from '@/services/startupSignals';// deferred startup work waits for Home's first list
+import {onboardingLaunch} from '@/services/onboardingLaunch';// onboarding straight after a sign-up
 
 type Habit = {// one row from getHabitsWithTodayStatus: an active habit scheduled today, with today's status
   habitId: string;
@@ -57,6 +58,9 @@ type Habit = {// one row from getHabitsWithTodayStatus: an active habit schedule
 type HomeList = {date: string; today: Habit[]; all: ActiveHabit[] | null};
 
 // Home asks for a sync on focus at most this often, so switching tabs quickly doesn't hammer Firestore.
+// After a sign-up, how long Home stays blank waiting for onboarding to open before showing itself anyway
+const LAUNCH_FALLBACK_MS = 1500;
+
 // Starts at load time: sign-in/launch already runs a cycle, so the first focus doesn't add another.
 const FOCUS_SYNC_MIN_INTERVAL_MS = 30 * 1000;
 let lastFocusSyncAt = Date.now();
@@ -145,6 +149,31 @@ export default function HomeScreen() {// default export, becomes the "index" tab
   const firstName = user?.uid === userId ? user?.displayName?.trim().split(/\s+/)[0] : undefined;// only if auth already has a displayName
 
   useEffect(() => mark('home:mount'), []);
+
+  // Right after a sign-up: open onboarding at once over a blank Home (services/onboardingLaunch.ts). Home's data
+  // still loads underneath (home:usable is unchanged); it shows itself once it is focused again after onboarding.
+  // For everyone else this is one in-memory read, false.
+  const [launching, setLaunching] = useState(onboardingLaunch.takeLaunch);
+  useEffect(() => {
+    if (!launching) return;
+    if (!onboardingLaunch.isOpen()) router.push('/onboarding');
+    // Never left blank: if onboarding didn't open (the push lost in the sign-in navigation), show Home; the
+    // gate then opens it from the stored pending flag as usual
+    const fallback = setTimeout(() => {
+      if (onboardingLaunch.isOpen()) return;
+      setLaunching(false);
+      onboardingLaunch.endLaunch();
+    }, LAUNCH_FALLBACK_MS);
+    return () => clearTimeout(fallback);
+  }, [launching]);
+  const focusCount = useRef(0);
+  useFocusEffect(useCallback(() => {
+    focusCount.current += 1;
+    if (launching && focusCount.current > 1) {// the first focus is the mount; the next is the return from onboarding
+      setLaunching(false);
+      onboardingLaunch.endLaunch();
+    }
+  }, [launching]));
 
   // Home is "usable" on the frame after the first commit with the list loaded. Fires once per app run;
   // a remount (another account) finds it already fired.
@@ -398,6 +427,9 @@ export default function HomeScreen() {// default export, becomes the "index" tab
   const showChecking = emptyState === 'checking' || (emptyState === 'empty' && onboarding.checking);
   const {other} = splitHomeRows(habits, list.all, weekdayOfDate(list.date));
   const daysById = new Map((list.all ?? []).map((h) => [h.habitId, h.days]));
+
+  // onboarding is opening over Home: only the background, so no greeting, cards or "Checking..." flash first
+  if (launching) return <View style={styles.safe} />;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>

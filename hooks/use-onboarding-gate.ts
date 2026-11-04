@@ -1,6 +1,7 @@
 import {useCallback, useState} from 'react';
 import {router, useFocusEffect} from 'expo-router';
 import {onboardingStore} from '@/services/onboardingStore';
+import {onboardingLaunch} from '@/services/onboardingLaunch';
 import {shouldAutoShowOnboarding, shouldCheckOnboarding, type GateInput} from '@/utils/onboarding/gate';
 
 // Home: opens onboarding on its own after a sign-up on this phone (rules in utils/onboarding/gate.ts). Reads the
@@ -19,7 +20,8 @@ export function useOnboardingGate(input: GateInput & {userId: string | undefined
     let active = true;
     Promise.all([onboardingStore.read(userId), onboardingStore.isPending(userId)]).then(([record, pending]) => {
       if (!active) return;
-      if (shouldAutoShowOnboarding(record, pending)) router.push('/onboarding');
+      // never a second copy over one the sign-up launch already opened (services/onboardingLaunch.ts)
+      if (shouldAutoShowOnboarding(record, pending) && !onboardingLaunch.isOpen()) router.push('/onboarding');
       else setSettledFor(userId);
     });
     return () => {

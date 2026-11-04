@@ -185,3 +185,13 @@ Titles, labels and messages on the screens after Q11, keyed by their constant na
 | OWN_HABIT_REASON       | Your own habit                                                                        |
 | NOTHING_LEFT           | You already have every habit we'd suggest for these answers.                          |
 | CREATE_FAILED          | Couldn't add every habit. The ones marked Added are saved. Tap Start to try the rest. |
+| SKIP_TITLE             | Skip setup?                                                                           |
+| SKIP_BODY              | We won't be able to generate habits for you.                                          |
+| SKIP_YES               | Yes, skip                                                                             |
+| SKIP_NO                | No, continue                                                                          |
+| LEAVE_TITLE            | Leave setup?                                                                          |
+| LEAVE_BODY             | The habits you've added are saved.                                                    |
+| LEAVE_YES              | Yes, leave                                                                            |
+| LEAVE_NO               | No, stay                                                                              |
+| LEAVING_NOTICE         | Taking you home. You can set up your plan any time in Settings.                       |
+| GO_HOME                | Go home                                                                               |

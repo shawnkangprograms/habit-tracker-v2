@@ -7,6 +7,7 @@ import {
 import {getFirebaseAuth} from '@/services/authInit';
 import {endSession} from '@/services/authMarker';
 import {onboardingStore} from '@/services/onboardingStore';
+import {onboardingLaunch} from '@/services/onboardingLaunch';
 // Every sign-out goes through endSession (clears the sign-in marker first); tests/auth-session.test.ts checks
 // that nothing else in the app calls Firebase's signOut or deletes the user.
 
@@ -14,7 +15,16 @@ import {onboardingStore} from '@/services/onboardingStore';
 export async function signUp(email, password, age){
 
     const auth = getFirebaseAuth();
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    // Home opens onboarding straight away instead of showing itself first (services/onboardingLaunch.ts). Set
+    // before the account exists: the auth listener swaps in the tabs before createUserWithEmailAndPassword returns.
+    onboardingLaunch.beginSignUp();
+    let userCredential;
+    try {
+        userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    } catch (err) {
+        onboardingLaunch.cancelSignUp();
+        throw err;
+    }
 
     const uid = userCredential.user.uid;
     // Onboarding opens on its own only after a sign-up on this phone (utils/onboarding/gate.ts). Set before the
@@ -32,6 +42,7 @@ export async function signUp(email, password, age){
         // Deleting also signs out, so it goes through endSession; it goes ahead even if the marker can't be cleared.
         await endSession(() => userCredential.user.delete(), {proceedIfMarkerClearFails: true}).catch(() => {});
         await onboardingStore.clearPending(uid).catch(() => {});
+        onboardingLaunch.cancelSignUp();// onboarding, if already open, closes itself once no one is signed in
         const err = new Error('Could not create the user profile');
         err.code = 'profile-write-failed';
         err.cause = cause;

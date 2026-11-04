@@ -324,6 +324,18 @@ export const OWN_HABIT_REASON = 'Your own habit';// the reason line of a habit t
 export const NOTHING_LEFT = "You already have every habit we'd suggest for these answers.";
 export const CREATE_FAILED = "Couldn't add every habit. The ones marked Added are saved. Tap Start to try the rest.";
 
+// The "Skip setup" confirmation (utils/onboarding/skipDialog.ts): Skip before any habit exists, Leave after
+export const SKIP_TITLE = 'Skip setup?';
+export const SKIP_BODY = "We won't be able to generate habits for you.";
+export const SKIP_YES = 'Yes, skip';
+export const SKIP_NO = 'No, continue';
+export const LEAVE_TITLE = 'Leave setup?';
+export const LEAVE_BODY = "The habits you've added are saved.";
+export const LEAVE_YES = 'Yes, leave';
+export const LEAVE_NO = 'No, stay';
+export const LEAVING_NOTICE = 'Taking you home. You can set up your plan any time in Settings.';
+export const GO_HOME = 'Go home';
+
 // ---------- Loading quotes ----------
 
 // A Swahili proverb has its English line, shown underneath in smaller text
