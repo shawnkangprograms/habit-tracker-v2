@@ -122,10 +122,18 @@ export function serialisePacks(record: PacksRecord): string {
   return JSON.stringify({version: PACKS_VERSION, packs: record.packs.map(packValue)});
 }
 
-// ---------- The mirror: {uid, record} under PACKS_MIRROR_KEY ----------
-// record is the parsed record, null for "no record", or 'corrupt', so the mirror never hides a corrupt record.
+// ---------- "Not now" on Home's "Choose your habit packs" card (Stage 1b) ----------
+// Per user, on this phone only, under its own key ('1' once dismissed), and copied into the mirror so Home knows
+// it on the first render. Settings > Habit packs still opens the picker.
 
-export type PacksMirror = {uid: string; parsed: ParsedPacks};
+export const chooseDismissedKey = (uid: string) => `packs:chooseDismissed:v1:${uid}`;
+export const DISMISSED_VALUE = '1';
+
+// ---------- The mirror: {uid, record, dismissed} under PACKS_MIRROR_KEY ----------
+// record is the parsed record, null for "no record", or 'corrupt', so the mirror never hides a corrupt record.
+// dismissed is the "Not now" flag; a 1a mirror without it reads as false.
+
+export type PacksMirror = {uid: string; parsed: ParsedPacks; dismissed: boolean};
 
 export function parseMirror(raw: string | null): PacksMirror | null {
   if (raw === null) return null;
@@ -138,15 +146,16 @@ export function parseMirror(raw: string | null): PacksMirror | null {
   if (typeof v !== 'object' || v === null || Array.isArray(v)) return null;
   const o = v as Record<string, unknown>;
   if (typeof o.uid !== 'string' || o.uid.length === 0 || !('record' in o)) return null;
-  if (o.record === null) return {uid: o.uid, parsed: {kind: 'none'}};
-  if (o.record === 'corrupt') return {uid: o.uid, parsed: {kind: 'corrupt'}};
+  const dismissed = o.dismissed === true;
+  if (o.record === null) return {uid: o.uid, parsed: {kind: 'none'}, dismissed};
+  if (o.record === 'corrupt') return {uid: o.uid, parsed: {kind: 'corrupt'}, dismissed};
   const record = packsFromValue(o.record);
-  return record ? {uid: o.uid, parsed: {kind: 'ok', record}} : null;
+  return record ? {uid: o.uid, parsed: {kind: 'ok', record}, dismissed} : null;
 }
 
-export function serialiseMirror(uid: string, parsed: ParsedPacks): string {
+export function serialiseMirror(uid: string, parsed: ParsedPacks, dismissed = false): string {
   const record = parsed.kind === 'ok'
     ? {version: PACKS_VERSION, packs: parsed.record.packs.map(packValue)}
     : parsed.kind === 'corrupt' ? 'corrupt' : null;
-  return JSON.stringify({uid, record});
+  return JSON.stringify({uid, record, dismissed});
 }

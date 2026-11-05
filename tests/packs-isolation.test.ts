@@ -43,7 +43,11 @@ const FORBIDDEN = [
 
 describe('pack modules', () => {
   test('exist, and import nothing that reaches Firebase, sync, the insight request or the startup path', () => {
-    assert.ok(PACK_FILES.length >= 9, 'expected the utils/packs modules and the store');
+    assert.ok(PACK_FILES.length >= 15, 'expected the utils/packs modules, the store, the hook, the components and the picker');
+    for (const file of ['utils/packs/home.ts', 'utils/packs/picker.ts', 'hooks/use-packs.ts', 'components/packs/pack-card.tsx',
+      'components/packs/choose-packs-card.tsx', 'app/packs/choose.tsx']) {
+      assert.ok(PACK_FILES.map(rel).includes(file), `${file} is scanned`);
+    }
     for (const file of PACK_FILES) {
       for (const spec of specifiers(readFileSync(file, 'utf8'))) {
         assert.ok(!FORBIDDEN.some((re) => re.test(spec)), `${rel(file)} imports ${spec}`);

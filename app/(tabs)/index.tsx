@@ -6,7 +6,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {Alert, AppState, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View} from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import * as Haptics from 'expo-haptics';
-import {getActiveHabitsWithDays, getHabitsWithTodayStatus} from '@/db/habits';// habit reads in SQLite
+import {addHabit, getActiveHabitsWithDays, getHabitsWithTodayStatus} from '@/db/habits';// habit reads in SQLite; addHabit for "Add the rest"
 import {toggleCompletion} from '@/db/completions';// today's completion toggle
 import {getGamificationStats} from '@/db/gamification';// XP, level and streak, derived from local rows
 import {beginLoad as beginStatsLoad, publish as publishStats} from '@/services/statsStore';// shared with Profile and the tab icon
@@ -44,6 +44,16 @@ import {homeUsable} from '@/services/startupSignals';// deferred startup work wa
 import {onboardingLaunch} from '@/services/onboardingLaunch';// onboarding straight after a sign-up
 import {useProfileName} from '@/services/profileName';// the greeting's name, kept on this phone
 import {firstNameFor, greetingFor} from '@/utils/greeting';
+import {usePacks} from '@/hooks/use-packs';// the pack record, from the startup mirror (no regroup after the first render)
+import {packsStore} from '@/services/packsStore';
+import {askForReminderPermission} from '@/services/reminderPermission';
+import {PackCard, type AddRest} from '@/components/packs/pack-card';
+import {ChoosePacksCard} from '@/components/packs/choose-packs-card';
+import {homeGroups, showChooseCard} from '@/utils/packs/home';
+import {addTheRest} from '@/utils/packs/addRest';
+import {limitsForLevel, nextLimitLevel, roomFor} from '@/utils/packs/limits';
+import {ADD_REST_FAILED, HOME_HABITS_TITLE, HOME_PACKS_TITLE, habitLimitMessage} from '@/utils/packs/copy';
+import {ROUTINE_REMINDER_DEFAULT} from '@/utils/onboarding/plan';
 
 type Habit = {// one row from getHabitsWithTodayStatus: an active habit scheduled today, with today's status
   habitId: string;
@@ -411,6 +421,50 @@ export default function HomeScreen() {// default export, becomes the "index" tab
       });
   }, [loadHabits, loadStats]);
 
+  // Habit packs (docs/PACKS_REPORTS_SPEC.md, section 4): known on the first render from the startup mirror
+  const packs = usePacks(userId);
+  const [addingPack, setAddingPack] = useState<string | null>(null);
+  const addingRef = useRef(false);// one "Add the rest" at a time, even for two taps in the same frame
+  const [packNotices, setPackNotices] = useState<Record<string, string>>({});// by packId: the last run's message
+
+  // "Add the rest" (utils/packs/addRest.ts): adopts, then creates the pack's missing templates daily at 20:00,
+  // as many as the habit limit allows. The level comes from the stats Home already has (or one local
+  // computation if that load failed; level 1 if that fails too), never the network.
+  const addRestFor = async (packId: string) => {
+    if (!userId || addingRef.current) return;
+    addingRef.current = true;
+    setAddingPack(packId);
+    let notice: string | null = null;
+    try {
+      const parsed = await packsStore.read(userId);
+      if (parsed.kind !== 'ok') return;
+      const habits = await (getActiveHabitsWithDays(userId) as Promise<ActiveHabit[]>);
+      const level = statsRef.current?.stats.level
+        ?? await (getGamificationStats(userId) as Promise<GamificationStats>).then((s) => s.level, () => 1);
+      const result = await addTheRest({
+        addHabit: (input) => addHabit(userId, input) as Promise<string>,
+        savePacks: (record) => packsStore.write(userId, record),
+      }, {record: parsed.record, packId, habits, level, reminderTime: ROUTINE_REMINDER_DEFAULT});
+      if (result.failed) notice = ADD_REST_FAILED;
+      else if (result.limited) notice = habitLimitMessage(nextLimitLevel(level, 'habits'));
+      if (result.added > 0) askForReminderPermission();// in context, only once habits with a reminder exist
+    } catch (err) {
+      console.log('Add the rest failed', err);
+      notice = ADD_REST_FAILED;
+    } finally {
+      setPackNotices((n) => {
+        const rest = {...n};
+        if (notice) rest[packId] = notice;
+        else delete rest[packId];
+        return rest;
+      });
+      addingRef.current = false;
+      setAddingPack(null);
+      loadHabits('refresh').catch((err: unknown) => console.log('Home reload failed', err));
+      loadStats('refresh');
+    }
+  };
+
   const doneToday = habits.filter((h) => h.completed === 1).length;// Home lists exactly the habits scheduled today
   // every active habit; if that read failed, today's rows if any, otherwise unknown (no false empty state)
   const activeCount = list.all ? list.all.length : (habits.length > 0 ? habits.length : null);
@@ -430,6 +484,72 @@ export default function HomeScreen() {// default export, becomes the "index" tab
   const showChecking = emptyState === 'checking' || (emptyState === 'empty' && onboarding.checking);
   const {other} = splitHomeRows(habits, list.all, weekdayOfDate(list.date));
   const daysById = new Map((list.all ?? []).map((h) => [h.habitId, h.days]));
+
+  // Today's rows: each packed habit only inside its pack, the rest under "Habits"
+  const groups = homeGroups(packs?.parsed ?? null, habits, list.all);
+  const showPacks = groups.packs.length > 0 && emptyState !== 'empty';// never beside the first-run card: one clear action
+  const level = stats?.stats.level ?? null;
+  // under "Add the rest" while the habit limit is reached (it stays tappable: a run then only adopts)
+  const limitCaption = level !== null && activeCount !== null && roomFor(level, 'habits', activeCount) === 0
+    ? habitLimitMessage(nextLimitLevel(level, 'habits')) : null;
+  // with the stats card (they appear together), so {n} is the real pack limit and nothing shifts twice
+  const chooseCard = stats !== null && loaded && emptyState !== 'empty' && showChooseCard(packs, activeCount);
+
+  const packAddRest = (packId: string, missing: readonly string[] | null): AddRest | null => {
+    if (!missing || missing.length === 0) return null;
+    return {adding: addingPack === packId, onPress: () => addRestFor(packId), notice: packNotices[packId] ?? limitCaption};
+  };
+
+  // One of today's rows: tapping the card opens Edit, the check toggles today's completion
+  const renderToday = (habit: Habit) => {
+    const color = ICON_COLORS[habit.icon] ?? colors.accent;
+    const done = habit.completed === 1;
+    const schedule = scheduleSummary(habit.frequencyType, daysById.get(habit.habitId));
+    const status = rowTimeStatus(habit, now, list.date);
+    const alarmOn = habit.alarm === 1;
+    const label = [habit.habitName, habit.reminderTime, STATUS_WORDS[status], schedule, alarmOn && 'alarm on']
+      .filter(Boolean).join(', ');
+    return (
+      <Pressable
+        key={habit.habitId}
+        style={[styles.card, {backgroundColor: `${color}14`, borderColor: `${color}54`}]}
+        onPress={() => router.push({pathname: '/habit-form', params: {habitId: habit.habitId}})}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        accessibilityHint="Opens the edit form">
+
+        <View style={[styles.badge, {backgroundColor: `${color}30`, borderColor: `${color}80`}, done && styles.doneContent]}>
+          <HabitIcon id={habit.icon} size={21} color={color} />
+        </View>
+
+        <View style={styles.details}>
+          <Text style={[styles.name, done && styles.doneContent]} numberOfLines={1}>{habit.habitName}</Text>
+          <View style={styles.subtitleRow}>
+            <Text style={[styles.subtitle, styles.shrink, done && styles.doneContent]} numberOfLines={1}>
+              {habit.reminderTime ? `${schedule} · ` : schedule}
+            </Text>
+            {habit.reminderTime && <TimeText time={habit.reminderTime} status={status} />}
+            {alarmOn && <Bell />}
+          </View>
+        </View>
+
+        <HabitCheck
+          done={done}
+          habitName={habit.habitName}
+          reduceMotion={reduceMotion}
+          onPress={() => handleToggle(habit)}
+        />
+
+        {floats[habit.habitId] && (
+          <XpFloat
+            key={floats[habit.habitId].key}
+            amount={floats[habit.habitId].amount}
+            onDone={() => removeFloat(habit.habitId, floats[habit.habitId].key)}
+          />
+        )}
+      </Pressable>
+    );
+  };
 
   // onboarding is opening over Home: only the background, so no greeting, cards or "Checking..." flash first
   if (launching) return <View style={styles.safe} />;
@@ -482,57 +602,37 @@ export default function HomeScreen() {// default export, becomes the "index" tab
           <EmptyHomeCard reduceMotion={reduceMotion} onPick={() => router.push('/habit-form')} />
         )}
 
+        {chooseCard && userId && (
+          <ChoosePacksCard
+            limit={limitsForLevel(level ?? 1).packs}
+            onChoose={() => router.push({pathname: '/packs/choose', params: {from: 'home'}})}
+            onLater={() => { packsStore.dismissChoose(userId); }}
+          />
+        )}
+
+        {showPacks && userId && (
+          <>
+            <Text style={styles.sectionTitle} accessibilityRole="header">{HOME_PACKS_TITLE}</Text>
+            <View style={styles.list}>
+              {groups.packs.map((pack) => (
+                <PackCard
+                  key={pack.packId}
+                  uid={userId}
+                  packId={pack.packId}
+                  name={pack.name}
+                  done={pack.done}
+                  total={pack.rows.length}
+                  addRest={packAddRest(pack.packId, pack.missing)}>
+                  {pack.rows.map(renderToday)}
+                </PackCard>
+              ))}
+            </View>
+            <Text style={styles.sectionTitle} accessibilityRole="header">{HOME_HABITS_TITLE}</Text>
+          </>
+        )}
+
         <View style={styles.list}>
-          {habits.map((habit) => {
-            const color = ICON_COLORS[habit.icon] ?? colors.accent;
-            const done = habit.completed === 1;
-            const schedule = scheduleSummary(habit.frequencyType, daysById.get(habit.habitId));
-            const status = rowTimeStatus(habit, now, list.date);
-            const alarmOn = habit.alarm === 1;
-            const label = [habit.habitName, habit.reminderTime, STATUS_WORDS[status], schedule, alarmOn && 'alarm on']
-              .filter(Boolean).join(', ');
-            return (
-              // tapping the card opens the Edit form
-              <Pressable
-                key={habit.habitId}
-                style={[styles.card, {backgroundColor: `${color}14`, borderColor: `${color}54`}]}
-                onPress={() => router.push({pathname: '/habit-form', params: {habitId: habit.habitId}})}
-                accessibilityRole="button"
-                accessibilityLabel={label}
-                accessibilityHint="Opens the edit form">
-
-                <View style={[styles.badge, {backgroundColor: `${color}30`, borderColor: `${color}80`}, done && styles.doneContent]}>
-                  <HabitIcon id={habit.icon} size={21} color={color} />
-                </View>
-
-                <View style={styles.details}>
-                  <Text style={[styles.name, done && styles.doneContent]} numberOfLines={1}>{habit.habitName}</Text>
-                  <View style={styles.subtitleRow}>
-                    <Text style={[styles.subtitle, styles.shrink, done && styles.doneContent]} numberOfLines={1}>
-                      {habit.reminderTime ? `${schedule} · ` : schedule}
-                    </Text>
-                    {habit.reminderTime && <TimeText time={habit.reminderTime} status={status} />}
-                    {alarmOn && <Bell />}
-                  </View>
-                </View>
-
-                <HabitCheck
-                  done={done}
-                  habitName={habit.habitName}
-                  reduceMotion={reduceMotion}
-                  onPress={() => handleToggle(habit)}
-                />
-
-                {floats[habit.habitId] && (
-                  <XpFloat
-                    key={floats[habit.habitId].key}
-                    amount={floats[habit.habitId].amount}
-                    onDone={() => removeFloat(habit.habitId, floats[habit.habitId].key)}
-                  />
-                )}
-              </Pressable>
-            );
-          })}
+          {groups.unpacked.map(renderToday)}
 
           {/* hidden while the first-run card shows, so there is one clear action */}
           {emptyState !== 'empty' && (

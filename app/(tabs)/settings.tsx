@@ -20,6 +20,7 @@ import {SwitchRow} from '@/components/switch-row';
 import {TRACE_ON} from '@/utils/startupTrace';
 import {SETTINGS_ROW} from '@/utils/onboarding/copy';
 import {NAME_ROW} from '@/utils/profileName';
+import {SETTINGS_PACKS_ROW} from '@/utils/packs/copy';
 
 // DEV ONLY: long-press the title to seed early-praise history (logs first, a second long press confirms)
 const devSeed = devSeedEarlyPraise;
@@ -193,6 +194,16 @@ export default function SettingsScreen (){
                   accessibilityRole="button">
                   <MaterialCommunityIcons name="account-edit-outline" size={22} color={colors.accent} />
                   <Text style={styles.rowText}>{NAME_ROW}</Text>
+                  <MaterialCommunityIcons name="chevron-right" size={22} color={colors.muted} />
+                </Pressable>
+
+                {/* the built-in pack picker, for everyone (the same screen as Home's "Choose your habit packs") */}
+                <Pressable
+                  style={({pressed}) => [styles.row, pressed && styles.pressed]}
+                  onPress={() => router.push({pathname: '/packs/choose', params: {from: 'settings'}})}
+                  accessibilityRole="button">
+                  <MaterialCommunityIcons name="view-grid-outline" size={22} color={colors.accent} />
+                  <Text style={styles.rowText}>{SETTINGS_PACKS_ROW}</Text>
                   <MaterialCommunityIcons name="chevron-right" size={22} color={colors.muted} />
                 </Pressable>
 

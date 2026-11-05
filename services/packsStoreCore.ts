@@ -1,16 +1,17 @@
 // The pack record's storage, per user (utils/packs/record.ts): the canonical record under packs:v1:<uid>, and
-// the mirror {uid, record} under one fixed key, read with the sign-in marker in services/authMarker.ts (the same
-// native multiGet as the greeting's name), so Home can show packs on its first render with no extra startup
-// read. The mirror counts only for its own uid; for any other uid the canonical record is read and the mirror is
-// rebuilt from it. Every write saves both keys in one multiSet, so they can't drift apart. Storage is injected
-// (AsyncStorage in services/packsStore.ts, a Map in tests). Like the onboarding record, kept on sign-out.
+// the mirror {uid, record, dismissed} under one fixed key, read with the sign-in marker in services/authMarker.ts
+// (the same native multiGet as the greeting's name), so Home can show packs on its first render with no extra
+// startup read. The mirror counts only for its own uid; for any other uid the canonical record (and the "Not now"
+// flag of Home's choose card) is read and the mirror is rebuilt from it. Every write saves its key and the mirror
+// in one multiSet, so they can't drift apart. Storage is injected (AsyncStorage in services/packsStore.ts, a Map
+// in tests). Like the onboarding record, kept on sign-out.
 //
 // Never throws. An unreadable storage reads as 'corrupt' (never written over) and is not remembered, so the next
 // read tries again. A failed save keeps the value in memory for this app run only.
 
 import {
-  PACKS_MIRROR_KEY, packsKey, parseMirror, parsePacks, serialiseMirror, serialisePacks, type PacksRecord,
-  type ParsedPacks,
+  chooseDismissedKey, DISMISSED_VALUE, PACKS_MIRROR_KEY, packsKey, parseMirror, parsePacks, serialiseMirror,
+  serialisePacks, type PacksRecord, type ParsedPacks,
 } from '@/utils/packs/record';
 
 export type PacksStorage = {
@@ -18,11 +19,21 @@ export type PacksStorage = {
   multiSet(pairs: [string, string][]): Promise<void>;
 };
 
+// What Home renders from: the record and the choose card's "Not now" flag. A new object on every change, so
+// it works as a useSyncExternalStore snapshot.
+export type PacksState = {parsed: ParsedPacks; dismissed: boolean};
+
 export function createPacksStore(storage: PacksStorage) {
-  const memory = new Map<string, ParsedPacks>();
+  const memory = new Map<string, PacksState>();
   let mirrorUid: string | null = null;// whose record the stored mirror holds, as far as this app run knows
   let writes: Promise<void> = Promise.resolve();// one save at a time, in order
   let updates: Promise<void> = Promise.resolve();// one read-change-write at a time
+  const listeners = new Set<() => void>();
+
+  function remember(uid: string, state: PacksState): void {
+    memory.set(uid, state);
+    for (const listener of [...listeners]) listener();
+  }
 
   function save(pairs: () => [string, string][]): Promise<void> {
     const next = writes.then(() => storage.multiSet(pairs()));
@@ -30,37 +41,51 @@ export function createPacksStore(storage: PacksStorage) {
     return writes;
   }
 
+  const mirrorPair = (uid: string): [string, string] => {
+    const state = memory.get(uid)!;
+    return [PACKS_MIRROR_KEY, serialiseMirror(uid, state.parsed, state.dismissed)];
+  };
+
   // The raw mirror value read with the marker at startup. Reads nothing.
   function loadMirror(raw: string | null): void {
     const mirror = parseMirror(raw);
     mirrorUid = mirror?.uid ?? null;
-    if (mirror && !memory.has(mirror.uid)) memory.set(mirror.uid, mirror.parsed);
+    if (mirror && !memory.has(mirror.uid)) remember(mirror.uid, {parsed: mirror.parsed, dismissed: mirror.dismissed});
   }
 
-  async function read(uid: string): Promise<ParsedPacks> {
+  // What is known for this user right now, without reading storage (undefined: not read yet)
+  function peek(uid: string): PacksState | undefined {
+    return memory.get(uid);
+  }
+
+  async function load(uid: string): Promise<PacksState | null> {
     const known = memory.get(uid);
     if (known) return known;
     let raw: string | null;
+    let dismissed: string | null;
     try {
-      raw = await storage.getItem(packsKey(uid));
+      [raw, dismissed] = await Promise.all([storage.getItem(packsKey(uid)), storage.getItem(chooseDismissedKey(uid))]);
     } catch {
-      return {kind: 'corrupt'};
+      return null;
     }
-    if (!memory.has(uid)) memory.set(uid, parsePacks(raw));// a write that finished meanwhile wins
+    if (!memory.has(uid)) remember(uid, {parsed: parsePacks(raw), dismissed: dismissed === DISMISSED_VALUE});// a write that finished meanwhile wins
     if (mirrorUid !== uid) {
       mirrorUid = uid;
-      save(() => [[PACKS_MIRROR_KEY, serialiseMirror(uid, memory.get(uid)!)]]);// the newest value when it runs
+      save(() => [mirrorPair(uid)]);// the newest value when it runs
     }
     return memory.get(uid)!;
+  }
+
+  async function read(uid: string): Promise<ParsedPacks> {
+    return (await load(uid))?.parsed ?? {kind: 'corrupt'};
   }
 
   // Memory holds exactly what was saved (parsed back), so it never holds more than storage does
   function write(uid: string, record: PacksRecord): Promise<void> {
     const json = serialisePacks(record);
-    const parsed = parsePacks(json);
-    memory.set(uid, parsed);
+    remember(uid, {parsed: parsePacks(json), dismissed: memory.get(uid)?.dismissed ?? false});
     mirrorUid = uid;
-    return save(() => [[packsKey(uid), json], [PACKS_MIRROR_KEY, serialiseMirror(uid, parsed)]]);
+    return save(() => [[packsKey(uid), json], mirrorPair(uid)]);
   }
 
   // Reads the current record, and writes what `change` returns (null: no write). Never throws.
@@ -73,5 +98,22 @@ export function createPacksStore(storage: PacksStorage) {
     return updates;
   }
 
-  return {loadMirror, read, write, update};
+  // "Not now" on Home's choose card. Never throws. If the record can't be read, only the flag is saved (the
+  // mirror is left alone, so it never claims a record it doesn't know).
+  async function dismissChoose(uid: string): Promise<void> {
+    const state = await load(uid);
+    if (!state) return save(() => [[chooseDismissedKey(uid), DISMISSED_VALUE]]);
+    remember(uid, {...state, dismissed: true});
+    mirrorUid = uid;
+    return save(() => [[chooseDismissedKey(uid), DISMISSED_VALUE], mirrorPair(uid)]);
+  }
+
+  function subscribe(listener: () => void): () => void {
+    listeners.add(listener);
+    return () => {
+      listeners.delete(listener);
+    };
+  }
+
+  return {loadMirror, peek, read, write, update, dismissChoose, subscribe};
 }

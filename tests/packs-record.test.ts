@@ -91,11 +91,17 @@ describe('the record', () => {
 });
 
 describe('the mirror', () => {
-  test('round-trips a record, "none" and "corrupt" for its uid', () => {
+  test('round-trips a record, "none" and "corrupt" for its uid, with the "Not now" flag', () => {
     const ok = r.parsePacks(r.serialisePacks(TWO));
     for (const parsed of [ok, {kind: 'none'} as const, {kind: 'corrupt'} as const]) {
-      assert.deepEqual(r.parseMirror(r.serialiseMirror('u1', parsed)), {uid: 'u1', parsed});
+      assert.deepEqual(r.parseMirror(r.serialiseMirror('u1', parsed)), {uid: 'u1', parsed, dismissed: false});
+      assert.deepEqual(r.parseMirror(r.serialiseMirror('u1', parsed, true)), {uid: 'u1', parsed, dismissed: true});
     }
+  });
+
+  test('a Stage 1a mirror (no flag) still reads, as not dismissed', () => {
+    assert.deepEqual(r.parseMirror('{"uid":"u1","record":null}'), {uid: 'u1', parsed: {kind: 'none'}, dismissed: false});
+    assert.deepEqual(r.parseMirror('{"uid":"u1","record":null,"dismissed":"yes"}')?.dismissed, false);
   });
 
   test('anything else is no mirror at all', () => {
@@ -144,11 +150,11 @@ describe('the store', () => {
     store.loadMirror(r.serialiseMirror('u1', {kind: 'none'}));
     const parsed = await store.read('u2');
     assert.equal(parsed.kind, 'ok');
-    assert.equal(m.calls.getItem, 1);
+    assert.equal(m.calls.getItem, 2);// the record and the "Not now" flag
     await store.update('u2', () => null);// waits for queued saves
-    assert.deepEqual(r.parseMirror(m.data.get(r.PACKS_MIRROR_KEY) ?? null), {uid: 'u2', parsed});
+    assert.deepEqual(r.parseMirror(m.data.get(r.PACKS_MIRROR_KEY) ?? null), {uid: 'u2', parsed, dismissed: false});
     await store.read('u2');
-    assert.equal(m.calls.getItem, 1);// remembered
+    assert.equal(m.calls.getItem, 2);// remembered
   });
 
   test('no mirror: the same, and a corrupt record is mirrored as corrupt', async () => {
@@ -157,7 +163,58 @@ describe('the store', () => {
     store.loadMirror(null);
     assert.deepEqual(await store.read('u1'), {kind: 'corrupt'});
     await store.update('u1', () => null);
-    assert.deepEqual(r.parseMirror(m.data.get(r.PACKS_MIRROR_KEY) ?? null), {uid: 'u1', parsed: {kind: 'corrupt'}});
+    assert.deepEqual(r.parseMirror(m.data.get(r.PACKS_MIRROR_KEY) ?? null), {uid: 'u1', parsed: {kind: 'corrupt'}, dismissed: false});
+  });
+
+  test('peek: what the mirror or a read left in memory, without reading; listeners hear every change', async () => {
+    const m = memoryStorage();
+    const store = createPacksStore(m.storage);
+    let heard = 0;
+    const off = store.subscribe(() => {
+      heard += 1;
+    });
+    assert.equal(store.peek('u1'), undefined);
+    store.loadMirror(r.serialiseMirror('u1', {kind: 'none'}));
+    assert.deepEqual(store.peek('u1'), {parsed: {kind: 'none'}, dismissed: false});
+    const before = store.peek('u1');
+    await store.write('u1', TWO);
+    assert.notEqual(store.peek('u1'), before);// a new snapshot object
+    assert.equal(store.peek('u1')?.parsed.kind, 'ok');
+    assert.equal(heard, 2);
+    off();
+    await store.dismissChoose('u1');
+    assert.equal(heard, 2);
+    assert.equal(m.calls.getItem, 0);
+  });
+
+  test('"Not now": saved per user with the mirror in one multiSet, kept by later pack writes, read back for another uid', async () => {
+    const m = memoryStorage();
+    const store = createPacksStore(m.storage);
+    store.loadMirror(r.serialiseMirror('u1', {kind: 'none'}));
+    await store.dismissChoose('u1');
+    assert.equal(m.calls.multiSet, 1);
+    assert.equal(m.data.get(r.chooseDismissedKey('u1')), r.DISMISSED_VALUE);
+    assert.deepEqual(r.parseMirror(m.data.get(r.PACKS_MIRROR_KEY) ?? null), {uid: 'u1', parsed: {kind: 'none'}, dismissed: true});
+    await store.write('u1', TWO);
+    assert.equal(r.parseMirror(m.data.get(r.PACKS_MIRROR_KEY) ?? null)?.dismissed, true);
+
+    // a fresh app run for another account on this phone, then back: the flag comes from its own key
+    const later = createPacksStore(m.storage);
+    later.loadMirror(r.serialiseMirror('u2', {kind: 'none'}));
+    assert.equal((await later.read('u2')).kind, 'none');
+    assert.equal(later.peek('u2')?.dismissed, false);
+    await later.read('u1');
+    assert.equal(later.peek('u1')?.dismissed, true);
+  });
+
+  test('"Not now" with an unreadable storage saves only the flag and remembers nothing', async () => {
+    const m = memoryStorage();
+    const store = createPacksStore(m.storage);
+    m.fail.get = true;
+    await store.dismissChoose('u1');
+    assert.equal(store.peek('u1'), undefined);
+    assert.equal(m.data.get(r.chooseDismissedKey('u1')), r.DISMISSED_VALUE);
+    assert.equal(m.data.has(r.PACKS_MIRROR_KEY), false);
   });
 
   test('a write saves the record and the mirror in one multiSet', async () => {
