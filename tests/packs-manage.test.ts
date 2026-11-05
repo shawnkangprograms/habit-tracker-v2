@@ -234,6 +234,61 @@ describe('limits: one check, adding only', () => {
   });
 });
 
+describe('the level named in a limit message counts what the account already has', () => {
+  // {x}: the lowest level whose limit is higher than both the current limit and the current count
+  const habitsAt = (level: number, count: number, adding?: number) => lim.checkAdd({level, kind: 'habits', count, adding});
+  const packsAt = (level: number, count: number) => lim.checkAdd({level, kind: 'packs', count});
+  const msgLevel = (check: {ok: boolean; message?: string}) => {
+    assert.equal(check.ok, false);
+    return Number(/level (\d+)/.exec(check.message!)![1]);
+  };
+
+  test('23 habits at level 3 names level 7 (12 + 2 x 6 = 24 > 23), never level 4', () => {
+    assert.equal(lim.nextLimitLevel(3, 'habits', 23), 7);
+    assert.deepEqual(habitsAt(3, 23), {ok: false, room: 0, message: 'Habit limit reached. Reach level 7 to add more habits.'});
+    assert.equal(lim.limitMessageFor('habits', 3, 23), 'Habit limit reached. Reach level 7 to add more habits.');
+  });
+
+  test('habits over the limit: 18 at level 3 names 5 (level 4 allows only 18), 17 names 4', () => {
+    assert.equal(msgLevel(habitsAt(3, 18)), 5);
+    assert.equal(msgLevel(habitsAt(3, 17)), 4);
+  });
+
+  test('exactly at the limit: unchanged, the next level with more', () => {
+    assert.equal(msgLevel(habitsAt(3, 16)), 4);
+    assert.equal(msgLevel(habitsAt(1, 12)), 2);
+    assert.equal(msgLevel(packsAt(2, 2)), 3);
+  });
+
+  test('partly full, adding several: unchanged (level 1, 10 habits, adding 3 names 2)', () => {
+    assert.deepEqual(habitsAt(1, 10, 3), {ok: false, room: 2, message: 'Habit limit reached. Reach level 2 to add more habits.'});
+  });
+
+  test('packs over the limit: 6 at level 3 names 11, 4 at level 1 names 7', () => {
+    assert.equal(msgLevel(packsAt(3, 6)), 11);
+    assert.equal(msgLevel(packsAt(1, 4)), 7);
+    assert.equal(lim.limitMessageFor('packs', 3, 6), 'Pack limit reached. Reach level 11 to add more habit packs.');
+  });
+
+  test('property: levels 1-40 x counts 0-60, the named level is the lowest with room', () => {
+    for (let level = 1; level <= 40; level++) {
+      for (const kind of ['habits', 'packs'] as const) {
+        const current = lim.limitsForLevel(level)[kind];
+        for (let count = 0; count <= 60; count++) {
+          const check = lim.checkAdd({level, kind, count});
+          if (check.ok) continue;
+          const x = msgLevel(check);
+          const needed = Math.max(count, current);
+          assert.ok(x > level, `${kind} level ${level} count ${count}: ${x}`);
+          assert.ok(lim.limitsForLevel(x)[kind] > needed, `${kind} level ${level} count ${count}: ${x} has room`);
+          assert.ok(x - 1 === level || lim.limitsForLevel(x - 1)[kind] <= needed, `${kind} level ${level} count ${count}: ${x} is the lowest`);
+          assert.equal(check.message, lim.limitMessageFor(kind, level, count));
+        }
+      }
+    }
+  });
+});
+
 describe('onboarding: a Settings retake stops at the habit limit', () => {
   test('creates only `room` cards and reports limited; without room (the first run) it creates them all', async () => {
     const pl = plan.buildPlan({

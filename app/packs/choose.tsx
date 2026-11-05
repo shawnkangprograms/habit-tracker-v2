@@ -12,9 +12,9 @@ import {useSessionUid} from '@/services/session';
 import {colors, fonts, radii, spacing} from '@/constants/theme';
 import {BUILTIN_PACKS, type BuiltinPackId} from '@/utils/packs/builtin';
 import {
-  CHOOSE_ADOPT_NOTE, CREATE_OWN_PACK, PACK_NAMES, SAVE_PACKS, chooseTitle, habitCount, packLimitMessage,
+  CHOOSE_ADOPT_NOTE, CREATE_OWN_PACK, PACK_NAMES, SAVE_PACKS, chooseTitle, habitCount,
 } from '@/utils/packs/copy';
-import {checkAdd, limitsForLevel, nextLimitLevel} from '@/utils/packs/limits';
+import {checkAdd, limitMessageFor, limitsForLevel} from '@/utils/packs/limits';
 import type {HabitRef} from '@/utils/packs/membership';
 import {ownedBuiltins, packsAfterPick, togglePick} from '@/utils/packs/picker';
 import {TEMPLATE_NAMES} from '@/utils/onboarding/copy';
@@ -66,7 +66,7 @@ export default function ChoosePacksScreen() {
     if (parsed === null || level === null) return;
     const result = togglePick({picked, id, owned, packCount, level});
     setPicked(result.picked);
-    setLimitMessage(result.limited ? packLimitMessage(nextLimitLevel(level, 'packs')) : null);
+    setLimitMessage(result.limited ? limitMessageFor('packs', level, packCount + picked.length) : null);
   };
 
   // Counts the picks not saved yet too, so the user can't go past the limit by mixing both

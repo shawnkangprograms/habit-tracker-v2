@@ -19,14 +19,24 @@ export function limitsForLevel(level: number): Record<LimitKind, number> {
   return {habits: 12 + 2 * (l - 1), packs: 2 + Math.floor((l - 1) / 2)};
 }
 
-// The lowest level whose limit is higher than this level's: the {x} in the limit message
-export function nextLimitLevel(level: number, kind: LimitKind): number {
+// The {x} in the limit message: the lowest level whose limit is higher than both this level's limit and the
+// count the account already has. An account above its limit (levels can fall, habits can arrive from another
+// device) is told the level it actually needs, not just the next one. count 0 (the default): the next level whose
+// limit is higher than this level's.
+export function nextLimitLevel(level: number, kind: LimitKind, count = 0): number {
   const l = asLevel(level);
-  const current = limitsForLevel(l)[kind];
+  const needed = Math.max(limitsForLevel(l)[kind], Number.isFinite(count) ? count : 0);
   for (let next = l + 1; next <= SEARCH_MAX; next++) {
-    if (limitsForLevel(next)[kind] > current) return next;
+    if (limitsForLevel(next)[kind] > needed) return next;
   }
   return SEARCH_MAX;
+}
+
+// The limit message for an account at this level with this many habits or packs: built in one place for every
+// add path (checkAdd, Home's "Add the rest", the pack picker)
+export function limitMessageFor(kind: LimitKind, level: number, count: number): string {
+  const next = nextLimitLevel(level, kind, count);
+  return kind === 'habits' ? habitLimitMessage(next) : packLimitMessage(next);
 }
 
 // How many more can be added now (0 at or above the limit)
@@ -44,6 +54,5 @@ export type AddCheck = {ok: true; room: number} | {ok: false; room: number; mess
 export function checkAdd(input: {level: number; kind: LimitKind; count: number; adding?: number}): AddCheck {
   const room = roomFor(input.level, input.kind, input.count);
   if (room >= Math.max(1, input.adding ?? 1)) return {ok: true, room};
-  const next = nextLimitLevel(input.level, input.kind);
-  return {ok: false, room, message: input.kind === 'habits' ? habitLimitMessage(next) : packLimitMessage(next)};
+  return {ok: false, room, message: limitMessageFor(input.kind, input.level, input.count)};
 }

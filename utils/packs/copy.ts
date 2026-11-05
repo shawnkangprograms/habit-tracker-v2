@@ -46,7 +46,8 @@ export function habitCount(n: number): string {
   return `${n} habits`;
 }
 
-// {x}: the lowest level whose limit is higher (utils/packs/limits.ts, nextLimitLevel)
+// {x}: the lowest level whose limit is higher than both the current limit and the current count
+// (utils/packs/limits.ts, nextLimitLevel and limitMessageFor)
 export function habitLimitMessage(level: number): string {
   return `Habit limit reached. Reach level ${level} to add more habits.`;
 }

@@ -57,8 +57,8 @@ import {PackCard, type AddRest} from '@/components/packs/pack-card';
 import {ChoosePacksCard} from '@/components/packs/choose-packs-card';
 import {homeGroups, showChooseCard} from '@/utils/packs/home';
 import {addTheRest} from '@/utils/packs/addRest';
-import {checkAdd, limitsForLevel, nextLimitLevel} from '@/utils/packs/limits';
-import {ADD_REST_FAILED, CREATE_PACK_BUTTON, HOME_HABITS_TITLE, HOME_PACKS_TITLE, habitLimitMessage} from '@/utils/packs/copy';
+import {checkAdd, limitMessageFor, limitsForLevel} from '@/utils/packs/limits';
+import {ADD_REST_FAILED, CREATE_PACK_BUTTON, HOME_HABITS_TITLE, HOME_PACKS_TITLE} from '@/utils/packs/copy';
 import {ROUTINE_REMINDER_DEFAULT} from '@/utils/onboarding/plan';
 
 type Habit = {// one row from getHabitsWithTodayStatus: an active habit scheduled today, with today's status
@@ -486,7 +486,7 @@ export default function HomeScreen() {// default export, becomes the "index" tab
         savePacks: (record) => packsStore.write(userId, record),
       }, {record: parsed.record, packId, habits, level, reminderTime: ROUTINE_REMINDER_DEFAULT});
       if (result.failed) notice = ADD_REST_FAILED;
-      else if (result.limited) notice = habitLimitMessage(nextLimitLevel(level, 'habits'));
+      else if (result.limited) notice = limitMessageFor('habits', level, habits.length + result.added);// active habits after the adds
       if (result.added > 0) askForReminderPermission();// in context, only once habits with a reminder exist
     } catch (err) {
       console.log('Add the rest failed', err);
