@@ -23,6 +23,11 @@ import {useNotificationPrefs} from '@/services/notificationPrefs';
 import {getNotificationPermission, notificationsAvailable, type PermissionState} from '@/services/notifications';
 import {askForReminderPermission} from '@/services/reminderPermission';
 import {DEFAULT_REMINDER_TIME, LEAD_LABELS, reminderTimingNote, timingNoteText} from '@/utils/reminderForm';
+import {usePacks} from '@/hooks/use-packs';
+import {packsStore} from '@/services/packsStore';
+import {checkAddFor} from '@/services/packLimits';
+import {HABIT_PACK_LABEL, NO_PACK} from '@/utils/packs/copy';
+import {moveHabit, packOf} from '@/utils/packs/manage';
 
 // For the timing line under the chips: a plain function so the React Compiler lint doesn't treat it as a render-time read
 function clockNow(): Date {
@@ -61,6 +66,11 @@ export default function HabitFormScreen() {
   const [errors, setErrors] = useState<FieldErrors>({});
   const [isLoaded, setIsLoaded] = useState(!isEdit); // Edit mode waits for the habit before showing the form
   const savingRef = useRef(false); // a ref, not state, so a second tap in the same frame is ignored
+  // The habit's pack (docs/PACKS_REPORTS_SPEC.md, section 4): null = None. Saved on this phone only, after the habit.
+  const packs = usePacks(userId);
+  const [packChoice, setPackChoice] = useState<string | null>(null);
+  const [initialPack, setInitialPack] = useState<string | null>(null);
+  const [limitMessage, setLimitMessage] = useState<string | null>(null);// adding only: the habit limit
 
   useEffect(() => {
     if (!userId) {
@@ -86,7 +96,12 @@ export default function HabitFormScreen() {
         setReminder(habit.reminderTime ?? '');
         setAlarm(habit.alarm);
         setLead(habit.remindBeforeMin);
-        setIsLoaded(true);
+        return packsStore.read(userId).then((parsed) => {
+          const owner = parsed.kind === 'ok' ? packOf(parsed.record, habitId)?.id ?? null : null;
+          setPackChoice(owner);
+          setInitialPack(owner);
+          setIsLoaded(true);
+        });
       })
       .catch((err: unknown) => {
         Alert.alert('Something went wrong', err instanceof Error ? err.message : 'Please try again.', [{text: 'OK', onPress: goBack}]);
@@ -156,8 +171,26 @@ export default function HabitFormScreen() {
 
     savingRef.current = true;
     try {
+      let savedId = habitId;
       if (habitId) await updateHabit(userId, habitId, input.value);
-      else await addHabit(userId, input.value);
+      else {
+        // the habit limit (utils/packs/limits.ts) is checked only when adding, never when editing
+        const check = await checkAddFor(userId, 'habits');
+        if (!check.ok) {
+          setLimitMessage(check.message);
+          return;
+        }
+        savedId = (await addHabit(userId, input.value)) as string;
+      }
+      if (savedId && packChoice !== initialPack) {
+        const habit = {habitId: savedId, habitName: input.value.habitName};
+        // never throws; if the save fails the habit simply stays unpacked
+        await packsStore.update(userId, (parsed) => {
+          if (parsed.kind !== 'ok') return null;
+          const next = moveHabit(parsed.record, habit, packChoice);
+          return next === parsed.record ? null : next;
+        });
+      }
       if (reminderTime !== null) await askForReminderPermission();// services/reminderPermission.ts; never throws
       goBack();
     } catch (err) {
@@ -187,6 +220,8 @@ export default function HabitFormScreen() {
 
   // all hooks above run before any early return
   if (!isLoaded) return <SafeAreaView style={styles.screen} />;
+
+  const packOptions = packs?.parsed.kind === 'ok' ? [...packs.parsed.record.packs].sort((a, b) => a.order - b.order) : [];
 
   const nameLength = Array.from(habitName.trim()).length; // trimmed code points, as the validator counts
   const timingLine = reminderOn ? timingNoteText(reminderTimingNote({
@@ -297,6 +332,29 @@ export default function HabitFormScreen() {
             {errors.frequency ? <Text style={styles.errorText}>{errors.frequency}</Text> : null}
           </View>
 
+          {/* HABIT PACK: only once the user has packs */}
+          {packOptions.length > 0 && (
+            <View style={styles.section}>
+              <Text style={[styles.label, styles.labelGap]}>{HABIT_PACK_LABEL}</Text>
+              <View style={styles.chips} accessibilityRole="radiogroup" accessibilityLabel={HABIT_PACK_LABEL}>
+                {[{id: null, name: NO_PACK}, ...packOptions].map((option) => {
+                  const selected = packChoice === option.id;
+                  return (
+                    <Pressable
+                      key={option.id ?? 'none'}
+                      onPress={() => setPackChoice(option.id)}
+                      style={[styles.chip, selected ? styles.pillSelected : styles.pillUnselected]}
+                      hitSlop={4}
+                      accessibilityRole="radio"
+                      accessibilityState={{selected}}>
+                      <Text style={[styles.chipText, selected && styles.whiteText]}>{option.name}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+
           {/* REMINDER: time switch, picker, lead chips, alarm switch */}
           <View style={styles.section}>
             <Text style={[styles.label, styles.labelGap]}>REMINDER (OPTIONAL)</Text>
@@ -356,6 +414,7 @@ export default function HabitFormScreen() {
 
         {/* pinned actions, outside the scroll view */}
         <View style={styles.footer}>
+          {limitMessage && <Text style={styles.limit} accessibilityLiveRegion="polite">{limitMessage}</Text>}
           <Pressable
             style={({pressed}) => [styles.primaryButton, pressed && styles.pressed]}
             onPress={handleSave}
@@ -440,6 +499,7 @@ const styles = StyleSheet.create({
   },
   noteText: {fontFamily: fonts.regular, fontSize: 13, color: colors.muted},
   noteLink: {fontFamily: fonts.semiBold, fontSize: 13, color: colors.accent},
+  limit: {fontFamily: fonts.medium, fontSize: 13, color: colors.error, textAlign: 'center'},
   footer: {paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.lg, gap: spacing.md},
   primaryButton: {
     height: 56,

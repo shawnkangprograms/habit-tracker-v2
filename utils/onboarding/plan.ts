@@ -64,7 +64,8 @@ export type CreateDeps = {
 // What this screen has done so far: pick ids created, and the record as last saved (null = nothing saved yet)
 export type CreateSession = {created: ReadonlySet<string>; saved: OnboardingRecord | null};
 
-export type CreateResult = CreateSession & {failed: boolean; createdNow: number};
+// limited: stopped at `room` with selected cards still to create (a Settings retake at the habit limit)
+export type CreateResult = CreateSession & {failed: boolean; createdNow: number; limited: boolean};
 
 // Creates the selected cards not created yet, one at a time, in card order. Stops at the first failure and
 // keeps what was created; calling it again with the returned session retries the rest and never creates a
@@ -75,6 +76,7 @@ export async function createPlannedHabits(deps: CreateDeps, input: {
   reminderTime: string | null;
   session: CreateSession;
   writeIfNone?: boolean;// default true; false for "Add your own habit" (see the header)
+  room?: number;// how many habits may be created now; absent on the first run, which never checks a limit
 }): Promise<CreateResult> {
   const created = new Set(input.session.created);
   let saved = input.session.saved;
@@ -82,11 +84,12 @@ export async function createPlannedHabits(deps: CreateDeps, input: {
 
   for (const pick of input.plan.picks) {
     if (!input.selected.has(pick.id) || created.has(pick.id)) continue;
+    if (input.room !== undefined && createdNow >= input.room) return {created, saved, failed: false, createdNow, limited: true};
     let habitId: unknown;
     try {
       habitId = await deps.addHabit(toHabitInput(pick, input.reminderTime));
     } catch {
-      return {created, saved, failed: true, createdNow};
+      return {created, saved, failed: true, createdNow, limited: false};
     }
     created.add(pick.id);
     createdNow += 1;
@@ -100,7 +103,7 @@ export async function createPlannedHabits(deps: CreateDeps, input: {
     saved = completedRecord(input.plan.previous, deps.now());
     await deps.saveRecord(saved);
   }
-  return {created, saved, failed: false, createdNow};
+  return {created, saved, failed: false, createdNow, limited: false};
 }
 
 // The user's own habit, made in the habit form over this screen: the record to save, or null when this run

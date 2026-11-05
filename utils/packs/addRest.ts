@@ -7,7 +7,7 @@
 // Never twice: a habit created whose save then failed is found again by name on the next run and adopted, not
 // created again.
 
-import {roomFor} from '@/utils/packs/limits';
+import {checkAdd} from '@/utils/packs/limits';
 import {addToPack, adoptExisting, missingTemplates, type HabitRef} from '@/utils/packs/membership';
 import type {PacksRecord} from '@/utils/packs/record';
 import {TEMPLATE_NAMES} from '@/utils/onboarding/copy';
@@ -42,9 +42,8 @@ export async function addTheRest(deps: AddRestDeps, input: {
     return {record: input.record, added, failed: true, limited: false};
   }
 
-  let room = roomFor(input.level, 'habits', input.habits.length);
   for (const templateId of missingTemplates(record, input.packId, known)) {
-    if (room <= 0) return {record, added, failed: false, limited: true};
+    if (!checkAdd({level: input.level, kind: 'habits', count: known.length}).ok) return {record, added, failed: false, limited: true};
     const template = CATALOG.find((t) => t.id === templateId)!;
     let habitId: string;
     try {
@@ -54,7 +53,6 @@ export async function addTheRest(deps: AddRestDeps, input: {
       });
       known.push({habitId, habitName: TEMPLATE_NAMES[templateId]});
       added += 1;
-      room -= 1;
       const next = addToPack(record, input.packId, habitId);
       await deps.savePacks(next);
       record = next;

@@ -5,6 +5,8 @@
 // Nothing is ever removed: a user above a limit keeps everything and simply has no room. Onboarding's own habit
 // creation never asks for room.
 
+import {habitLimitMessage, packLimitMessage} from '@/utils/packs/copy';
+
 export type LimitKind = 'habits' | 'packs';
 
 // The highest level the next-level lookup searches; far above any real level
@@ -30,4 +32,18 @@ export function nextLimitLevel(level: number, kind: LimitKind): number {
 // How many more can be added now (0 at or above the limit)
 export function roomFor(level: number, kind: LimitKind, count: number): number {
   return Math.max(0, limitsForLevel(level)[kind] - Math.max(0, count));
+}
+
+// ---------- The one check every add path uses (Stage 2) ----------
+// "Add a habit", the habit form when adding, "Create a habit pack", the picker, "Add the rest" and a Settings
+// retake of onboarding. Only adding is ever refused: an account above a limit keeps, ticks, edits, moves and
+// deletes everything (section 16). adding: how many the caller wants to add now (default 1).
+
+export type AddCheck = {ok: true; room: number} | {ok: false; room: number; message: string};// room: how many fit now
+
+export function checkAdd(input: {level: number; kind: LimitKind; count: number; adding?: number}): AddCheck {
+  const room = roomFor(input.level, input.kind, input.count);
+  if (room >= Math.max(1, input.adding ?? 1)) return {ok: true, room};
+  const next = nextLimitLevel(input.level, input.kind);
+  return {ok: false, room, message: input.kind === 'habits' ? habitLimitMessage(next) : packLimitMessage(next)};
 }

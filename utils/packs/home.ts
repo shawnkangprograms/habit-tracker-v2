@@ -16,6 +16,7 @@ export type PackSection<T extends TodayRow> = {
   rows: T[];// the pack's habits due today, in Home's order
   done: number;
   missing: TemplateId[] | null;// templates "Add the rest" would bring in; null when the active habits are unknown
+  hasHabits: boolean;// false: no active habit at all ("No habits yet"); true when the active habits are unknown
 };
 
 export type HomeGroups<T extends TodayRow> = {packs: PackSection<T>[]; unpacked: T[]};
@@ -31,6 +32,7 @@ export function homeGroups<T extends TodayRow>(
 ): HomeGroups<T> {
   const record = shownRecord(parsed);
   if (!record) return {packs: [], unpacked: [...today]};
+  const active = all ? new Set(all.map((h) => h.habitId)) : null;
   const owner = new Map<string, string>();
   for (const pack of record.packs) for (const id of pack.habitIds) owner.set(id, pack.id);
   return {
@@ -42,6 +44,7 @@ export function homeGroups<T extends TodayRow>(
         rows,
         done: rows.filter((row) => row.completed === 1).length,
         missing: all ? missingTemplates(record, pack.id, all) : null,
+        hasHabits: active ? pack.habitIds.some((id) => active.has(id)) : true,
       };
     }),
     unpacked: today.filter((row) => !owner.has(row.habitId)),

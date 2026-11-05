@@ -80,19 +80,26 @@ export function createPacksStore(storage: PacksStorage) {
     return (await load(uid))?.parsed ?? {kind: 'corrupt'};
   }
 
-  // Memory holds exactly what was saved (parsed back), so it never holds more than storage does
-  function write(uid: string, record: PacksRecord): Promise<void> {
+  // Memory holds exactly what was saved (parsed back), so it never holds more than storage does. dismiss: also
+  // save the choose card's "Not now", in the same multiSet.
+  function write(uid: string, record: PacksRecord, dismiss = false): Promise<void> {
     const json = serialisePacks(record);
-    remember(uid, {parsed: parsePacks(json), dismissed: memory.get(uid)?.dismissed ?? false});
+    remember(uid, {parsed: parsePacks(json), dismissed: dismiss || (memory.get(uid)?.dismissed ?? false)});
     mirrorUid = uid;
-    return save(() => [[packsKey(uid), json], mirrorPair(uid)]);
+    return save(() => [
+      [packsKey(uid), json], ...(dismiss ? [[chooseDismissedKey(uid), DISMISSED_VALUE] as [string, string]] : []), mirrorPair(uid),
+    ]);
   }
 
   // Reads the current record, and writes what `change` returns (null: no write). Never throws.
-  function update(uid: string, change: (parsed: ParsedPacks) => PacksRecord | null): Promise<void> {
+  // dismissIfEmpty: a change that leaves no packs (deleting the last one) also saves "Not now", so the choose
+  // card doesn't come straight back (Stage 2).
+  function update(
+    uid: string, change: (parsed: ParsedPacks) => PacksRecord | null, options?: {dismissIfEmpty?: boolean},
+  ): Promise<void> {
     const run = updates.then(async () => {
       const next = change(await read(uid));
-      if (next) await write(uid, next);
+      if (next) await write(uid, next, (options?.dismissIfEmpty ?? false) && next.packs.length === 0);
     });
     updates = run.catch(() => {});
     return updates;

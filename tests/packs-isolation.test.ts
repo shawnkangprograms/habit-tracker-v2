@@ -31,6 +31,7 @@ const PACK_FILES = [
   ...files('utils/packs'),
   ...files('services/packsStore.ts'),
   ...files('services/packsStoreCore.ts'),
+  ...files('services/packLimits.ts'),
   ...files('components/packs'),
   ...files('hooks/use-packs.ts'),
   ...files('app/packs'),
@@ -43,9 +44,10 @@ const FORBIDDEN = [
 
 describe('pack modules', () => {
   test('exist, and import nothing that reaches Firebase, sync, the insight request or the startup path', () => {
-    assert.ok(PACK_FILES.length >= 15, 'expected the utils/packs modules, the store, the hook, the components and the picker');
-    for (const file of ['utils/packs/home.ts', 'utils/packs/picker.ts', 'hooks/use-packs.ts', 'components/packs/pack-card.tsx',
-      'components/packs/choose-packs-card.tsx', 'app/packs/choose.tsx']) {
+    assert.ok(PACK_FILES.length >= 18, 'expected the utils/packs modules, the store, the limits service, the hook, the components and the pack screens');
+    for (const file of ['utils/packs/home.ts', 'utils/packs/picker.ts', 'utils/packs/manage.ts', 'hooks/use-packs.ts',
+      'components/packs/pack-card.tsx', 'components/packs/choose-packs-card.tsx', 'app/packs/choose.tsx', 'app/packs/edit.tsx',
+      'services/packLimits.ts']) {
       assert.ok(PACK_FILES.map(rel).includes(file), `${file} is scanned`);
     }
     for (const file of PACK_FILES) {
@@ -64,7 +66,7 @@ describe('pack modules', () => {
 
   test('the ESLint block covers every pack folder', () => {
     const config = readFileSync(join(ROOT, 'eslint.config.js'), 'utf8');
-    for (const glob of ["'utils/packs/**'", "'services/packsStore*.ts'", "'components/packs/**'", "'hooks/use-packs.ts'", "'app/packs/**'"]) {
+    for (const glob of ["'utils/packs/**'", "'services/packsStore*.ts'", "'services/packLimits.ts'", "'components/packs/**'", "'hooks/use-packs.ts'", "'app/packs/**'"]) {
       assert.ok(config.includes(glob), glob);
     }
   });

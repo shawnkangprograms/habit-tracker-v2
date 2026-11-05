@@ -59,7 +59,7 @@ module.exports = defineConfig([
     // Habit packs stay on the phone (docs/PACKS_REPORTS_SPEC.md, section 7): the same bans as onboarding, plus
     // nothing from the startup path (the marker read hands the mirror in; packs never reach back into startup).
     // tests/packs-isolation.test.ts also scans these files for require() and import() calls.
-    files: ['utils/packs/**', 'services/packsStore*.ts', 'components/packs/**', 'hooks/use-packs.ts', 'app/packs/**'],
+    files: ['utils/packs/**', 'services/packsStore*.ts', 'services/packLimits.ts', 'components/packs/**', 'hooks/use-packs.ts', 'app/packs/**'],
     rules: {
       'no-restricted-imports': ['error', {
         paths: [

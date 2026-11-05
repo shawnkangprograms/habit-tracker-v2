@@ -9,7 +9,7 @@
 // pack first in `order` keeps it. Habits deleted since are filtered where they are used (utils/packs/membership.ts).
 
 import {BUILTIN_PACKS, isBuiltinPackId, type BuiltinPackId} from '@/utils/packs/builtin';
-import {TEMPLATE_IDS, isOneOf, type TemplateId} from '@/utils/onboarding/types';
+import {AXES, TEMPLATE_IDS, isOneOf, type Axis, type TemplateId} from '@/utils/onboarding/types';
 
 export const PACKS_VERSION = 1;
 export const packsKey = (uid: string) => `packs:v1:${uid}`;
@@ -26,6 +26,7 @@ export type Pack = {
   dropped: TemplateId[];// built-in only: templates removed from the pack, never brought back
   createdAt: number;// ms; anchors the pack's yearly report
   order: number;
+  area?: Axis;// custom only, chosen at creation (stage 2); a built-in pack's area comes from its builtinId
 };
 
 export type PacksRecord = {version: typeof PACKS_VERSION; packs: Pack[]};
@@ -34,20 +35,22 @@ export type ParsedPacks = {kind: 'none'} | {kind: 'corrupt'} | {kind: 'ok'; reco
 
 export const EMPTY_PACKS: PacksRecord = {version: PACKS_VERSION, packs: []};
 
-// Trimmed, 1 to 24 characters (code points), no control characters. Uniqueness is checked against the record.
+// Trimmed with inner spaces collapsed, 1 to 24 characters (code points), no control characters. Uniqueness is
+// checked against the record.
 export function validatePackName(raw: unknown):
   {valid: true; value: string} | {valid: false; reason: 'empty' | 'long' | 'control'} {
-  const value = typeof raw === 'string' ? raw.trim() : '';
-  if (value.length === 0) return {valid: false, reason: 'empty'};
-  if (/\p{Cc}/u.test(value)) return {valid: false, reason: 'control'};
+  const trimmed = typeof raw === 'string' ? raw.trim() : '';
+  if (trimmed.length === 0) return {valid: false, reason: 'empty'};
+  if (/\p{Cc}/u.test(trimmed)) return {valid: false, reason: 'control'};
+  const value = trimmed.replace(/\s+/g, ' ');
   if (Array.from(value).length > PACK_NAME_MAX) return {valid: false, reason: 'long'};
   return {valid: true, value};
 }
 
-// Is this name used by another pack (ignoring case)?
+// Is this name used by another pack (ignoring case, extra spaces)?
 export function packNameTaken(record: PacksRecord, name: string, exceptId?: string): boolean {
-  const key = name.trim().toLowerCase();
-  return record.packs.some((p) => p.id !== exceptId && p.name.toLowerCase() === key);
+  const key = (n: string) => n.trim().replace(/\s+/g, ' ').toLowerCase();
+  return record.packs.some((p) => p.id !== exceptId && key(p.name) === key(name));
 }
 
 const isTime = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0;
@@ -68,7 +71,12 @@ function parsePack(v: unknown): Pack | null {
     const templates = BUILTIN_PACKS.find((p) => p.id === o.builtinId)!.templates;
     pack.builtinId = o.builtinId;
     pack.dropped = [...new Set(o.dropped.filter((t): t is TemplateId => isOneOf(TEMPLATE_IDS, t) && templates.includes(t)))];
-  } else if (o.builtinId !== undefined) return null;
+  } else {
+    if (o.builtinId !== undefined) return null;
+    // an area that is missing or unknown reads as "no area" rather than a corrupt record: a rollback to the 1b
+    // update would save custom packs without it, and the edit screen lets the user pick one again
+    if (isOneOf(AXES, o.area)) pack.area = o.area;
+  }
   return pack;
 }
 
@@ -84,7 +92,7 @@ export function packsFromValue(v: unknown): PacksRecord | null {
     packs.push(pack);
   }
   const ids = new Set(packs.map((p) => p.id));
-  const names = new Set(packs.map((p) => p.name.toLowerCase()));
+  const names = new Set(packs.map((p) => p.name.toLowerCase()));// stored names are already trimmed and collapsed
   if (ids.size !== packs.length || names.size !== packs.length) return null;
   packs.sort((a, b) => a.order - b.order);
   const seen = new Set<string>();
@@ -115,6 +123,7 @@ function packValue(p: Pack) {
   return {
     id: p.id, kind: p.kind, ...(p.kind === 'builtin' ? {builtinId: p.builtinId} : {}), name: p.name,
     habitIds: [...p.habitIds], dropped: p.kind === 'builtin' ? [...p.dropped] : [], createdAt: p.createdAt, order: p.order,
+    ...(p.kind === 'custom' && p.area ? {area: p.area} : {}),
   };
 }
 

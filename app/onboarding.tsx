@@ -25,6 +25,7 @@ import {RoutineCard} from '@/components/onboarding/routine-card';
 import {RoutineReminder} from '@/components/onboarding/routine-reminder';
 import {RoutineGroup} from '@/components/onboarding/routine-group';
 import {packsStore} from '@/services/packsStore';
+import {checkAddFor} from '@/services/packLimits';
 import {packsAfterRun, routineGroups, runPacks, type RunJoin} from '@/utils/packs/choose';
 import type {HabitRef} from '@/utils/packs/membership';
 import type {ParsedPacks} from '@/utils/packs/record';
@@ -74,7 +75,9 @@ import {TEMPLATE_IDS, isOneOf, type Answers, type CompleteAnswers} from '@/utils
 // chosen from the scores, and the cards are grouped under the pack each will join, then "Other habits". The pack
 // record is written at every moment the onboarding record is (right after it), never on Skip; the two packs are
 // created once the run has made a habit and the user has no packs (any run, first or from Settings). Its failure is
-// swallowed and never blocks onboarding, and onboarding never checks the habit or pack limits.
+// swallowed and never blocks onboarding. The first run never checks the habit limit; a Settings retake creates
+// the selected cards only while there is room (services/packLimits.ts) and then shows the habit limit message
+// (Stage 2). Its two packs need no pack check: they are created only when the user has none.
 //
 // Motion (stage 4, timings in utils/onboarding/motion.ts): a new question fades in, and its options also slide in
 // from the side it came from (enter only; nothing on the first step). The title only fades, so no transform ever
@@ -181,6 +184,7 @@ export default function OnboardingScreen() {
   const runningRef = useRef(false);// a ref, not only state, so a second tap in the same frame is ignored
   const [running, setRunning] = useState(false);
   const [createFailed, setCreateFailed] = useState(false);
+  const [limitMessage, setLimitMessage] = useState<string | null>(null);// a Settings retake at the habit limit
   const [reminderOn, setReminderOn] = useState(true);
   const [reminderTime, setReminderTime] = useState(ROUTINE_REMINDER_DEFAULT);
   const [pickerAvailable] = useState(timePickerAvailable);// fixed for the app run
@@ -328,7 +332,19 @@ export default function OnboardingScreen() {
     runningRef.current = true;
     setRunning(true);
     setCreateFailed(false);
+    setLimitMessage(null);
     try {
+      // a Settings retake: only as many cards as the habit limit leaves room for
+      let room: number | undefined;
+      let limited: string | null = null;
+      if (entry === 'settings') {
+        const remaining = plan.picks.filter((p) => selected.has(p.id) && !session.current.created.has(p.id)).length;
+        if (remaining > 0) {
+          const check = await checkAddFor(userId, 'habits', remaining);
+          room = check.room;
+          if (!check.ok) limited = check.message;
+        }
+      }
       const result = await createPlannedHabits({
         addHabit: (input) => addHabit(userId, input),
         saveRecord: async (record) => {
@@ -341,10 +357,15 @@ export default function OnboardingScreen() {
           madeHabit.current = true;
           if (habitId && isOneOf(TEMPLATE_IDS, id)) joins.current.push({templateId: id, habitId});
         },
-      }, {plan, selected, reminderTime: reminderOn ? reminderTime : null, session: session.current, writeIfNone});
+      }, {plan, selected, reminderTime: reminderOn ? reminderTime : null, session: session.current, writeIfNone, room});
       session.current = {created: result.created, saved: result.saved};
       if (result.failed) {
         setCreateFailed(true);
+        return false;
+      }
+      if (result.limited) {
+        setLimitMessage(limited);
+        if (reminderOn && result.createdNow > 0) await askForReminderPermission();
         return false;
       }
       // only after the habits exist, and only if they have a reminder time
@@ -543,6 +564,7 @@ export default function OnboardingScreen() {
           {phase === 'routine' && plan && (
             <>
               {createFailed && <Text style={styles.error} accessibilityLiveRegion="polite">{CREATE_FAILED}</Text>}
+              {limitMessage && <Text style={styles.error} accessibilityLiveRegion="polite">{limitMessage}</Text>}
               <PressButton label={plan.picks.length > 0 ? START : DONE} enabled={!running} reduceMotion={reduceMotion} onPress={start} />
               <PressButton label={ADD_OWN_HABIT} variant="secondary" enabled={!running} reduceMotion={reduceMotion} onPress={addOwnHabit} />
             </>

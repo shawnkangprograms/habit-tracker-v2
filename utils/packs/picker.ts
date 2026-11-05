@@ -1,13 +1,13 @@
 // "Choose your habit packs" (app/packs/choose.tsx; docs/PACKS_REPORTS_SPEC.md, section 3, Stage 1b). Pure.
 //
 // The six built-in packs; the user picks up to the pack limit for their level (utils/packs/limits.ts), counting
-// the packs they already have. Packs they already have show as picked and can't be unpicked here (removing a pack
-// is stage 2). Saving adds the new packs after the existing ones, and active unpacked habits with a new pack's
+// the packs they already have. Packs they already have show as picked and can't be unpicked here (they are
+// edited or deleted from their Home card). Saving adds the new packs after the existing ones, and active unpacked habits with a new pack's
 // template names join it (trimmed, inner spaces collapsed, case ignored). Nothing else changes.
 
 import {BUILTIN_PACK_IDS, type BuiltinPackId} from '@/utils/packs/builtin';
 import {PACK_NAMES} from '@/utils/packs/copy';
-import {limitsForLevel} from '@/utils/packs/limits';
+import {checkAdd} from '@/utils/packs/limits';
 import {adoptExisting, type HabitRef} from '@/utils/packs/membership';
 import {EMPTY_PACKS, packNameTaken, type PacksRecord, type ParsedPacks} from '@/utils/packs/record';
 
@@ -30,7 +30,7 @@ export function togglePick(input: {
   const {picked, id, owned} = input;
   if (owned.includes(id)) return {picked: [...picked], limited: false};
   if (picked.includes(id)) return {picked: picked.filter((p) => p !== id), limited: false};
-  if (input.packCount + picked.length >= limitsForLevel(input.level).packs) return {picked: [...picked], limited: true};
+  if (!checkAdd({level: input.level, kind: 'packs', count: input.packCount + picked.length}).ok) return {picked: [...picked], limited: true};
   return {picked: BUILTIN_PACK_IDS.filter((p) => p === id || picked.includes(p)), limited: false};// card order
 }
 

@@ -51,8 +51,8 @@ import {PackCard, type AddRest} from '@/components/packs/pack-card';
 import {ChoosePacksCard} from '@/components/packs/choose-packs-card';
 import {homeGroups, showChooseCard} from '@/utils/packs/home';
 import {addTheRest} from '@/utils/packs/addRest';
-import {limitsForLevel, nextLimitLevel, roomFor} from '@/utils/packs/limits';
-import {ADD_REST_FAILED, HOME_HABITS_TITLE, HOME_PACKS_TITLE, habitLimitMessage} from '@/utils/packs/copy';
+import {checkAdd, limitsForLevel, nextLimitLevel} from '@/utils/packs/limits';
+import {ADD_REST_FAILED, CREATE_PACK_BUTTON, HOME_HABITS_TITLE, HOME_PACKS_TITLE, habitLimitMessage} from '@/utils/packs/copy';
 import {ROUTINE_REMINDER_DEFAULT} from '@/utils/onboarding/plan';
 
 type Habit = {// one row from getHabitsWithTodayStatus: an active habit scheduled today, with today's status
@@ -489,9 +489,20 @@ export default function HomeScreen() {// default export, becomes the "index" tab
   const groups = homeGroups(packs?.parsed ?? null, habits, list.all);
   const showPacks = groups.packs.length > 0 && emptyState !== 'empty';// never beside the first-run card: one clear action
   const level = stats?.stats.level ?? null;
-  // under "Add the rest" while the habit limit is reached (it stays tappable: a run then only adopts)
-  const limitCaption = level !== null && activeCount !== null && roomFor(level, 'habits', activeCount) === 0
-    ? habitLimitMessage(nextLimitLevel(level, 'habits')) : null;
+  // The limits (utils/packs/limits.ts, checkAdd), known once the stats and counts are. Each message shows as a
+  // caption under its add controls while that limit is reached; the controls stay tappable and then open
+  // nothing. Unknown (stats not loaded): the control opens its screen, which checks again. Only adding is refused.
+  const habitCheck = level !== null && activeCount !== null ? checkAdd({level, kind: 'habits', count: activeCount}) : null;
+  const packCount = packs?.parsed.kind === 'ok' ? packs.parsed.record.packs.length : 0;
+  const packCheck = level !== null && packs ? checkAdd({level, kind: 'packs', count: packCount}) : null;
+  const limitCaption = habitCheck?.ok === false ? habitCheck.message : null;// also under "Add the rest"
+  const packCaption = packCheck?.ok === false ? packCheck.message : null;
+  const addHabitTap = () => {
+    if (habitCheck?.ok !== false) router.push('/habit-form');
+  };
+  const createPackTap = () => {
+    if (packCheck?.ok !== false) router.push({pathname: '/packs/edit', params: {from: 'home'}});
+  };
   // with the stats card (they appear together), so {n} is the real pack limit and nothing shifts twice
   const chooseCard = stats !== null && loaded && emptyState !== 'empty' && showChooseCard(packs, activeCount);
 
@@ -622,6 +633,8 @@ export default function HomeScreen() {// default export, becomes the "index" tab
                   name={pack.name}
                   done={pack.done}
                   total={pack.rows.length}
+                  hasHabits={pack.hasHabits}
+                  onEdit={() => router.push({pathname: '/packs/edit', params: {packId: pack.packId, from: 'home'}})}
                   addRest={packAddRest(pack.packId, pack.missing)}>
                   {pack.rows.map(renderToday)}
                 </PackCard>
@@ -636,10 +649,18 @@ export default function HomeScreen() {// default export, becomes the "index" tab
 
           {/* hidden while the first-run card shows, so there is one clear action */}
           {emptyState !== 'empty' && (
-            <Pressable style={styles.addRow} onPress={() => router.push('/habit-form')}>
-              <MaterialCommunityIcons name="plus" size={20} color={colors.accent} />
-              <Text style={styles.addText}>Add a habit</Text>
-            </Pressable>
+            <>
+              <Pressable style={styles.addRow} onPress={createPackTap} accessibilityRole="button">
+                <MaterialCommunityIcons name="view-grid-plus-outline" size={20} color={colors.accent} />
+                <Text style={styles.addText}>{CREATE_PACK_BUTTON}</Text>
+              </Pressable>
+              {packCaption && <Text style={styles.limitCaption} accessibilityLiveRegion="polite">{packCaption}</Text>}
+              <Pressable style={styles.addRow} onPress={addHabitTap} accessibilityRole="button">
+                <MaterialCommunityIcons name="plus" size={20} color={colors.accent} />
+                <Text style={styles.addText}>Add a habit</Text>
+              </Pressable>
+              {limitCaption && <Text style={styles.limitCaption} accessibilityLiveRegion="polite">{limitCaption}</Text>}
+            </>
           )}
         </View>
 
@@ -744,4 +765,5 @@ const styles = StyleSheet.create({
     borderColor: colors.accent,
   },
   addText: {fontFamily: fonts.semiBold, fontSize: 14, color: colors.accent},
+  limitCaption: {fontFamily: fonts.medium, fontSize: 12, color: colors.muted, paddingHorizontal: spacing.xs},
 });

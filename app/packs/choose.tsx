@@ -5,24 +5,24 @@ import {router, useLocalSearchParams} from 'expo-router';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
 import {getActiveHabitsWithDays} from '@/db/habits';
-import {getGamificationStats} from '@/db/gamification';
 import {usePacks} from '@/hooks/use-packs';
+import {currentLevel} from '@/services/packLimits';
 import {packsStore} from '@/services/packsStore';
 import {useSessionUid} from '@/services/session';
-import {loadShared} from '@/services/statsStore';
 import {colors, fonts, radii, spacing} from '@/constants/theme';
-import {getLocalDateString} from '@/utils/dates';
-import type {GamificationStats} from '@/utils/gamification';
 import {BUILTIN_PACKS, type BuiltinPackId} from '@/utils/packs/builtin';
-import {CHOOSE_ADOPT_NOTE, PACK_NAMES, SAVE_PACKS, chooseTitle, habitCount, packLimitMessage} from '@/utils/packs/copy';
-import {limitsForLevel, nextLimitLevel} from '@/utils/packs/limits';
+import {
+  CHOOSE_ADOPT_NOTE, CREATE_OWN_PACK, PACK_NAMES, SAVE_PACKS, chooseTitle, habitCount, packLimitMessage,
+} from '@/utils/packs/copy';
+import {checkAdd, limitsForLevel, nextLimitLevel} from '@/utils/packs/limits';
 import type {HabitRef} from '@/utils/packs/membership';
 import {ownedBuiltins, packsAfterPick, togglePick} from '@/utils/packs/picker';
 import {TEMPLATE_NAMES} from '@/utils/onboarding/copy';
 
 // "Choose your habit packs" (docs/PACKS_REPORTS_SPEC.md, section 3): the six built-in packs with their habits;
 // pick up to the pack limit for the user's level. Opened from Home's choose card and from Settings > Habit packs.
-// Packs the user already has show as picked and stay (removing one is stage 2). Saving is local only.
+// Packs the user already has show as picked and stay (they are edited or deleted from their Home card).
+// "Create your own pack" opens the pack edit screen, within the same pack limit. Saving is local only.
 
 function clockNow(): number {
   return Date.now();
@@ -39,19 +39,18 @@ export default function ChoosePacksScreen() {
   const packs = usePacks(uid);
   const [level, setLevel] = useState<number | null>(null);
   const [picked, setPicked] = useState<BuiltinPackId[]>([]);
-  const [limitLevel, setLimitLevel] = useState<number | null>(null);// the {x} of the pack limit message, while shown
+  const [limitMessage, setLimitMessage] = useState<string | null>(null);// the pack limit message, while shown
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
 
-  // The level from local SQLite (the stats Home already shares, or one local computation); never the network.
-  // If that fails, level 1, the lowest limit.
+  // The level from local SQLite (services/packLimits.ts: the stats Home already shares, or one local
+  // computation); never the network. If that fails, level 1, the lowest limit.
   useEffect(() => {
     if (!uid) return;
     let active = true;
-    loadShared(uid, getLocalDateString(), () => getGamificationStats(uid) as Promise<GamificationStats>)
-      .then((result) => {
-        if (active) setLevel(result.entry?.stats.level ?? 1);
-      });
+    currentLevel(uid).then((l) => {
+      if (active) setLevel(l);
+    });
     return () => {
       active = false;
     };
@@ -67,7 +66,15 @@ export default function ChoosePacksScreen() {
     if (parsed === null || level === null) return;
     const result = togglePick({picked, id, owned, packCount, level});
     setPicked(result.picked);
-    setLimitLevel(result.limited ? nextLimitLevel(level, 'packs') : null);
+    setLimitMessage(result.limited ? packLimitMessage(nextLimitLevel(level, 'packs')) : null);
+  };
+
+  // Counts the picks not saved yet too, so the user can't go past the limit by mixing both
+  const createOwn = () => {
+    if (level === null) return;
+    const check = checkAdd({level, kind: 'packs', count: packCount + picked.length});
+    if (check.ok) router.push({pathname: '/packs/edit', params: {from: 'packs'}});
+    else setLimitMessage(check.message);
   };
 
   const save = async () => {
@@ -132,8 +139,18 @@ export default function ChoosePacksScreen() {
           </View>
         )}
 
-        {limitLevel !== null && (
-          <Text style={styles.limit} accessibilityLiveRegion="polite">{packLimitMessage(limitLevel)}</Text>
+        {ready && (
+          <Pressable
+            style={({pressed}) => [styles.createRow, pressed && styles.pressed]}
+            onPress={createOwn}
+            accessibilityRole="button">
+            <MaterialCommunityIcons name="view-grid-plus-outline" size={20} color={colors.accent} />
+            <Text style={styles.createText}>{CREATE_OWN_PACK}</Text>
+          </Pressable>
+        )}
+
+        {limitMessage !== null && (
+          <Text style={styles.limit} accessibilityLiveRegion="polite">{limitMessage}</Text>
         )}
 
         <Pressable
@@ -173,6 +190,19 @@ const styles = StyleSheet.create({
   packCount: {fontFamily: fonts.regular, fontSize: 11, color: colors.muted},
   habit: {fontFamily: fonts.regular, fontSize: 13, color: colors.text},
   pressed: {opacity: 0.85},
+  createRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    minHeight: 52,
+    marginTop: spacing.sm,
+    borderRadius: radii.habitCard,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: colors.accent,
+  },
+  createText: {fontFamily: fonts.semiBold, fontSize: 14, color: colors.accent},
   limit: {fontFamily: fonts.medium, fontSize: 13, color: colors.error, marginTop: spacing.lg, textAlign: 'center'},
   save: {
     height: 56,
