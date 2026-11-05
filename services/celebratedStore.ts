@@ -1,4 +1,4 @@
-// What has already been celebrated, per user, on this device: keys like "level:4", "streak:7",
+// What has already been celebrated, per user, on this device: keys like "level:v2:4", "streak:7",
 // "perfect:2026-10-21" and "early:2026-10-21" (see utils/celebrations.ts). The only stored state of the
 // celebrations feature; XP, streaks and badges stay derived. Storage is injected (AsyncStorage in the app,
 // a Map in tests). One JSON array per uid. level: and streak: keys are kept forever; perfect: and early:

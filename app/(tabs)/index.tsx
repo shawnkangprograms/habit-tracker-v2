@@ -8,7 +8,7 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import * as Haptics from 'expo-haptics';
 import {addHabit, getActiveHabitsWithDays, getHabitsWithTodayStatus} from '@/db/habits';// habit reads in SQLite; addHabit for "Add the rest"
 import {toggleCompletion} from '@/db/completions';// today's completion toggle
-import {getGamificationStats} from '@/db/gamification';// XP, level and streak, derived from local rows
+import {getGamificationStats} from '@/services/gamificationStats';// XP, level and streak, derived from local rows and reflections
 import {beginLoad as beginStatsLoad, publish as publishStats} from '@/services/statsStore';// shared with Profile and the tab icon
 import {onRemoteChange} from '@/db/remoteChanges';// data pulled from another device changed local rows
 import {requestSync} from '@/sync/syncEngine';// pull + push now (does nothing while sync is stopped)
@@ -26,6 +26,9 @@ import {XpFloat} from '@/components/xp-float';
 import {useReduceMotion} from '@/hooks/use-reduce-motion';
 import {useCelebrations, type TickStats} from '@/hooks/use-celebrations';// overlays, banner and toasts after a tick
 import {CelebrationLayer} from '@/components/celebration-layer';
+import {useReflectionBar} from '@/hooks/use-reflection-bar';// the reflection offer after a tick
+import {ReflectionBar} from '@/components/reflections/reflection-bar';
+import {reflectionsStore} from '@/services/reflectionsStore';
 import {InsightCard} from '@/components/insight-card';// AI insight; shows nothing until after Home is usable
 import {ReminderPrompt} from '@/components/reminder-prompt';// one-time "gentle evening reminder?" card
 import {getNotificationPrefs, notificationPrefsLoaded, useNotificationPrefs} from '@/services/notificationPrefs';
@@ -79,7 +82,7 @@ let lastFocusSyncAt = Date.now();
 
 type StatsSnapshot = {date: string; stats: GamificationStats};// stats plus the local date they were computed for
 type Float = {key: number; amount: number};// one "+N XP" label
-type LoadReason = 'focus' | 'remote' | 'toggle' | 'refresh' | 'day';// only for the dev timing log
+type LoadReason = 'focus' | 'remote' | 'toggle' | 'refresh' | 'day' | 'reflection';// only for the dev timing log
 
 // Dev only: one line per Home load, counts and milliseconds (never habit names)
 // TODO: remove or reduce these timing logs (and the transitionEnd listener below) before the release build
@@ -243,7 +246,9 @@ export default function HomeScreen() {// default export, becomes the "index" tab
   const [floats, setFloats] = useState<Record<string, Float>>({});// "+N XP" labels by habitId
   const reduceMotion = useReduceMotion();
   const celebration = useCelebrations(userId);
-  const {onTick} = celebration;
+  const {onTick, onReflection} = celebration;
+  const reflection = useReflectionBar(userId);
+  const {dayChanged: reflectionDayChanged, untick: reflectionUntick, offer: offerReflection} = reflection;// stable callbacks
   useNotificationPrefs();// loads the saved settings, so the soft prompt below knows whether it was answered
   const [reminderPrompt, setReminderPrompt] = useState(false);
   const closeReminderPrompt = useCallback(() => setReminderPrompt(false), []);
@@ -256,7 +261,7 @@ export default function HomeScreen() {// default export, becomes the "index" tab
     const startedAt = performance.now();
     const date = getLocalDateString();
     // through the shared store, so Profile can join this load and reuse the result (never rejects)
-    const load = beginStatsLoad(userId, date, () => (getGamificationStats(userId) as Promise<GamificationStats>)
+    const load = beginStatsLoad(userId, date, () => getGamificationStats(userId, date)
       .then((computed) => {
         mark('stats:computeEnd');// queries and computation done, before the store publish
         return computed;
@@ -302,7 +307,10 @@ export default function HomeScreen() {// default export, becomes the "index" tab
   useFocusEffect(useCallback(() => {// runs every time Home gains focus, so adds/edits/deletes from the form show immediately
     focusedAt.current = performance.now();
     loadHabits();
-    loadStats();// in parallel; the list never waits for stats
+    // in parallel; the list never waits for stats. Back from a saved reflection, this load is the one whose
+    // result shows its level-up or toast (only one stats load, so a second can't make it stale).
+    if (userId && reflectionsStore.takeRewardPending(userId)) onReflection(loadStats('reflection'));
+    else loadStats();
     if (Date.now() - lastFocusSyncAt >= FOCUS_SYNC_MIN_INTERVAL_MS) {
       lastFocusSyncAt = Date.now();
       requestSync();// changes from another device arrive through onRemoteChange below
@@ -311,7 +319,7 @@ export default function HomeScreen() {// default export, becomes the "index" tab
     // while focused, data pulled from another device reloads Home in place: state updates only
     // (same keys, no remount, loaded stays true), so the list doesn't flicker or lose its scroll position
     return onRemoteChange(reloadForRemote);
-  }, [loadHabits, loadStats, reloadForRemote]));
+  }, [userId, loadHabits, loadStats, reloadForRemote, onReflection]));
 
   // Time status clock. `now` is refreshed by a changed load (above), the timeout and a foreground return.
   // One timeout, to the next due minute end among today's unchecked timed rows or the next local midnight,
@@ -323,11 +331,13 @@ export default function HomeScreen() {// default export, becomes the "index" tab
   const tick = useCallback(() => {
     const t = clockNow();
     setNow(t);
-    if (getLocalDateString(new Date(t)) !== listDateShown) {
+    const today = getLocalDateString(new Date(t));
+    if (today !== listDateShown) {
+      reflectionDayChanged(today);// yesterday's offer goes with yesterday
       loadHabits('day').catch((err: unknown) => console.log('Home reload failed', err));
       loadStats('day');
     }
-  }, [listDateShown, loadHabits, loadStats]);
+  }, [listDateShown, loadHabits, loadStats, reflectionDayChanged]);
 
   useEffect(() => {
     const t = clockNow();
@@ -384,6 +394,7 @@ export default function HomeScreen() {// default export, becomes the "index" tab
       let statsDone: Promise<TickStats | null> | null = null;
       if (saved) {
         if (completing) completionHaptic();
+        else reflectionUntick(habit.habitId);// its offer goes; its XP (and any reflection's) goes with the derived stats
         // soft prompt: the first completing tick after this shipped, if never answered and the nudge is off
         // (never when this app binary has no notifications module)
         if (completing && notificationPrefsLoaded() && shouldShowSoftPrompt(getNotificationPrefs()) && notificationsAvailable()) {
@@ -402,6 +413,9 @@ export default function HomeScreen() {// default export, becomes the "index" tab
       // Celebrations and messages: only for the user's own completing tick, after the list has updated.
       // They reuse the stats load above and the rows just loaded; nothing else is read except the early check.
       if (completing && statsDone && rows) onTick({habitId: habit.habitId, tickedAt, rows, stats: statsDone});
+      // The reflection offer, from the same rows, only while that reflection would still earn XP today
+      const tapDay = getLocalDateString(new Date(tickedAt));
+      if (completing && saved && rows && tapDay === getLocalDateString()) offerReflection(habit, tapDay, rows);
     } finally {
       inFlight.current.delete(habit.habitId);
     }
@@ -440,7 +454,7 @@ export default function HomeScreen() {// default export, becomes the "index" tab
       if (parsed.kind !== 'ok') return;
       const habits = await (getActiveHabitsWithDays(userId) as Promise<ActiveHabit[]>);
       const level = statsRef.current?.stats.level
-        ?? await (getGamificationStats(userId) as Promise<GamificationStats>).then((s) => s.level, () => 1);
+        ?? await getGamificationStats(userId).then((s) => s.level, () => 1);
       const result = await addTheRest({
         addHabit: (input) => addHabit(userId, input) as Promise<string>,
         savePacks: (record) => packsStore.write(userId, record),
@@ -572,155 +586,169 @@ export default function HomeScreen() {// default export, becomes the "index" tab
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       {/* the tab bar sits below the scene and handles the bottom inset itself */}
-      <ScrollView
-        contentContainerStyle={styles.content}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={colors.accent}// iOS spinner
-            colors={[colors.accent]}// Android spinner
-            progressBackgroundColor={colors.surface}// Android spinner background
-          />
-        }>
+      <View style={styles.main}>
+        <ScrollView
+          contentContainerStyle={styles.content}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.accent}// iOS spinner
+              colors={[colors.accent]}// Android spinner
+              progressBackgroundColor={colors.surface}// Android spinner background
+            />
+          }>
 
-        <View style={styles.greeting}>
-          <Text style={styles.date}>{formatToday()}</Text>
-          <Text style={styles.hello}>{greetingFor(currentHour(), firstName)}</Text>
-        </View>
+          <View style={styles.greeting}>
+            <Text style={styles.date}>{formatToday()}</Text>
+            <Text style={styles.hello}>{greetingFor(currentHour(), firstName)}</Text>
+          </View>
 
-        {stats && loaded && (
-          <StatsCard
-            level={stats.stats.level}
-            xpIntoLevel={stats.stats.xpIntoLevel}
-            xpForNextLevel={stats.stats.xpForNextLevel}
-            progress={stats.stats.progress}
-            currentStreak={stats.stats.currentStreak}
-            doneToday={doneToday}
-            scheduledToday={habits.length}
-          />
-        )}
+          {stats && loaded && (
+            <StatsCard
+              level={stats.stats.level}
+              xpIntoLevel={stats.stats.xpIntoLevel}
+              xpForNextLevel={stats.stats.xpForNextLevel}
+              progress={stats.stats.progress}
+              currentStreak={stats.stats.currentStreak}
+              doneToday={doneToday}
+              scheduledToday={habits.length}
+            />
+          )}
 
-        {/* keyed by uid: another account always gets a fresh card, never the previous one's insight */}
-        {userId && <InsightCard key={userId} userId={userId} />}
+          {/* keyed by uid: another account always gets a fresh card, never the previous one's insight */}
+          {userId && <InsightCard key={userId} userId={userId} />}
 
-        {reminderPrompt && <ReminderPrompt onClose={closeReminderPrompt} />}
+          {reminderPrompt && <ReminderPrompt onClose={closeReminderPrompt} />}
 
-        <Text style={styles.title}>Today.</Text>
+          <Text style={styles.title}>Today.</Text>
 
-        {showChecking && (
-          // a returning user on a new phone has no local habits until the first pull finishes; a new user also
-          // sees this while the onboarding record is read, instead of a flash of the empty card
-          <Text style={styles.empty} accessibilityLiveRegion="polite">Checking for your habits...</Text>
-        )}
-        {emptyState === 'empty' && !onboarding.checking && (
-          <EmptyHomeCard reduceMotion={reduceMotion} onPick={() => router.push('/habit-form')} />
-        )}
+          {showChecking && (
+            // a returning user on a new phone has no local habits until the first pull finishes; a new user also
+            // sees this while the onboarding record is read, instead of a flash of the empty card
+            <Text style={styles.empty} accessibilityLiveRegion="polite">Checking for your habits...</Text>
+          )}
+          {emptyState === 'empty' && !onboarding.checking && (
+            <EmptyHomeCard reduceMotion={reduceMotion} onPick={() => router.push('/habit-form')} />
+          )}
 
-        {chooseCard && userId && (
-          <ChoosePacksCard
-            limit={limitsForLevel(level ?? 1).packs}
-            onChoose={() => router.push({pathname: '/packs/choose', params: {from: 'home'}})}
-            onLater={() => { packsStore.dismissChoose(userId); }}
-          />
-        )}
+          {chooseCard && userId && (
+            <ChoosePacksCard
+              limit={limitsForLevel(level ?? 1).packs}
+              onChoose={() => router.push({pathname: '/packs/choose', params: {from: 'home'}})}
+              onLater={() => { packsStore.dismissChoose(userId); }}
+            />
+          )}
 
-        {showPacks && userId && (
-          <>
-            <Text style={styles.sectionTitle} accessibilityRole="header">{HOME_PACKS_TITLE}</Text>
-            <View style={styles.list}>
-              {groups.packs.map((pack) => (
-                <PackCard
-                  key={pack.packId}
-                  uid={userId}
-                  packId={pack.packId}
-                  name={pack.name}
-                  done={pack.done}
-                  total={pack.rows.length}
-                  hasHabits={pack.hasHabits}
-                  onEdit={() => router.push({pathname: '/packs/edit', params: {packId: pack.packId, from: 'home'}})}
-                  addRest={packAddRest(pack.packId, pack.missing)}>
-                  {pack.rows.map(renderToday)}
-                </PackCard>
-              ))}
-              <Pressable style={styles.addRow} onPress={createPackTap} accessibilityRole="button">
-                <MaterialCommunityIcons name="view-grid-plus-outline" size={20} color={colors.accent} />
-                <Text style={styles.addText}>{CREATE_PACK_BUTTON}</Text>
-              </Pressable>
-              {packCaption && <Text style={styles.limitCaption} accessibilityLiveRegion="polite">{packCaption}</Text>}
-            </View>
-            <Text style={styles.sectionTitle} accessibilityRole="header">{HOME_HABITS_TITLE}</Text>
-          </>
-        )}
-
-        <View style={styles.list}>
-          {groups.unpacked.map(renderToday)}
-
-          {/* hidden while the first-run card shows, so there is one clear action */}
-          {emptyState !== 'empty' && (
+          {showPacks && userId && (
             <>
-              <Pressable style={styles.addRow} onPress={addHabitTap} accessibilityRole="button">
-                <MaterialCommunityIcons name="plus" size={20} color={colors.accent} />
-                <Text style={styles.addText}>Add a habit</Text>
-              </Pressable>
-              {limitCaption && <Text style={styles.limitCaption} accessibilityLiveRegion="polite">{limitCaption}</Text>}
+              <Text style={styles.sectionTitle} accessibilityRole="header">{HOME_PACKS_TITLE}</Text>
+              <View style={styles.list}>
+                {groups.packs.map((pack) => (
+                  <PackCard
+                    key={pack.packId}
+                    uid={userId}
+                    packId={pack.packId}
+                    name={pack.name}
+                    done={pack.done}
+                    total={pack.rows.length}
+                    hasHabits={pack.hasHabits}
+                    onEdit={() => router.push({pathname: '/packs/edit', params: {packId: pack.packId, from: 'home'}})}
+                    addRest={packAddRest(pack.packId, pack.missing)}>
+                    {pack.rows.map(renderToday)}
+                  </PackCard>
+                ))}
+                <Pressable style={styles.addRow} onPress={createPackTap} accessibilityRole="button">
+                  <MaterialCommunityIcons name="view-grid-plus-outline" size={20} color={colors.accent} />
+                  <Text style={styles.addText}>{CREATE_PACK_BUTTON}</Text>
+                </Pressable>
+                {packCaption && <Text style={styles.limitCaption} accessibilityLiveRegion="polite">{packCaption}</Text>}
+              </View>
+              <Text style={styles.sectionTitle} accessibilityRole="header">{HOME_HABITS_TITLE}</Text>
             </>
           )}
-        </View>
 
-        {/* active habits not due today: not completable, no status colours; tapping opens Edit */}
-        {other.length > 0 && (
-          <>
-            <Text style={styles.sectionTitle} accessibilityRole="header">Other days</Text>
-            <View style={styles.list}>
-              {other.map((habit) => {
-                const icon = habit.icon as IconId;
-                const color = ICON_COLORS[icon] ?? colors.accent;
-                const schedule = scheduleSummary(habit.frequencyType, habit.days);
-                const alarmOn = habit.alarm === 1;
-                const label = [habit.habitName, schedule, habit.reminderTime, `next ${fullDayName(habit.next)}`, alarmOn && 'alarm on']
-                  .filter(Boolean).join(', ');
-                return (
-                  <Pressable
-                    key={habit.habitId}
-                    style={[styles.card, {backgroundColor: `${color}14`, borderColor: `${color}54`}]}
-                    onPress={() => router.push({pathname: '/habit-form', params: {habitId: habit.habitId}})}
-                    accessibilityRole="button"
-                    accessibilityLabel={label}
-                    accessibilityHint="Opens the edit form">
+          <View style={styles.list}>
+            {groups.unpacked.map(renderToday)}
 
-                    <View style={[styles.badge, {backgroundColor: `${color}30`, borderColor: `${color}80`}]}>
-                      <HabitIcon id={icon} size={21} color={color} />
-                    </View>
+            {/* hidden while the first-run card shows, so there is one clear action */}
+            {emptyState !== 'empty' && (
+              <>
+                <Pressable style={styles.addRow} onPress={addHabitTap} accessibilityRole="button">
+                  <MaterialCommunityIcons name="plus" size={20} color={colors.accent} />
+                  <Text style={styles.addText}>Add a habit</Text>
+                </Pressable>
+                {limitCaption && <Text style={styles.limitCaption} accessibilityLiveRegion="polite">{limitCaption}</Text>}
+              </>
+            )}
+          </View>
 
-                    <View style={styles.details}>
-                      <Text style={styles.name} numberOfLines={1}>{habit.habitName}</Text>
-                      <View style={styles.subtitleRow}>
-                        <Text style={[styles.subtitle, styles.shrink]} numberOfLines={1}>
-                          {habit.reminderTime ? `${schedule} · ${habit.reminderTime}` : schedule}
-                        </Text>
-                        {alarmOn && <Bell />}
+          {/* active habits not due today: not completable, no status colours; tapping opens Edit */}
+          {other.length > 0 && (
+            <>
+              <Text style={styles.sectionTitle} accessibilityRole="header">Other days</Text>
+              <View style={styles.list}>
+                {other.map((habit) => {
+                  const icon = habit.icon as IconId;
+                  const color = ICON_COLORS[icon] ?? colors.accent;
+                  const schedule = scheduleSummary(habit.frequencyType, habit.days);
+                  const alarmOn = habit.alarm === 1;
+                  const label = [habit.habitName, schedule, habit.reminderTime, `next ${fullDayName(habit.next)}`, alarmOn && 'alarm on']
+                    .filter(Boolean).join(', ');
+                  return (
+                    <Pressable
+                      key={habit.habitId}
+                      style={[styles.card, {backgroundColor: `${color}14`, borderColor: `${color}54`}]}
+                      onPress={() => router.push({pathname: '/habit-form', params: {habitId: habit.habitId}})}
+                      accessibilityRole="button"
+                      accessibilityLabel={label}
+                      accessibilityHint="Opens the edit form">
+
+                      <View style={[styles.badge, {backgroundColor: `${color}30`, borderColor: `${color}80`}]}>
+                        <HabitIcon id={icon} size={21} color={color} />
                       </View>
-                    </View>
 
-                    <Text style={styles.next}>Next: {shortDayName(habit.next)}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </>
-        )}
+                      <View style={styles.details}>
+                        <Text style={styles.name} numberOfLines={1}>{habit.habitName}</Text>
+                        <View style={styles.subtitleRow}>
+                          <Text style={[styles.subtitle, styles.shrink]} numberOfLines={1}>
+                            {habit.reminderTime ? `${schedule} · ${habit.reminderTime}` : schedule}
+                          </Text>
+                          {alarmOn && <Bell />}
+                        </View>
+                      </View>
 
-      </ScrollView>
+                      <Text style={styles.next}>Next: {shortDayName(habit.next)}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </>
+          )}
 
-      {/* one at a time: level-up / milestone overlay, perfect-day banner (top) or toast (bottom) */}
-      <CelebrationLayer item={celebration.current} reduceMotion={reduceMotion} onDismiss={celebration.dismiss} />
+        </ScrollView>
+
+        {/* one at a time: level-up / milestone overlay, perfect-day banner (top) or toast (bottom, so above the bar) */}
+        <CelebrationLayer item={celebration.current} reduceMotion={reduceMotion} onDismiss={celebration.dismiss} />
+      </View>
+
+      {/* docked below the list, above the tab bar: it shrinks the list's viewport and never covers a row */}
+      {reflection.bar && (
+        <ReflectionBar
+          key={reflection.bar.id}
+          bar={reflection.bar}
+          reduceMotion={reduceMotion}
+          onOpen={reflection.open}
+          onExpire={reflection.expire}
+        />
+      )}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safe: {flex: 1, backgroundColor: colors.background},
+  main: {flex: 1},// the list and the celebration layer, above the reflection bar
   content: {paddingHorizontal: spacing.lg, paddingBottom: 18, gap: 10},
   greeting: {paddingTop: 5, gap: 1},
   date: {fontFamily: fonts.regular, fontSize: 12, color: colors.muted},

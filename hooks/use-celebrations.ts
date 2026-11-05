@@ -10,6 +10,7 @@ import {
   pickSituation, tickItems, type QueueItem,
 } from '@/utils/celebrations';
 import {isEarlierThanUsual, sameDaySamples} from '@/utils/completionTime';
+import {SAVED_PLAIN} from '@/utils/reflections/copy';
 import {getLocalDateString} from '@/utils/dates';
 import type {GamificationStats} from '@/utils/gamification';
 
@@ -41,8 +42,8 @@ export function tickLog(message: string) {
   if (__DEV__) console.log(`Tick feedback: ${message}`);
 }
 
-// Celebrations and encouragement for Home. Only onTick (the user's own completing tick) ever adds anything:
-// never launch, focus, sync or un-tick. Shows one item at a time, only while Home is focused and the setting
+// Celebrations and encouragement for Home. Only onTick (the user's own completing tick) and onReflection (Home's
+// first focus after the user saved a reflection) ever add anything: never launch, a plain focus, sync or un-tick. Shows one item at a time, only while Home is focused and the setting
 // is on. Leaving Home drops waiting toasts; celebrations wait.
 //
 // Ticks are handled concurrently, not one after another, so a new tick never waits behind an older one.
@@ -118,8 +119,37 @@ export function useCelebrations(userId: string | undefined) {
     handleTick(tick, seq).catch((err: unknown) => console.log('Tick feedback failed', err));
   }, [handleTick]);
 
+  // A saved reflection: the level-up overlay if its XP reached a new level, otherwise a short toast ("+20 XP" only
+  // when the reflection XP really went up). Completions didn't change, so nothing else can be celebrated.
+  const handleReflection = useCallback(async (stats: Promise<TickStats | null>) => {
+    if (!userId || !getCelebrationsEnabled()) return;
+    const result = await stats;
+    if (!result?.snapshot) return;
+    const today = result.snapshot.date;
+    const before = result.published.comparable ? result.published.previous?.stats : undefined;
+    const diff = before ? diffTick({before, after: result.snapshot.stats, doneToday: 0, scheduledToday: 0}) : null;
+    const rewarded = !!before && result.snapshot.stats.reflectionXp > before.reflectionXp;
+
+    const celebrated = diff ? await celebratedStore.load(userId) : new Set<string>();
+    const found = diff ? celebrationsFor(diff, today, celebrated) : null;
+    const celebrations = found?.celebrations.filter((c) => c.kind === 'levelUp') ?? [];
+    const keys = found?.keys.filter((k) => k.startsWith('level:')) ?? [];
+    const vars = diff ? messageVars(diff) : null;
+    const toast = rewarded && vars ? picker.pick('reflectionSaved', vars) : SAVED_PLAIN;
+    const items = vars
+      ? tickItems(celebrations, toast, vars, picker, () => ++lastId.current)
+      : [{id: ++lastId.current, kind: 'toast' as const, text: toast ?? SAVED_PLAIN}];
+    if (getCelebrationsEnabled()) setQueue((q) => enqueue(q, items));
+    await celebratedStore.mark(userId, keys, today);
+  }, [userId, picker]);
+
+  const onReflection = useCallback((stats: Promise<TickStats | null>) => {
+    ++latestTick.current;// an older tick still waiting drops its toast
+    handleReflection(stats).catch((err: unknown) => console.log('Reflection feedback failed', err));
+  }, [handleReflection]);
+
   const dismiss = useCallback((id: number) => setQueue((q) => dismissItem(q, id)), []);
 
   const current = focused && enabled ? queue[0] ?? null : null;
-  return {current, dismiss, onTick};
+  return {current, dismiss, onTick, onReflection};
 }

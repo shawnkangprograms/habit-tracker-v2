@@ -9,6 +9,7 @@ import {
   diffStats as engineDiff, PERFECT_DAY_XP, STREAK_MILESTONES, type GamificationStats,
 } from '@/utils/gamification';
 import {MEDAL_TIERS, type MedalTier} from '@/utils/medals';
+import {SAVED_REWARDED} from '@/utils/reflections/copy';
 
 // ---------- What one tick changed ----------
 
@@ -36,9 +37,11 @@ export type TickDiff = {
   streakDay: number | null;// the streak grew to this many days (2 or more)
 };
 
-// null when this was not a completing tick (no completion was added), e.g. an un-tick: nothing to react to
+// null when nothing was earned: no completion and no reflection XP was added (an un-tick, or a load after the
+// Stage 3 XP rebalance lowered the level). A level drop never produces anything: levelUp needs after > before.
+// For a saved reflection (completions unchanged) only levelUp can be set; the caller shows its own toast.
 export function diffTick({before, after, doneToday, scheduledToday}: TickInput): TickDiff | null {
-  if (after.completionXp <= before.completionXp) return null;
+  if (after.completionXp <= before.completionXp && after.reflectionXp <= before.reflectionXp) return null;
   const engine = engineDiff(before, after);
   const crossed = [...engine.newBadges].sort((a, b) => a - b);
   const levelsCrossed: number[] = [];
@@ -63,11 +66,14 @@ export function diffTick({before, after, doneToday, scheduledToday}: TickInput):
 }
 
 // ---------- Celebrations (once ever) ----------
-// Keys: "level:N", "streak:N", "perfect:YYYY-MM-DD", plus "early:YYYY-MM-DD" for early praise.
+// Keys: "level:v2:N", "streak:N", "perfect:YYYY-MM-DD", plus "early:YYYY-MM-DD" for early praise.
 // They live per uid on this device (services/celebratedStore.ts). A fresh phone starts with an empty set, so a
 // past milestone can be celebrated once more if the user's own tick crosses it again. Accepted.
+// Levels use "level:v2:N" since the Stage 3 XP rebalance: the old curve's "level:N" keys are ignored (so a level
+// reached again on the new curve gets its full celebration, not "Back to level N") and never deleted (so going
+// back to an older update can't celebrate its levels a second time). Streak days didn't change, so "streak:N" stays.
 
-export const levelKey = (level: number) => `level:${level}`;
+export const levelKey = (level: number) => `level:v2:${level}`;
 export const streakKey = (days: number) => `streak:${days}`;
 export const perfectKey = (date: string) => `perfect:${date}`;
 export const earlyKey = (date: string) => `early:${date}`;
@@ -129,7 +135,7 @@ export type Situation =
   | Repeat
   | 'early' | 'comeback' | 'firstEver' | 'streakDay' | 'lastOne' | 'nearLevel' | 'progress' | 'firstToday';
 
-export const NEAR_LEVEL_XP = 30;
+export const NEAR_LEVEL_XP = 20;// one reflection
 
 // Every situation that applies, highest precedence first. Repeats (from celebrationsFor) come before
 // everything else, in their own order: level, medal, perfect day.
@@ -170,7 +176,7 @@ export type MessageVars = {
   milestone: number;// the medal this tick reached (repeat toasts); 0 if none
 };
 
-export type MessageKey = Situation | 'perfectDay' | 'levelUp' | 'streakMilestone';
+export type MessageKey = Situation | 'perfectDay' | 'levelUp' | 'streakMilestone' | 'reflectionSaved';
 type Variant = (v: MessageVars) => string | null;// null: this wording doesn't fit these numbers
 
 const dayCount = (k: number) => (k === 1 ? 'one day' : `${k} days`);
@@ -258,6 +264,8 @@ export const MESSAGE_BANK: Record<MessageKey, Variant[]> = {
     (v) => `${v.d} days in a row. That's a real habit forming.`,
     (v) => `${v.d} days straight. The ${v.tier} medal is yours.`,
   ],
+  // after a rewarded reflection, back on Home (an unrewarded one shows SAVED_PLAIN)
+  reflectionSaved: SAVED_REWARDED.map((text) => () => text),
 };
 
 // The numbers a toast or banner talks about, from one tick's diff

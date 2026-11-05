@@ -1,5 +1,6 @@
-// Gamification logic: XP, streaks, badges and level, all DERIVED from habits, habitDays and completions.
-// Nothing here is stored, so it can't drift out of sync, and un-checking a completion removes its XP.
+// Gamification logic: XP, streaks, badges and level, all DERIVED from habits, habitDays, completions and the
+// reflections kept on this phone (docs/PACKS_REPORTS_SPEC.md, sections 12 and 16). Nothing here is stored, so it
+// can't drift out of sync, and un-checking a completion removes its XP and that day's reflection XP for it.
 // Pure functions: no database, React or Firebase. Runs under Node's test runner, so only `import type` from '@/...'.
 //
 // Known limitation (accepted): habitDays holds only a habit's CURRENT schedule, so past dates are judged
@@ -18,15 +19,21 @@ export type GamiHabit = {
 
 export type GamiCompletion = {habitId: string; date: string; completed: boolean};
 
-export const XP_PER_COMPLETION = 10;
-export const PERFECT_DAY_XP = 20;
+// One saved reflection (utils/reflections/record.ts): only what XP needs, never the answers or the text
+export type GamiReflection = {habitId: string; date: string; savedAt: number};
+
+export const XP_PER_COMPLETION = 2;
+export const PERFECT_DAY_XP = 5;
+export const REFLECTION_XP = 20;
+export const MAX_REWARDED_REFLECTIONS_PER_DAY = 3;
+// Scaled with the ticks in the Stage 3 rebalance (old XP divided by 5, rounded); the days never change
 export const STREAK_MILESTONES = [
-  {days: 3, xp: 25},
-  {days: 7, xp: 50},
-  {days: 14, xp: 100},
-  {days: 30, xp: 200},
-  {days: 60, xp: 400},
-  {days: 100, xp: 800},
+  {days: 3, xp: 5},
+  {days: 7, xp: 10},
+  {days: 14, xp: 20},
+  {days: 30, xp: 40},
+  {days: 60, xp: 80},
+  {days: 100, xp: 160},
 ] as const;
 
 // ---------- Calendar arithmetic on YYYY-MM-DD strings ----------
@@ -169,15 +176,46 @@ export function countPerfectDays(habits: GamiHabit[], completions: GamiCompletio
   return perfect;
 }
 
-// ---------- Level ----------
-// Level n -> n+1 costs 50 * n XP. Reaching level L takes 25 * L * (L - 1) XP in total:
-// level 1 at 0, level 2 at 50, level 3 at 150, level 4 at 300, level 5 at 500.
+// ---------- Reflections ----------
+// A reflection pays only while that day's completion of its habit is ticked, and at most
+// MAX_REWARDED_REFLECTIONS_PER_DAY a day: the earliest saved ones (savedAt, then habitId) among those that count.
+// The record holds one per habit per day; a duplicate here still pays once. Future dates are ignored.
 
-export function xpToReachLevel(level: number): number {
-  return 25 * level * (level - 1);
+export function rewardedReflections(
+  reflections: GamiReflection[],
+  completions: GamiCompletion[],
+  today: string,
+): GamiReflection[] {
+  requireToday(today);
+  const doneKeys = new Set(completedUpTo(completions, today).map((c) => `${c.habitId}|${c.date}`));
+  const byDate = new Map<string, Map<string, GamiReflection>>();// date -> habitId -> its earliest reflection
+  for (const r of reflections) {
+    if (!isDateString(r.date) || r.date > today || !doneKeys.has(`${r.habitId}|${r.date}`)) continue;
+    const day = byDate.get(r.date) ?? new Map<string, GamiReflection>();
+    const kept = day.get(r.habitId);
+    if (!kept || earlier(r, kept)) day.set(r.habitId, r);
+    byDate.set(r.date, day);
+  }
+  const rewarded: GamiReflection[] = [];
+  for (const day of byDate.values()) {
+    rewarded.push(...[...day.values()].sort((a, b) => (earlier(a, b) ? -1 : 1)).slice(0, MAX_REWARDED_REFLECTIONS_PER_DAY));
+  }
+  return rewarded;
 }
 
-// xpForNextLevel is the size of the current level (50 * level); progress = xpIntoLevel / xpForNextLevel (0..1)
+function earlier(a: GamiReflection, b: GamiReflection): boolean {
+  return a.savedAt !== b.savedAt ? a.savedAt < b.savedAt : a.habitId < b.habitId;
+}
+
+// ---------- Level ----------
+// Level n -> n+1 costs 100 * n XP. Reaching level L takes 50 * L * (L - 1) XP in total:
+// level 1 at 0, level 2 at 100, level 3 at 300, level 4 at 600, level 5 at 1000.
+
+export function xpToReachLevel(level: number): number {
+  return 50 * level * (level - 1);
+}
+
+// xpForNextLevel is the size of the current level (100 * level); progress = xpIntoLevel / xpForNextLevel (0..1)
 export function levelFromXp(totalXp: number): {
   level: number;
   xpIntoLevel: number;
@@ -186,12 +224,12 @@ export function levelFromXp(totalXp: number): {
 } {
   const xp = Number.isFinite(totalXp) && totalXp > 0 ? Math.floor(totalXp) : 0;
   // closed-form estimate, then corrected in whole levels so float rounding can't misplace a boundary
-  let level = Math.max(1, Math.floor((1 + Math.sqrt(1 + (4 * xp) / 25)) / 2));
+  let level = Math.max(1, Math.floor((1 + Math.sqrt(1 + (2 * xp) / 25)) / 2));
   while (xpToReachLevel(level + 1) <= xp) level += 1;
   while (level > 1 && xpToReachLevel(level) > xp) level -= 1;
 
   const xpIntoLevel = xp - xpToReachLevel(level);
-  const xpForNextLevel = 50 * level;
+  const xpForNextLevel = 100 * level;
   return {level, xpIntoLevel, xpForNextLevel, progress: xpIntoLevel / xpForNextLevel};
 }
 
@@ -218,6 +256,7 @@ export type GamificationStats = {
   completionXp: number;
   perfectDays: number;
   perfectDayXp: number;
+  reflectionXp: number;// rewarded reflections x REFLECTION_XP
   milestoneXp: number;
   totalXp: number;
   currentStreak: number;
@@ -234,20 +273,23 @@ export function computeGamification(
   habits: GamiHabit[],
   completions: GamiCompletion[],
   today: string,
+  reflections: GamiReflection[] = [],
 ): GamificationStats {
   requireToday(today);
-  // completed rows of deleted habits still earn their XP
+  // completed rows of deleted habits still earn their XP, and so do their reflections
   const completionXp = completedUpTo(completions, today).length * XP_PER_COMPLETION;
   const perfectDays = countPerfectDays(habits, completions, today);
   const perfectDayXp = perfectDays * PERFECT_DAY_XP;
+  const reflectionXp = rewardedReflections(reflections, completions, today).length * REFLECTION_XP;
   const streaks = computeStreaks(habits, completions, today);
   const bonusXp = milestoneXp(streaks.longestStreak);
-  const totalXp = completionXp + perfectDayXp + bonusXp;
+  const totalXp = completionXp + perfectDayXp + reflectionXp + bonusXp;
 
   return {
     completionXp,
     perfectDays,
     perfectDayXp,
+    reflectionXp,
     milestoneXp: bonusXp,
     totalXp,
     currentStreak: streaks.currentStreak,

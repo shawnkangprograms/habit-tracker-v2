@@ -30,7 +30,7 @@ const diffOf = (over: Partial<TickDiff>): TickDiff => ({
 
 describe('diffTick', () => {
   test('level up: the new level and every level crossed', () => {
-    const d = tick(stats({completionXp: 40, totalXp: 40}), stats({completionXp: 50, totalXp: 160}));
+    const d = tick(stats({completionXp: 40, totalXp: 40}), stats({completionXp: 50, totalXp: 350}));
     assert.equal(d?.levelUp, 3);
     assert.deepEqual(d?.levelsCrossed, [2, 3]);
   });
@@ -86,18 +86,71 @@ describe('diffTick', () => {
   });
 });
 
+describe('Stage 3 XP rebalance: level drops, old markers and reflections', () => {
+  test('a level drop never celebrates, even on a tick that adds a completion', () => {
+    // e.g. the first stats after the update were level 10 on the old curve; the next load is level 3
+    const before = stats({completionXp: 1920, totalXp: 4500});
+    const after = stats({completionXp: 1922, totalXp: 469});
+    assert.equal(before.level, 10);
+    assert.equal(after.level, 3);
+    const d = tick(before, after);
+    assert.equal(d?.levelUp, null);
+    assert.deepEqual(d?.levelsCrossed, []);
+    assert.deepEqual(c.celebrationsFor(d!, TODAY, new Set()).celebrations, []);
+    assert.deepEqual(c.celebrationsFor(d!, TODAY, new Set()).repeats, []);
+  });
+
+  test('a load with nothing earned (the recalculation itself) produces nothing', () => {
+    assert.equal(tick(stats({completionXp: 1920, totalXp: 4500}), stats({completionXp: 1920, totalXp: 469})), null);
+  });
+
+  test('old-curve "level:N" markers are ignored: a level reached on the new curve gets its overlay', () => {
+    const diff = diffOf({levelUp: 3, levelsCrossed: [3]});
+    const plan = c.celebrationsFor(diff, TODAY, new Set(['level:2', 'level:3', 'level:9']));
+    assert.deepEqual(plan.celebrations, [{kind: 'levelUp', level: 3}]);
+    assert.deepEqual(plan.keys, ['level:v2:3']);
+    assert.deepEqual(plan.repeats, []);
+    assert.equal(c.levelKey(3), 'level:v2:3');
+  });
+
+  test('a saved reflection: only a level-up can come of it', () => {
+    const before = stats({completionXp: 20, reflectionXp: 0, totalXp: 90});
+    const after = stats({completionXp: 20, reflectionXp: 20, totalXp: 110});
+    const d = tick(before, after, 0, 0);
+    assert.equal(d?.levelUp, 2);
+    assert.equal(d?.perfectDay, false);
+    assert.equal(d?.streakMilestone, null);
+    const plan = c.celebrationsFor(d!, TODAY, new Set());
+    assert.deepEqual(plan.celebrations, [{kind: 'levelUp', level: 2}]);
+  });
+
+  test('un-ticking a reflected habit (both XP go down) produces nothing', () => {
+    const before = stats({completionXp: 22, reflectionXp: 20, totalXp: 110});
+    const after = stats({completionXp: 20, reflectionXp: 0, totalXp: 88});
+    assert.equal(tick(before, after), null);
+  });
+
+  test('near-level is one reflection away (20 XP); the saved-reflection toasts rotate', () => {
+    assert.equal(c.NEAR_LEVEL_XP, 20);
+    const picker = c.createMessagePicker();
+    const vars = c.messageVars(diffOf({}));
+    assert.equal(picker.pick('reflectionSaved', vars), 'Reflection saved. +20 XP.');
+    assert.equal(picker.pick('reflectionSaved', vars), 'Saved. +20 XP for reflecting.');
+  });
+});
+
 describe('celebrations: priority, once only, highest milestone', () => {
   const big = diffOf({levelUp: 4, levelsCrossed: [4], streakMilestone: 7, streakMilestonesCrossed: [3, 7], perfectDay: true, currentStreak: 7});
 
   test('order: level up, then streak milestone, then perfect day', () => {
     const {celebrations, keys} = c.celebrationsFor(big, TODAY, new Set());
     assert.deepEqual(celebrations.map((x: Celebration) => x.kind), ['levelUp', 'streak', 'perfectDay']);
-    assert.deepEqual(keys, ['level:4', 'streak:3', 'streak:7', `perfect:${TODAY}`]);
+    assert.deepEqual(keys, ['level:v2:4', 'streak:3', 'streak:7', `perfect:${TODAY}`]);
     assert.deepEqual(celebrations[1], {kind: 'streak', days: 7, tier: 'silver'});
   });
 
   test('already celebrated keys are left out (un-tick then re-tick never repeats)', () => {
-    const done = new Set(['level:4', 'streak:3', 'streak:7', `perfect:${TODAY}`]);
+    const done = new Set(['level:v2:4', 'streak:3', 'streak:7', `perfect:${TODAY}`]);
     assert.deepEqual(c.celebrationsFor(big, TODAY, done),
       {celebrations: [], keys: [], repeats: ['repeatLevel', 'repeatMedal', 'repeatPerfect']});
   });
@@ -119,7 +172,7 @@ describe('repeat toasts (reached again, already celebrated)', () => {
 
   test('re-reaching a celebrated level, medal or perfect day: a repeat toast, no overlay, nothing to mark', () => {
     const cases: [Partial<TickDiff>, string[], string, string][] = [
-      [{levelUp: 3, levelsCrossed: [3]}, ['level:3'], 'repeatLevel', 'Back to level 3.'],
+      [{levelUp: 3, levelsCrossed: [3]}, ['level:v2:3'], 'repeatLevel', 'Back to level 3.'],
       [{streakMilestone: 7, streakMilestonesCrossed: [7], currentStreak: 7, longestStreak: 7}, ['streak:7'], 'repeatMedal', 'The 7-day medal is back.'],
       [{perfectDay: true}, [`perfect:${TODAY}`], 'repeatPerfect', 'Perfect day again. Every habit done.'],
     ];
@@ -147,7 +200,7 @@ describe('repeat toasts (reached again, already celebrated)', () => {
 
   test('a first-time celebration on the same tick still suppresses a repeat toast', () => {
     const diff = diffOf({levelUp: 3, levelsCrossed: [3], streakMilestone: 7, streakMilestonesCrossed: [7]});
-    const plan = c.celebrationsFor(diff, TODAY, new Set(['level:3']));
+    const plan = c.celebrationsFor(diff, TODAY, new Set(['level:v2:3']));
     assert.deepEqual(plan.celebrations.map((x: Celebration) => x.kind), ['streak']);
     assert.deepEqual(plan.repeats, ['repeatLevel']);
     const items = c.tickItems(plan.celebrations, 'Back to level 3.', c.messageVars(diff), c.createMessagePicker(), ids());
@@ -187,13 +240,13 @@ describe('toast precedence', () => {
       comeback: true, firstHabitEver: true, streakDay: 4, habitsLeftToday: 1, xpToNextLevel: 20, firstHabitToday: true,
     });
     assert.deepEqual(c.situationsFor(everything, true), ['early', 'comeback', 'firstEver', 'streakDay', 'lastOne', 'nearLevel', 'firstToday']);
-    assert.deepEqual(c.situationsFor(diffOf({habitsLeftToday: 3, xpToNextLevel: 30}), false), ['nearLevel', 'progress']);
+    assert.deepEqual(c.situationsFor(diffOf({habitsLeftToday: 3, xpToNextLevel: 20}), false), ['nearLevel', 'progress']);
   });
 
   test('highest applicable wins; nothing applicable gives no toast', () => {
     assert.equal(c.pickSituation(diffOf({streakDay: 3, habitsLeftToday: 2}), false), 'streakDay');
     assert.equal(c.pickSituation(diffOf({streakDay: 3}), true), 'early');
-    assert.equal(c.pickSituation(diffOf({habitsLeftToday: 2, xpToNextLevel: 31}), false), 'progress');
+    assert.equal(c.pickSituation(diffOf({habitsLeftToday: 2, xpToNextLevel: 21}), false), 'progress');
     assert.equal(c.pickSituation(diffOf({}), false), null);
   });
 });
@@ -235,7 +288,7 @@ describe('message picker', () => {
     const p = c.createMessagePicker();
     const vars = c.messageVars(diffOf({currentStreak: 5}));
     assert.equal(p.pick('perfectDay', vars), 'Perfect day. Day 5 in a row.');
-    assert.equal(p.pick('perfectDay', vars), 'Perfect day, +20 XP. Day 5 of your streak.');
+    assert.equal(p.pick('perfectDay', vars), 'Perfect day, +5 XP. Day 5 of your streak.');
   });
 
   test('copy changes are in', () => {

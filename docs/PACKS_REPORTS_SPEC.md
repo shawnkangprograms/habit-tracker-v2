@@ -1,6 +1,6 @@
 # HabitQuest: habit packs, reports and report notifications (spec v1, locked)
 
-Companion to ONBOARDING_SPEC.md. Everything here ships as OTA-only changes on Build 2 (fingerprint must stay `d820d50154d72f636213ae4251d04c3f0beb8f8a`, checked right before every publish; `.gitignore` and line endings are fingerprint inputs): no native dependency, app.json, eas.json or package changes. Packs, reports, areas, notes, Vitality and checkups are on-device only; the only things that ever leave the phone are the narrative request in stage 9 (section 8) and, only with the user's consent, short note excerpts (section 12).
+Companion to ONBOARDING_SPEC.md. Everything here ships as OTA-only changes on Build 2 (fingerprint must stay `d820d50154d72f636213ae4251d04c3f0beb8f8a`, checked right before every publish; `.gitignore` and line endings are fingerprint inputs): no native dependency, app.json, eas.json or package changes. Packs, reports, areas, reflections, Vitality and checkups are on-device only; the only things that ever leave the phone are the narrative request in stage 9 (section 8), with reflection tags and, only with the user's consent, short reflection excerpts (section 12). Before stage 9 nothing of them leaves the phone.
 
 ## 1. Catalog: 24 habit templates
 
@@ -112,14 +112,14 @@ Rules:
 
 ## 7. Isolation and privacy (extends the onboarding rules)
 
-- A new ESLint no-restricted-imports block covers the packs and reports modules (utils/packs, utils/reports, services/packs*, components/packs) and, as they arrive, the areas, notes, Vitality and checkup modules: no `firebase/*`, no `@/sync/*`, no `@/services/insights`, nothing from the startup path. The one exception is the stage 9 narrative module, which may import the callable client and nothing else.
+- A new ESLint no-restricted-imports block covers the packs and reports modules (utils/packs, utils/reports, services/packs*, components/packs) and, as they arrive, the areas, reflections (Stage 3: utils/reflections, services/reflectionsStore*, services/gamificationStats.ts, components/reflections, hooks/use-reflection-bar.ts, app/reflect.tsx), Vitality and checkup modules: no `firebase/*`, no `@/sync/*`, no `@/services/insights`, nothing from the startup path. The one exception is the stage 9 narrative module, which may import the callable client and nothing else; it is the one audited export path for reflections.
 - Nothing from packs, reports, the radar, Vitality or checkups runs during cold start. Home reads them after `home:usable`, with one exception (amended in Stage 1a, so Home never shows a flat list that then regroups into packs): the canonical pack record stays per user at `packs:v1:<uid>`, and a mirror copy `{uid, record}` under the fixed key `packs:mirror:v1` is read in the sign-in marker's existing `multiGet`, as the greeting's name is (zero extra native calls). The mirror is used only if its uid matches the signed-in user; otherwise the canonical record is read and the mirror rebuilt from it. Every pack write saves both keys in one `multiSet`. A corrupt record is mirrored as corrupt, so the mirror never hides it. Stage 1b adds the choose card's "Not now" flag to the mirror (`{uid, record, dismissed}`; a mirror without it reads as not dismissed); "Not now" saves its own key and the mirror in one `multiSet`, and rebuilding the mirror for another uid reads both keys.
-- Pack names, custom habit names, onboarding answers, Q10, first and last names and the areas map never go to Firestore or Gemini. Note free text goes to Gemini only under the consent rule in section 12.
+- Pack names, custom habit names, onboarding answers, Q10, first and last names and the areas map never go to Firestore or Gemini. Reflection free text goes to Gemini only under the consent rule in section 12.
 
 ## 8. Gemini narrative (stage 9)
 
 - Rules compute every number and suggestion. Gemini writes only a short narrative (target about 300 characters, server hard limit 450) for a report that already exists, once per report, and the result is stored with the report.
-- Sent: report kind and period, the built-in pack name (a custom pack is sent as "your pack"), counts and streaks, and note tags (section 12). Template habits are sent by their template name; other habits as "a habit you added". No user id, no questionnaire answers, and no free text except consented note excerpts (section 12).
+- Sent: report kind and period, the built-in pack name (a custom pack is sent as "your pack"), counts and streaks, and reflection tags (section 12). Template habits are sent by their template name; other habits as "a habit you added". No user id, no questionnaire answers, and no free text except consented reflection excerpts (section 12).
 - Checkup narratives (section 14) use the same function and fallback.
 - A new `kind` in the existing `generateInsight` function with its own daily limit per user and the same refusal handling; deployed with `firebase deploy --only functions:generateInsight` before the client uses it.
 - If offline, over limit, busy or failing, the report shows a template sentence and retries later (the existing 30-minute and 60-minute backoff rules). Reports never wait on the network.
@@ -132,19 +132,19 @@ Renumbered 2026-11-04 (earlier numbering: 1 packs, 2 management, 3 calendar, 4 r
    - **1a:** the catalog, built-in packs, the pure modules (record, builtin, choose, membership, addRest, limits, copy), the pack store and its mirror, the pack-constrained starters, the grouped routine screen, the packs record written with the onboarding record, and the ESLint block and isolation test. Home stays a flat list.
    - **1b:** the Home "Habit packs" and "Habits" sections with expandable pack cards, the "Choose your habit packs" card and picker, and "Add the rest" (the only add path that enforces the limit in stage 1).
 2. Pack management and limits: create, edit and delete packs, the habit form pack row, and limit enforcement on every add path through one shared function, with the caption under the add controls. Over-limit accounts keep everything (section 16).
-3. Notes, reflection and XP rebalance: notes and note XP (section 12), including the additive migration and the Settings consent switch (off; nothing is sent before stage 9), the reflection prompt and the XP rebalance (section 16).
+3. Reflections and XP rebalance: the reflection bar and screen, reflection XP and the on-device record (section 12), and the XP rebalance (section 16). Nothing leaves the phone in this stage; the consent switch moved to stage 9.
 4. Vitality (section 13) on the Home stats card, with the shared per-day completion module.
 5. Live radar (section 11): area tags in use, the habit form Area row, the Home card and the Summary radar.
 6. Per-habit streak calendar.
 7. Report engine (stats, rules, template sentences), Reports screen, the Home "New report" card, and the merged weekly flow with the checkup (section 14).
 8. Notification scheduling (reports and the daily checkup), copy table, Settings switches.
-9. Gemini narrative (reports and checkups): function change and deploy first, then the client with its fallback.
+9. Gemini narrative (reports and checkups): function change and deploy first, then the client with its fallback. Also in this stage: the Settings switch "Use my notes in AI summaries" (off by default; the consent wording says the text is processed outside Kenya), the one audited reflection export path (section 12), and a checklist item to revisit the reflection screen's intro line ("Four quick taps.") and the privacy policy.
 
 ## 10. Tests
 
 Pure modules in `utils/packs` and `utils/reports` are tested under Node like the onboarding ones: pack selection and tie-breaks, limits by level (table values, next-level lookup, grandfathering users above a limit, onboarding never blocked), name validation, adoption and "Add the rest" with injected add-habit (failure and retry, never twice), removal and `dropped`, membership after habit deletion, period boundaries (Monday weeks, month ends, anniversary with faked dates including the leap day), suggestion thresholds, freezing, notification schedule stagger and rotation, and the privacy rule that no packs or reports module imports forbidden code.
 
-Also, as each stage lands: every template has exactly one area and it equals its pack's area; habit-to-area resolution (packed, unpacked with a stored area, icon pre-fill, "Not counted"); radar scores over the Week and Month windows (scheduled days only, no data, empty area); note validation, note XP (once per habit per day, the 10-character rule) and the AI filter (consent off, replace habits never, 7 excerpts of at most 200 characters); Vitality deltas, clamping, today excluded, creation-day rule and recompute after past edits; checkup question selection, the first-checkup trigger and the schedule settings.
+Also, as each stage lands: every template has exactly one area and it equals its pack's area; habit-to-area resolution (packed, unpacked with a stored area, icon pre-fill, "Not counted"); radar scores over the Week and Month windows (scheduled days only, no data, empty area); reflection validation, reflection XP (20 while ticked, one per habit per day, 3 a day, un-tick removes it), the level curve, the milestone table and an existing account recalculated from history (Stage 3), and in stage 9 the AI filter (consent off, replace habits never, 7 excerpts of at most 200 characters); Vitality deltas, clamping, today excluded, creation-day rule and recompute after past edits; checkup question selection, the first-checkup trigger and the schedule settings.
 
 ## 11. Live radar
 
@@ -169,13 +169,25 @@ Also, as each stage lands: every template has exactly one area and it equals its
 - **Where:** a compact radar card on Home above Today (tappable, opens Summary); the full radar with the Week / Month switch on Summary.
 - **Motion and cost:** transforms and opacity only, plain fade or none under reduced motion. Computed when the screen is focused, never at cold start; on Home only after `home:usable`.
 
-## 12. Notes and note XP
+## 12. Reflections and reflection XP
 
-- **When:** *Superseded by §16 (the reflection bar at the bottom of Home replaces the inline chip).* After a habit is ticked, its card shows an inline "Add a note" chip. No modal on tick; the chip never blocks the list or ejects the user. Tapping it opens the note sheet.
-- **The sheet:** *Superseded by §16 (up to 4 questions, mostly closed, one optional free text; the questions are approved in the Stage 3 plan).* How it felt (Easy / OK / Hard); optional "what got in the way" chips (Tired, Busy, Forgot, Not in the mood, Other); optional free text up to 280 characters. One note per habit per day, editable that day.
-- **XP:** *Superseded by §16 (20 XP per reflection for the closed questions, free text never pays, at most 3 a day; 2 XP per tick).* A note earns XP when it has at least one tag (feeling or obstacle) or free text of at least 10 characters (trimmed), once per habit per day. A completion is worth 10 XP (`XP_PER_COMPLETION` in utils/gamification.ts), so a note is worth **2 XP** (one fifth). Like all XP it is derived, never stored: it counts only while that day's completion is ticked, and it goes when the note does.
-- **Storage:** a new local SQLite table (additive migration through `PRAGMA user_version`, no change to existing tables): one row per habit per day, with the feeling, the obstacle tags, the text and timestamps. Never synced. Deleted when its habit is deleted. On sign-out it follows the same rule as the user's other local rows (kept per user id).
-- **AI rule:** tags always feed the analysis (counts only). Free text reaches Gemini only when the user turns on "Use my notes in AI summaries" in Settings (off by default), with consent wording that says the text is processed outside Kenya. Only recent short excerpts are sent: at most the last 7 notes, at most 200 characters each. Notes on replace habits (from Q10: phone and social, pornography, smoking or vaping, gaming, junk food, alcohol, procrastination, matched by name since Q10 is never stored) never go to AI, whatever the switch says. Habit names are still never sent.
+Rewritten in Stage 3 (replaces "Notes and note XP": the inline "Add a note" chip, the note sheet, 2 XP per note and the SQLite table).
+
+- **When:** after the user's own completing tick on Home, a bar at the bottom of Home offers a reflection on that habit (section 16). It is the only way in.
+- **The screen:** a full-screen route (app/reflect.tsx, not a sheet; swipe-back off; Android Back and the back row ask before dropping answers). Title "Reflect", the habit name, intro "Four quick taps.", then four one-tap questions and one optional free-text field:
+
+| Question | Answers (stored tag) |
+|---|---|
+| How did it feel? | Easy (`easy`), OK (`ok`), Hard (`hard`) |
+| How much did you do? | All of it (`all`), Most of it (`most`), A little (`little`) |
+| What helped most? | A reminder (`reminder`), My routine (`routine`), Someone else (`someone`), Just me (`self`) |
+| Did anything get in the way? | Nothing (`none`), Tired (`tired`), Busy (`busy`), Low mood (`mood`), Other (`other`) |
+
+  Free text "ANYTHING ELSE? (OPTIONAL)", placeholder "A few words for yourself", at most 200 characters after trimming (control characters removed, line breaks kept), counter "{n}/200", error "Use 200 characters or fewer.". "Save reflection" is enabled once all four questions are answered. One reflection per habit per day; not editable in Stage 3.
+- **XP:** 20 per reflection (`REFLECTION_XP`), earned by answering the four questions; the free text never affects XP. It counts only while that day's completion of the habit is ticked, and at most 3 a day (the earliest saved among those that count). Like all XP it is derived, never stored: un-ticking removes it, re-ticking restores it if it is still among that day's first 3.
+- **Storage:** AsyncStorage `reflections:v1:<uid>` = `{version: 1, days: {date: {habitId: {feel, amount, helped, blocker, text?, savedAt}}}}`, on this phone only; never synced, never in Firestore or the admin screens. Kept on sign-out like the packs record. Kept when the habit is un-ticked or deleted (its XP follows the completion rule: deleted habits keep their XP). A corrupt record reads as none and is replaced by the next save; unreadable storage is never written over. Size: about 1 KB a day at most with the cap, under Android's per-item read limit for years.
+- **AI rule (applies from stage 9; nothing is sent in Stage 3):** tags are always usable by the AI analysis (counts only). Free text reaches Gemini only when the user turns on "Use my notes in AI summaries" in Settings (off by default; the switch arrives in stage 9), with consent wording that says the text is processed outside Kenya. Only recent short excerpts are sent: at most the last 7 reflections, at most 200 characters each. Reflections on replace habits (from Q10: phone and social, pornography, smoking or vaping, gaming, junk food, alcohol, procrastination, matched by name since Q10 is never stored) never leave the phone, whatever the switch says. Habit names are never sent. Stage 9 adds exactly one audited export path for this.
+- **Backlog:** reflections must be covered by in-app data deletion before the Play release.
 
 ## 13. Vitality
 
@@ -189,7 +201,7 @@ Also, as each stage lands: every template has exactly one area and it equals its
 ## 14. Checkup (merged into the weekly report)
 
 - The weekly report ends with "Start checkup": at most 5 tap-to-answer questions.
-- Questions and recommendations come from local rules over note tags, missed days and streaks: shrink a habit, move its time, or add one from a pack. Gemini only writes the narrative, in stage 9, with the template fallback.
+- Questions and recommendations come from local rules over reflection tags, missed days and streaks: shrink a habit, move its time, or add one from a pack. Gemini only writes the narrative, in stage 9, with the template fallback.
 - **First checkup:** a Home card (never a pop-up), shown the first time the user completes all of a day's habits, or 24 hours after sign-up, whichever comes first. It works from the chosen packs and habits, since the onboarding answers are not stored.
 - **Settings:** Checkup Off / Daily / Weekly (default Weekly), with time and weekday. Weekly checkups are announced inside the weekly report notification (no extra notification). Daily is one question as a Home card, with its own optional local notification.
 - **Storage:** answers stored locally as `checkups:v1:<uid>`, never synced.
@@ -201,9 +213,17 @@ Also, as each stage lands: every template has exactly one area and it equals its
 
 ## 16. Reflection prompt and XP rebalance (locked 5 Nov 2026)
 
-- Ticking a habit shows a non-blocking bar at the bottom of Home, above the tab bar, offering a short reflection on that habit. It never covers the list, never needs dismissing, disappears by itself after a few seconds, is replaced by the next tick's bar, and is removed if the habit is un-ticked. Exact strings are approved in the Stage 3 plan.
+- Ticking a habit shows a non-blocking bar at the bottom of Home, above the tab bar, offering a short reflection on that habit. It never covers the list (it is docked below the list, which shrinks to make room), never needs dismissing, disappears by itself after 8 seconds (20 with a screen reader on), is replaced by the next tick's bar, and is removed if the habit is un-ticked, at midnight and when Home loses focus. It is announced to screen readers, fades instead of sliding under reduce motion, and appears only while that reflection would still earn XP today.
+- **Strings (approved in the Stage 3 plan):** bar "{habitName} done. Reflect on it?", reward "+20 XP", button "Reflect" (the whole bar is the button; label "Reflect on {habitName} for 20 XP", hint "Opens a short reflection"; announcement "{habitName} done. Reflect on it for 20 XP from the button at the bottom of the screen."). Screen: see section 12; reward line "+20 XP for answering the four questions." or "This one won't earn XP today."; disabled-save hint "Answer the four questions to save."; discard "Discard this reflection?" / "Your answers won't be saved." with "Discard" and "Keep editing"; errors "Couldn't save reflection" / "Something went wrong. Please try again." and "Already reflected" / "You've already reflected on this habit today.". Home toast after saving: "Reflection saved. +20 XP." or "Saved. +20 XP for reflecting." (rotating); "Reflection saved." when it earned nothing.
 - Reflection = up to 4 questions, mostly tap-to-answer closed questions plus one optional free-text question. The reward is earned by answering the closed questions; the free text is optional and never affects XP, so nobody is paid for filler.
-- XP: 2 per tick, +5 perfect day, 20 per reflection. At most 3 rewarded reflections per day, and only one per habit per day. Level n to n+1 costs 100n XP. XP stays derived from habits/completions/reflections, never stored as a running total; un-ticking a habit removes its tick XP and that day's reflection XP for it. Existing accounts are recalculated from history, so levels will drop; this is expected.
-- Streak milestone XP is kept but scaled by the same factor as ticks (divided by 5, rounded). The Stage 3 plan lists the new table for approval.
+- XP: 2 per tick, +5 perfect day, 20 per reflection. At most 3 rewarded reflections per day, and only one per habit per day. Level n to n+1 costs 100n XP, so level L is reached at 50 x L x (L - 1): level 2 at 100, 3 at 300, 4 at 600, 5 at 1000, 10 at 4500. XP stays derived from habits/completions/reflections, never stored as a running total; un-ticking a habit removes its tick XP and that day's reflection XP for it. Existing accounts are recalculated from history, so levels will drop; this is expected.
+- Streak milestone XP is kept but scaled by the same factor as ticks (divided by 5, rounded):
+
+| Streak days | 3 | 7 | 14 | 30 | 60 | 100 |
+|---|---|---|---|---|---|---|
+| XP (was) | 5 (25) | 10 (50) | 20 (100) | 40 (200) | 80 (400) | 160 (800) |
+
+- **Level drops and celebrations:** a drop never shows anything (no "level down", no overlay, no toast). Level celebrations use the keys `level:v2:N` from Stage 3; the old curve's `level:N` keys are ignored and never deleted (so a level reached again on the new curve gets its full celebration, and going back to an older update can't celebrate twice). Streak keys are unchanged. A level reached by a reflection is celebrated on Home's next focus after the save. "Near level" toasts start at 20 XP to go (one reflection).
+- XP and level are read only on the phone (Home stats card and limits, Profile, the celebrations, services/packLimits.ts) through services/gamificationStats.ts. They are not stored, synced, sent to the insight function or shown in the admin screens, so the recalculation touches nothing outside the phone.
 - Over-limit rule (applies from Stage 2): habit and pack limits only ever block ADDING. Nothing is deleted, hidden or disabled when a level drop puts an account over its limit.
 - Ticks are self-reported; reflections add context but do not prove completion. The final report must state this as a limitation.

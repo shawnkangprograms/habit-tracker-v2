@@ -1,7 +1,8 @@
-// Habit packs stay on the phone (docs/PACKS_REPORTS_SPEC.md, section 7). ESLint blocks static imports
-// (eslint.config.js); this also catches require() and import() calls, keeps the pure logic pure, and checks the
-// other direction: sync, the database layer, the insight request, the Cloud Functions and the admin screens
-// never mention packs.
+// Habit packs and reflections stay on the phone (docs/PACKS_REPORTS_SPEC.md, sections 7 and 12). ESLint blocks
+// static imports (eslint.config.js); this also catches require() and import() calls, keeps the pure logic pure, and
+// checks the other direction: sync, the database layer, the insight request, the Cloud Functions and the admin
+// screens never mention packs or reflections. Reflections are not sent anywhere in Stage 3; Stage 9 adds one
+// audited export path for them, and this test will then allow exactly that module.
 /// <reference types="node" />
 import {describe, test} from 'node:test';
 import assert from 'node:assert/strict';
@@ -72,6 +73,47 @@ describe('pack modules', () => {
   });
 });
 
+const REFLECTION_FILES = [
+  ...files('utils/reflections'),
+  ...files('services/reflectionsStore.ts'),
+  ...files('services/reflectionsStoreCore.ts'),
+  ...files('services/gamificationStats.ts'),
+  ...files('components/reflections'),
+  ...files('hooks/use-reflection-bar.ts'),
+  ...files('app/reflect.tsx'),
+];
+
+describe('reflection modules (not sent anywhere in Stage 3)', () => {
+  test('exist, and import nothing that reaches Firebase, sync, the insight request or the startup path', () => {
+    for (const file of ['utils/reflections/record.ts', 'utils/reflections/rewards.ts', 'utils/reflections/bar.ts',
+      'utils/reflections/questions.ts', 'utils/reflections/copy.ts', 'services/reflectionsStoreCore.ts',
+      'services/reflectionsStore.ts', 'services/gamificationStats.ts', 'components/reflections/reflection-bar.tsx',
+      'hooks/use-reflection-bar.ts', 'app/reflect.tsx']) {
+      assert.ok(REFLECTION_FILES.map(rel).includes(file), `${file} is scanned`);
+    }
+    for (const file of REFLECTION_FILES) {
+      for (const spec of specifiers(readFileSync(file, 'utf8'))) {
+        assert.ok(!FORBIDDEN.some((re) => re.test(spec)), `${rel(file)} imports ${spec}`);
+      }
+    }
+  });
+
+  test('the pure logic in utils/reflections imports only pure modules', () => {
+    const allowed = /^@\/utils\/(reflections\/\w+|gamification)$/;
+    for (const file of files('utils/reflections')) {
+      for (const spec of specifiers(readFileSync(file, 'utf8'))) assert.match(spec, allowed, `${rel(file)} imports ${spec}`);
+    }
+  });
+
+  test('the ESLint block covers every reflection file', () => {
+    const config = readFileSync(join(ROOT, 'eslint.config.js'), 'utf8');
+    for (const glob of ["'utils/reflections/**'", "'services/reflectionsStore*.ts'", "'services/gamificationStats.ts'",
+      "'components/reflections/**'", "'hooks/use-reflection-bar.ts'", "'app/reflect.tsx'"]) {
+      assert.ok(config.includes(glob), glob);
+    }
+  });
+});
+
 describe('sync, the database, the insight request, the Cloud Functions and the admin screens', () => {
   test('never mention packs', () => {
     const outbound = [
@@ -82,6 +124,27 @@ describe('sync, the database, the insight request, the Cloud Functions and the a
     ];
     assert.ok(outbound.length > 15);
     for (const file of outbound) assert.doesNotMatch(readFileSync(file, 'utf8'), /\bpacks?\b|packsStore|utils\/packs/i, rel(file));
+  });
+
+  test('never mention reflections', () => {
+    const outbound = [
+      ...files('sync'), ...files('db'), ...files('functions/src'), ...files('functions/index.js'),
+      ...files('services/firestore.js'), ...files('services/firebaseInit.js'), ...files('services/insights.ts'),
+      ...files('services/insightCache.ts'), ...files('utils/insightInput.ts'), ...files('utils/insightSchedule.ts'),
+      ...files('services/admin.js'), ...files('services/adminAudit.js'), ...files('app/admin'),
+    ];
+    assert.ok(outbound.length > 15);
+    for (const file of outbound) assert.doesNotMatch(readFileSync(file, 'utf8'), /reflection/i, rel(file));
+  });
+
+  test('the insight function rejects a request carrying a reflections field', async () => {
+    const {validateInput} = await import('../functions/src/validateInput.js');
+    const request = {
+      v: 1, trackedDays: 10, streak: 2, bestWeekday: 'mon',
+      habits: [{icon: 'water', freq: 'daily', daysPerWeek: 7, done: 5, scheduled: 10}],
+    };
+    assert.equal(validateInput(request).ok, true);
+    assert.equal(validateInput({...request, reflections: [{feel: 'easy'}]}).ok, false);
   });
 
   test('the insight function rejects a request carrying a packs field', async () => {

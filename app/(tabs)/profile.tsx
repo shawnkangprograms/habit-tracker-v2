@@ -4,13 +4,12 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {ScrollView, StyleSheet, Text, View} from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import Animated, {FadeInDown, ReduceMotion} from 'react-native-reanimated';
-import {getGamificationStats} from '@/db/gamification';// XP, level and streak, derived from local rows
+import {getGamificationStats} from '@/services/gamificationStats';// XP, level and streak, derived from local rows and reflections
 import {onRemoteChange} from '@/db/remoteChanges';// data pulled from another device changed local rows
 import {useSessionUid} from '@/services/session';
 import {loadShared} from '@/services/statsStore';// shared with Home: reuse, join or load once
 import {useStatsEntry} from '@/hooks/use-stats';
 import {getLocalDateString} from '@/utils/dates';
-import type {GamificationStats} from '@/utils/gamification';
 import {medalStates} from '@/utils/medals';
 import {colors, fonts, radii, spacing} from '@/constants/theme';
 import {LevelBadge, XpBar} from '@/components/stats-card';
@@ -35,7 +34,7 @@ export default function ProfileScreen() {
   const refresh = useCallback(async (reason: LoadReason) => {
     if (!userId) return;
     const startedAt = performance.now();
-    const result = await loadShared(userId, getLocalDateString(), () => getGamificationStats(userId) as Promise<GamificationStats>);
+    const result = await loadShared(userId, getLocalDateString(), () => getGamificationStats(userId));
     const ms = Math.round(performance.now() - startedAt);
     if (result.source === 'reused') storeLog('reused');
     else if (result.source === 'joined') storeLog(`joined in-flight (${reason}, ${ms} ms)`);

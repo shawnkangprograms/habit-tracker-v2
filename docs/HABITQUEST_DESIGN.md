@@ -37,7 +37,7 @@ https://claude.ai/artifact/AupM7DJ3Fcw5b746p54JJc
 - UX: inline errors as the user types/leaves a field, Save disabled until valid, errors clear when fixed
 
 ## Scope (committed)
-Full Figma prototype scope: Sign In/Up, 10-question onboarding, building-profile screen, 6-axis radar "Habit Profile", recommended routine, Home with XP progress ring, Habit Detail, Summary (day/week/month/year), Settings (profile merged in), Level-Up overlay, bottom tabs Home/Summary/Settings. The Figma file has NO Add/Edit Habit screen; design it in the same visual language. XP is derived from completion count (no table). Splash: Expo native splash only
+Full Figma prototype scope: Sign In/Up, 10-question onboarding, building-profile screen, 6-axis radar "Habit Profile", recommended routine, Home with XP progress ring, Habit Detail, Summary (day/week/month/year), Settings (profile merged in), Level-Up overlay, bottom tabs Home/Summary/Settings. The Figma file has NO Add/Edit Habit screen; design it in the same visual language. XP is derived from completions and the reflections kept on the phone (no table, no stored total; docs/PACKS_REPORTS_SPEC.md sections 12 and 16). Splash: Expo native splash only
 - Out of scope: social/multi-user, monetization, full encryption, account deletion
 
 ## Build order and testing
