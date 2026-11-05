@@ -256,6 +256,29 @@ describe('onboarding: a Settings retake stops at the habit limit', () => {
   });
 });
 
+describe('Home layout', () => {
+  test('"Create a habit pack" sits below the last pack card with its caption; "Add a habit" is last under "Habits"', () => {
+    const home = source('../app/(tabs)/index.tsx');
+    const at = (text: string) => {
+      const i = home.indexOf(text);
+      assert.ok(i >= 0, text);
+      return i;
+    };
+    const cards = at('{groups.packs.map((pack) => (');
+    const create = at('onPress={createPackTap}');
+    const packCaption = at('{packCaption && ');
+    const habitsHeader = at('{HOME_HABITS_TITLE}</Text>');
+    const unpacked = at('{groups.unpacked.map(renderToday)}');
+    const addHabit = at('onPress={addHabitTap}');
+    const habitCaption = at('{limitCaption && ');
+    assert.ok(cards < create && create < packCaption && packCaption < habitsHeader, 'create row in the packs section');
+    assert.ok(habitsHeader < unpacked && unpacked < addHabit && addHabit < habitCaption, '"Add a habit" last under "Habits"');
+    assert.equal(home.match(/onPress=\{createPackTap\}/g)!.length, 1);
+    // with no packs: only once packs and stats are known and neither card shows
+    assert.match(home, /const showPacks = emptyState !== 'empty' && \(groups\.packs\.length > 0\s*\|\| \(packs !== null && stats !== null && loaded && emptyState === 'hidden' && !chooseCard\)\);/);
+  });
+});
+
 describe('strings', () => {
   test('the Stage 2 strings are the spec\'s (section 4)', () => {
     const home = SPEC.split(/\r?\n(?=## )/).find((s) => s.startsWith('## 4.'))!;

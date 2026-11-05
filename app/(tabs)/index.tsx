@@ -487,7 +487,6 @@ export default function HomeScreen() {// default export, becomes the "index" tab
 
   // Today's rows: each packed habit only inside its pack, the rest under "Habits"
   const groups = homeGroups(packs?.parsed ?? null, habits, list.all);
-  const showPacks = groups.packs.length > 0 && emptyState !== 'empty';// never beside the first-run card: one clear action
   const level = stats?.stats.level ?? null;
   // The limits (utils/packs/limits.ts, checkAdd), known once the stats and counts are. Each message shows as a
   // caption under its add controls while that limit is reached; the controls stay tappable and then open
@@ -505,6 +504,11 @@ export default function HomeScreen() {// default export, becomes the "index" tab
   };
   // with the stats card (they appear together), so {n} is the real pack limit and nothing shifts twice
   const chooseCard = stats !== null && loaded && emptyState !== 'empty' && showChooseCard(packs, activeCount);
+  // The "Habit packs" section: the pack cards, then "Create a habit pack". With no packs it shows the create row
+  // alone, once the packs and stats are known and the choose card isn't showing (dismissed, or a skipped
+  // account), so it never appears and then gives way to the card. Never beside the first-run card: one clear action.
+  const showPacks = emptyState !== 'empty' && (groups.packs.length > 0
+    || (packs !== null && stats !== null && loaded && emptyState === 'hidden' && !chooseCard));
 
   const packAddRest = (packId: string, missing: readonly string[] | null): AddRest | null => {
     if (!missing || missing.length === 0) return null;
@@ -639,6 +643,11 @@ export default function HomeScreen() {// default export, becomes the "index" tab
                   {pack.rows.map(renderToday)}
                 </PackCard>
               ))}
+              <Pressable style={styles.addRow} onPress={createPackTap} accessibilityRole="button">
+                <MaterialCommunityIcons name="view-grid-plus-outline" size={20} color={colors.accent} />
+                <Text style={styles.addText}>{CREATE_PACK_BUTTON}</Text>
+              </Pressable>
+              {packCaption && <Text style={styles.limitCaption} accessibilityLiveRegion="polite">{packCaption}</Text>}
             </View>
             <Text style={styles.sectionTitle} accessibilityRole="header">{HOME_HABITS_TITLE}</Text>
           </>
@@ -650,11 +659,6 @@ export default function HomeScreen() {// default export, becomes the "index" tab
           {/* hidden while the first-run card shows, so there is one clear action */}
           {emptyState !== 'empty' && (
             <>
-              <Pressable style={styles.addRow} onPress={createPackTap} accessibilityRole="button">
-                <MaterialCommunityIcons name="view-grid-plus-outline" size={20} color={colors.accent} />
-                <Text style={styles.addText}>{CREATE_PACK_BUTTON}</Text>
-              </Pressable>
-              {packCaption && <Text style={styles.limitCaption} accessibilityLiveRegion="polite">{packCaption}</Text>}
               <Pressable style={styles.addRow} onPress={addHabitTap} accessibilityRole="button">
                 <MaterialCommunityIcons name="plus" size={20} color={colors.accent} />
                 <Text style={styles.addText}>Add a habit</Text>
