@@ -16,7 +16,7 @@ import {getFirebaseAuth} from '@/services/authInit';// only for an optional disp
 import {useSessionUid} from '@/services/session';// the user whose local data Home shows (presumed or confirmed)
 import {getLocalDateString} from '@/utils/dates';
 import {isDeepEqual} from '@/utils/equality';// skip a re-render when a reload returned what is already shown
-import type {GamificationStats} from '@/utils/gamification';
+import type {AppStats} from '@/utils/vitality';
 import {colors, fonts, radii, spacing, ICON_COLORS} from '@/constants/theme';
 import {HabitIcon} from '@/constants/habitIcons';
 import type {IconId} from '@/constants/habits';
@@ -80,7 +80,7 @@ const LAUNCH_FALLBACK_MS = 1500;
 const FOCUS_SYNC_MIN_INTERVAL_MS = 30 * 1000;
 let lastFocusSyncAt = Date.now();
 
-type StatsSnapshot = {date: string; stats: GamificationStats};// stats plus the local date they were computed for
+type StatsSnapshot = {date: string; stats: AppStats};// stats plus the local date they were computed for
 type Float = {key: number; amount: number};// one "+N XP" label
 type LoadReason = 'focus' | 'remote' | 'toggle' | 'refresh' | 'day' | 'reflection';// only for the dev timing log
 
@@ -613,6 +613,7 @@ export default function HomeScreen() {// default export, becomes the "index" tab
               currentStreak={stats.stats.currentStreak}
               doneToday={doneToday}
               scheduledToday={habits.length}
+              vitality={stats.stats.vitality}
             />
           )}
 

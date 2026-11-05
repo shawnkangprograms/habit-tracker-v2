@@ -3,7 +3,9 @@ import {StyleSheet, Text, View} from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import Animated, {ReduceMotion, useAnimatedStyle, useSharedValue, withTiming} from 'react-native-reanimated';
 import {ProgressRing} from '@/components/progress-ring';
+import {VitalityBar} from '@/components/vitality-bar';
 import {colors, fonts, radii, spacing} from '@/constants/theme';
+import type {Vitality} from '@/utils/vitality';
 
 // Round level badge; also used on Profile at a larger size
 export function LevelBadge(props: {level: number; size?: number}) {
@@ -37,7 +39,7 @@ export function XpBar(props: {progress: number; xpIntoLevel: number; xpForNextLe
   );
 }
 
-// Home header: level badge, XP bar toward the next level, current streak, and today's ring.
+// Home header: level badge, XP bar toward the next level, current streak, and today's ring; Vitality below them.
 export function StatsCard(props: {
   level: number;
   xpIntoLevel: number;
@@ -46,51 +48,55 @@ export function StatsCard(props: {
   currentStreak: number;
   doneToday: number;
   scheduledToday: number;
+  vitality: Vitality;
 }) {
   const restDay = props.scheduledToday === 0;
   const streakLabel = `${props.currentStreak} day${props.currentStreak === 1 ? '' : 's'}`;
 
   return (
     <View style={styles.card}>
-      <LevelBadge level={props.level} />
+      <View style={styles.top}>
+        <LevelBadge level={props.level} />
 
-      <View style={styles.middle}>
-        <View style={styles.row}>
-          <Text style={styles.levelText}>Level {props.level}</Text>
-          <View style={styles.streak} accessibilityLabel={`Current streak ${streakLabel}`}>
-            <MaterialCommunityIcons name="fire" size={16} color={colors.accent} />
-            <Text style={styles.streakText}>{streakLabel}</Text>
+        <View style={styles.middle}>
+          <View style={styles.row}>
+            <Text style={styles.levelText}>Level {props.level}</Text>
+            <View style={styles.streak} accessibilityLabel={`Current streak ${streakLabel}`}>
+              <MaterialCommunityIcons name="fire" size={16} color={colors.accent} />
+              <Text style={styles.streakText}>{streakLabel}</Text>
+            </View>
           </View>
+          <XpBar progress={props.progress} xpIntoLevel={props.xpIntoLevel} xpForNextLevel={props.xpForNextLevel} />
         </View>
-        <XpBar progress={props.progress} xpIntoLevel={props.xpIntoLevel} xpForNextLevel={props.xpForNextLevel} />
+
+        <View accessibilityLabel={restDay ? 'Rest day' : `${props.doneToday} of ${props.scheduledToday} habits done today`}>
+          <ProgressRing
+            progress={restDay ? 0 : props.doneToday / props.scheduledToday}
+            size={54}
+            strokeWidth={5}
+            color={restDay ? colors.muted : colors.green}>
+            <Text style={[styles.ringText, restDay && styles.ringTextRest]}>
+              {restDay ? 'Rest\nday' : `${props.doneToday}/${props.scheduledToday}`}
+            </Text>
+          </ProgressRing>
+        </View>
       </View>
 
-      <View accessibilityLabel={restDay ? 'Rest day' : `${props.doneToday} of ${props.scheduledToday} habits done today`}>
-        <ProgressRing
-          progress={restDay ? 0 : props.doneToday / props.scheduledToday}
-          size={54}
-          strokeWidth={5}
-          color={restDay ? colors.muted : colors.green}>
-          <Text style={[styles.ringText, restDay && styles.ringTextRest]}>
-            {restDay ? 'Rest\nday' : `${props.doneToday}/${props.scheduledToday}`}
-          </Text>
-        </ProgressRing>
-      </View>
+      <VitalityBar vitality={props.vitality} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
+    gap: spacing.sm,
     padding: spacing.md,
     borderRadius: radii.largeCard,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,
   },
+  top: {flexDirection: 'row', alignItems: 'center', gap: spacing.md},
   levelBadge: {
     borderRadius: radii.pill,
     borderWidth: 2,

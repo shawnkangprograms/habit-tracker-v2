@@ -133,7 +133,7 @@ Renumbered 2026-11-04 (earlier numbering: 1 packs, 2 management, 3 calendar, 4 r
    - **1b:** the Home "Habit packs" and "Habits" sections with expandable pack cards, the "Choose your habit packs" card and picker, and "Add the rest" (the only add path that enforces the limit in stage 1).
 2. Pack management and limits: create, edit and delete packs, the habit form pack row, and limit enforcement on every add path through one shared function, with the caption under the add controls. Over-limit accounts keep everything (section 16).
 3. Reflections and XP rebalance: the reflection bar and screen, reflection XP and the on-device record (section 12), and the XP rebalance (section 16). Nothing leaves the phone in this stage; the consent switch moved to stage 9.
-4. Vitality (section 13) on the Home stats card, with the shared per-day completion module.
+4. Vitality (section 13) on the Home stats card, with the shared per-day completion module (built).
 5. Live radar (section 11): area tags in use, the habit form Area row, the Home card and the Summary radar.
 6. Per-habit streak calendar.
 7. Report engine (stats, rules, template sentences), Reports screen, the Home "New report" card, and the merged weekly flow with the checkup (section 14).
@@ -191,12 +191,19 @@ Rewritten in Stage 3 (replaces "Notes and note XP": the inline "Add a note" chip
 
 ## 13. Vitality
 
+Built in Stage 4.
+
 - A bar on the Home stats card, named Vitality (Health is a radar axis).
-- **Computed from history, never stored.** It starts at 50 on the first day after the first habit exists. For each closed day with at least one scheduled habit: delta = round(10 x share of scheduled habits done) - 4, so +6 for a full day, +1 for half, 0 at 40%, -4 for none. The value is clamped to 0 to 100 after each day.
-- Today does not count until it closes (local midnight). Days with no scheduled habit change nothing. A habit counts only from the day it was created. Edits to past days recompute it (it is derived).
+- **Computed from history on every stats load, never stored** (no key, no table, no sync, no network). It is computed inside the existing stats load (services/gamificationStats.ts) from the rows that load already reads: no extra SQLite query and no storage read. Maths in utils/vitality.ts over the shared per-day counts in utils/dailyCompletion.ts (which the radar, section 11, reuses).
+- **Per closed day** with at least one scheduled habit: delta = round(10 x done / scheduled) - 4 (halves round up; computed in whole numbers), so +6 for a full day, +1 for half, 0 at 40%, -4 for none; with 8 habits: 8 done +6, 6 done +4, 4 done +1, 3 done 0, 2 done -1, 0 done -4. Clamped to 0..100 after every day. A day with nothing scheduled changes nothing. Days the app wasn't opened have no ticks, so they count as 0 done.
+- **Start:** before any day with a scheduled habit has closed, the card shows "Starts after your first full day." with an empty bar. After the first such day the value is 50 + that day's delta.
+- **Today** is never part of the closed history. The shown value is the value after the last closed day plus today's provisional delta only if it is a gain (capped at 100); a loss applies when the day closes. Home already reloads its stats at local midnight, so yesterday's loss appears then.
+- **Who counts on a day (the perfect-day rule):** habits not deleted, created on or before that date (the creation day counts), daily or due on that weekday; done = those with a completed row that date. Completion rows after today are ignored. Days are stepped by calendar day numbers, so daylight saving and clock changes can't add or skip a day.
+  - Deleted habits drop out of every day, past ones included, exactly as for perfect days. So a perfect day is always +6 and a day that breaks the streak is always -4. **Known disagreement with the streak:** the streak still counts a past day on which only a now-deleted habit was ticked; Vitality scores that day as 0 done among the remaining habits. Deleting every habit returns the bar to its starting message.
+  - **Known limitation (shared with XP and streaks):** the current schedule is applied to past days, so changing a habit's frequency can change past Vitality. Fixing it would need a schedule history.
 - No game over. A low bar shows "Low. Today is a fresh start."
-- It uses the same per-day completion module as the radar (section 11).
-- **Strings (proposed, awaiting approval):** label "Vitality"; value "{n} / 100"; low (under 25) "Low. Today is a fresh start."; steady (25 to 74) "Steady. Keep the days ticking."; high (75 and over) "Strong. You're on a roll."; before the first closed day "Starts after your first full day."; accessibility "Vitality {n} out of 100".
+- **Strings (approved):** label "Vitality"; value "{n} / 100"; low (under 25) "Low. Today is a fresh start."; steady (25 to 74) "Steady. Keep the days ticking."; strong (75 and over) "Strong. You're on a roll."; before the first closed day "Starts after your first full day."; accessibility "Vitality {n} out of 100".
+- **Layout:** below the stats card's existing row, inside the card: one text line ("Vitality" and "{n} / 100" on the left, the message on the right, strictly one line, ellipsized) and a full-width 6 dp bar under it. The same height in every state (one shared line height), about 26 dp. The fill is green, amber below 25 (orange is the XP bar's); contrast against the track: green 5.43:1, amber 8.46:1. It animates with scaleX from the left (transform only) and jumps under reduce motion. Not tappable.
 
 ## 14. Checkup (merged into the weekly report)
 

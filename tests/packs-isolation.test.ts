@@ -114,6 +114,29 @@ describe('reflection modules (not sent anywhere in Stage 3)', () => {
   });
 });
 
+const VITALITY_FILES = [...files('utils/vitality.ts'), ...files('utils/dailyCompletion.ts'), ...files('components/vitality-bar.tsx')];
+
+describe('Vitality modules (on-device only, Stage 4)', () => {
+  test('exist, are covered by the ESLint block, and import nothing that reaches Firebase, sync or the network', () => {
+    assert.deepEqual(VITALITY_FILES.map(rel).sort(), ['components/vitality-bar.tsx', 'utils/dailyCompletion.ts', 'utils/vitality.ts']);
+    const config = readFileSync(join(ROOT, 'eslint.config.js'), 'utf8');
+    for (const glob of ["'utils/vitality.ts'", "'utils/dailyCompletion.ts'", "'components/vitality-bar.tsx'"]) assert.ok(config.includes(glob), glob);
+    for (const file of VITALITY_FILES) {
+      for (const spec of specifiers(readFileSync(file, 'utf8'))) {
+        assert.ok(!FORBIDDEN.some((re) => re.test(spec)), `${rel(file)} imports ${spec}`);
+      }
+    }
+  });
+
+  test('the maths imports only pure modules', () => {
+    for (const file of [...files('utils/vitality.ts'), ...files('utils/dailyCompletion.ts')]) {
+      for (const spec of specifiers(readFileSync(file, 'utf8'))) {
+        assert.match(spec, /^@\/utils\/(gamification|dailyCompletion)$/, `${rel(file)} imports ${spec}`);
+      }
+    }
+  });
+});
+
 describe('sync, the database, the insight request, the Cloud Functions and the admin screens', () => {
   test('never mention packs', () => {
     const outbound = [
@@ -135,6 +158,17 @@ describe('sync, the database, the insight request, the Cloud Functions and the a
     ];
     assert.ok(outbound.length > 15);
     for (const file of outbound) assert.doesNotMatch(readFileSync(file, 'utf8'), /reflection/i, rel(file));
+  });
+
+  test('never mention Vitality', () => {
+    const outbound = [
+      ...files('sync'), ...files('db'), ...files('functions/src'), ...files('functions/index.js'),
+      ...files('services/firestore.js'), ...files('services/firebaseInit.js'), ...files('services/insights.ts'),
+      ...files('services/insightCache.ts'), ...files('utils/insightInput.ts'), ...files('utils/insightSchedule.ts'),
+      ...files('services/admin.js'), ...files('services/adminAudit.js'), ...files('app/admin'),
+    ];
+    assert.ok(outbound.length > 15);
+    for (const file of outbound) assert.doesNotMatch(readFileSync(file, 'utf8'), /vitality|dailyCompletion/i, rel(file));
   });
 
   test('the insight function rejects a request carrying a reflections field', async () => {

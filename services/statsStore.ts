@@ -9,12 +9,12 @@
 // registered before any screen's listener, and the change emitters call listeners in subscription order:
 // markStale always runs before a screen's handler for the same change can call beginLoad.
 
-import type {GamificationStats} from '@/utils/gamification';
+import type {AppStats} from '@/utils/vitality';
 import {isDeepEqual} from '@/utils/equality';
 import {onLocalChange} from '@/db/localChanges';
 import {onRemoteChange} from '@/db/remoteChanges';
 
-export type StatsEntry = {userId: string; date: string; stats: GamificationStats};// date: the local day it was computed for
+export type StatsEntry = {userId: string; date: string; stats: AppStats};// date: the local day it was computed for
 export type SharedLoadResult = {entry: StatsEntry | null; source: 'reused' | 'joined' | 'loaded'};
 export type LoadTicket = {gen: number; remoteGen: number};// counters captured when a load STARTS
 
@@ -85,7 +85,7 @@ export function needsLoad(userId: string, today: string): boolean {
 export function beginLoad(
   userId: string,
   date: string,
-  loader: () => Promise<GamificationStats>,
+  loader: () => Promise<AppStats>,
 ): LoadTicket & {promise: Promise<StatsEntry | null>} {
   const startedGen = gen;
   const startedRemoteGen = remoteGen;
@@ -130,7 +130,7 @@ export function publish(next: StatsEntry | null, load: LoadTicket): PublishResul
 export async function loadShared(
   userId: string,
   today: string,
-  loader: () => Promise<GamificationStats>,
+  loader: () => Promise<AppStats>,
 ): Promise<SharedLoadResult> {
   if (!needsLoad(userId, today)) return {entry, source: 'reused'};
   if (inFlight && inFlight.userId === userId && inFlight.gen === gen) {

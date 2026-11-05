@@ -3,7 +3,7 @@
 import {describe, test} from 'node:test';
 import assert from 'node:assert/strict';
 import './helpers/alias.ts'; // must come before the dynamic imports below
-import type {GamificationStats} from '../utils/gamification.ts';
+import type {AppStats} from '../utils/vitality.ts';
 
 // Same module instances the store subscribes to (the alias resolves "@/db/..." to these files)
 const {emitLocalChange, onLocalChange} = await import('../db/localChanges.js');
@@ -12,8 +12,8 @@ const store = await import('../services/statsStore.ts');
 const {computeGamification} = await import('../utils/gamification.ts');
 
 const TODAY = '2026-10-21';
-const BASE = computeGamification([], [], TODAY);
-const withStreak = (currentStreak: number): GamificationStats => ({...BASE, currentStreak, longestStreak: currentStreak});
+const BASE: AppStats = {...computeGamification([], [], TODAY), vitality: {state: 'starting'}};
+const withStreak = (currentStreak: number): AppStats => ({...BASE, currentStreak, longestStreak: currentStreak});
 
 // The store is module state: every test signs in a user of its own
 let userCount = 0;
@@ -29,7 +29,7 @@ function deferred<T>() {
   return {promise, resolve};
 }
 
-async function loadAndPublish(userId: string, stats: GamificationStats, date = TODAY) {
+async function loadAndPublish(userId: string, stats: AppStats, date = TODAY) {
   const load = store.beginLoad(userId, date, async () => stats);
   return store.publish(await load.promise, load);
 }
@@ -48,7 +48,7 @@ describe('stats store: freshness', () => {
     const userId = freshUser();
     await loadAndPublish(userId, withStreak(2));
 
-    const gate = deferred<GamificationStats>();
+    const gate = deferred<AppStats>();
     const early = store.beginLoad(userId, TODAY, () => gate.promise);
     emitLocalChange();// arrives while the read is running
     gate.resolve(withStreak(3));
@@ -110,7 +110,7 @@ describe('stats store: snapshots and notifications', () => {
 
   test('publishes for another user, or older than what is shown, are ignored', async () => {
     const userId = freshUser();
-    const gate = deferred<GamificationStats>();
+    const gate = deferred<AppStats>();
     const older = store.beginLoad(userId, TODAY, () => gate.promise);
     emitLocalChange();
     await loadAndPublish(userId, withStreak(7));// started later, finished first
@@ -156,7 +156,7 @@ describe('stats store: loadShared (Profile)', () => {
 
   test('joins a load Home started, without a second read', async () => {
     const userId = freshUser();
-    const gate = deferred<GamificationStats>();
+    const gate = deferred<AppStats>();
     const home = store.beginLoad(userId, TODAY, () => gate.promise);
     let calls = 0;
     const profile = store.loadShared(userId, TODAY, async () => { calls += 1; return withStreak(9); });
@@ -179,7 +179,7 @@ describe('stats store: loadShared (Profile)', () => {
 
   test('does not join a load that started before the latest change', async () => {
     const userId = freshUser();
-    const gate = deferred<GamificationStats>();
+    const gate = deferred<AppStats>();
     store.beginLoad(userId, TODAY, () => gate.promise);
     emitRemoteChange();
     let calls = 0;
@@ -230,7 +230,7 @@ describe('stats store: comparable publishes (celebrations never react to sync)',
     const userId = freshUser();
     await loadAndPublish(userId, withStreak(1));
     emitLocalChange();
-    const gate = deferred<GamificationStats>();
+    const gate = deferred<AppStats>();
     const load = store.beginLoad(userId, TODAY, () => gate.promise);
     emitRemoteChange();// lands while the read is running
     gate.resolve(withStreak(2));
@@ -247,7 +247,7 @@ describe('stats store: comparable publishes (celebrations never react to sync)',
 
   test('the previous entry\'s load saw a remote change before it published: not comparable', async () => {
     const userId = freshUser();
-    const gate = deferred<GamificationStats>();
+    const gate = deferred<AppStats>();
     const first = store.beginLoad(userId, TODAY, () => gate.promise);
     emitRemoteChange();
     gate.resolve(withStreak(1));

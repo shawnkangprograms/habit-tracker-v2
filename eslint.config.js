@@ -56,7 +56,7 @@ module.exports = defineConfig([
     },
   },
   {
-    // Habit packs and reflections stay on the phone (docs/PACKS_REPORTS_SPEC.md, sections 7 and 12): the same bans
+    // Habit packs, reflections and Vitality stay on the phone (docs/PACKS_REPORTS_SPEC.md, sections 7, 12, 13): the same bans
     // as onboarding, plus nothing from the startup path (the marker read hands the packs mirror in; neither reaches
     // back into startup). Reflections are not sent anywhere in Stage 3; Stage 9 adds one audited export path for
     // them (section 12's AI rules), and only that module will be allowed the callable client.
@@ -65,6 +65,7 @@ module.exports = defineConfig([
       'utils/packs/**', 'services/packsStore*.ts', 'services/packLimits.ts', 'components/packs/**', 'hooks/use-packs.ts', 'app/packs/**',
       'utils/reflections/**', 'services/reflectionsStore*.ts', 'services/gamificationStats.ts', 'components/reflections/**',
       'hooks/use-reflection-bar.ts', 'app/reflect.tsx',
+      'utils/vitality.ts', 'utils/dailyCompletion.ts', 'components/vitality-bar.tsx',
     ],
     rules: {
       'no-restricted-imports': ['error', {
