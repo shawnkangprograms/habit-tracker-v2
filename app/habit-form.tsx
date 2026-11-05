@@ -24,6 +24,7 @@ import {getNotificationPermission, notificationsAvailable, type PermissionState}
 import {askForReminderPermission} from '@/services/reminderPermission';
 import {DEFAULT_REMINDER_TIME, LEAD_LABELS, reminderTimingNote, timingNoteText} from '@/utils/reminderForm';
 import {usePacks} from '@/hooks/use-packs';
+import {useKeyboardScroll} from '@/hooks/use-keyboard-scroll';
 import {packsStore} from '@/services/packsStore';
 import {checkAddFor} from '@/services/packLimits';
 import {HABIT_PACK_LABEL, NO_PACK} from '@/utils/packs/copy';
@@ -50,6 +51,8 @@ export default function HabitFormScreen() {
   const habitId = typeof params.habitId === 'string' && params.habitId ? params.habitId : undefined;
   const isEdit = !!habitId;
   const userId = useSessionUid() ?? undefined;// presumed or confirmed (services/session.ts)
+  const {padding: keyboardPad, scrollRef, innerRef, onScroll: onKeyboardScroll, onLayout: onKeyboardLayout, reveal: revealField} =
+    useKeyboardScroll('spacer');// Android: keeps Save and the name field above the keyboard
 
   // Add mode defaults match the Figma frame: star selected, Every day
   const [habitName, setHabitName] = useState('');
@@ -239,9 +242,17 @@ export default function HabitFormScreen() {
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
-      {/* iOS: padding lifts the content above the keyboard. Android: the window resizes (softwareKeyboardLayoutMode defaults to resize), so no behaviour is set */}
+      {/* iOS: padding lifts the content above the keyboard. Android: edge-to-edge, so the window doesn't resize;
+          the spacer below the footer lifts it instead (hooks/use-keyboard-scroll.ts) */}
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          ref={scrollRef}
+          innerViewRef={innerRef}
+          onScroll={onKeyboardScroll}
+          scrollEventThrottle={16}
+          onLayout={onKeyboardLayout}
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled">
 
           <Pressable style={styles.backRow} onPress={goBack} hitSlop={12} accessibilityRole="button">
             <MaterialCommunityIcons name="chevron-left" size={22} color={colors.muted} />
@@ -262,6 +273,7 @@ export default function HabitFormScreen() {
               style={[styles.input, errors.name && styles.inputError]}
               value={habitName}
               onChangeText={(text) => { setHabitName(text); clearError('name'); }}
+              onFocus={revealField}
               placeholder="e.g. Read 10 pages"
               placeholderTextColor={colors.muted}
               selectionColor={colors.accent}
@@ -431,6 +443,8 @@ export default function HabitFormScreen() {
             </Pressable>
           )}
         </View>
+        {/* Android only: lifts the pinned actions above the keyboard and shrinks the form (0 on iOS) */}
+        {keyboardPad > 0 && <View style={{height: keyboardPad}} />}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

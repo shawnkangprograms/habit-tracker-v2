@@ -8,6 +8,8 @@ import {router, useFocusEffect, useLocalSearchParams} from 'expo-router';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
 import {getHabitsWithTodayStatus} from '@/db/habits';
+import {useKeyboardPadding} from '@/hooks/use-keyboard-padding';
+import {useReduceMotion} from '@/hooks/use-reduce-motion';
 import {reflectionsStore} from '@/services/reflectionsStore';
 import {useSessionUid} from '@/services/session';
 import {markStale} from '@/services/statsStore';
@@ -28,6 +30,11 @@ import {wouldReward} from '@/utils/reflections/rewards';
 // Four one-tap questions earn the reward; the optional free text never does. Saved on this phone only. After a
 // save the stats are marked stale (an AsyncStorage write isn't a database change) and Home, on its next focus,
 // reloads them and shows the level-up or a short toast.
+//
+// Keyboard: on Android the window doesn't resize for it (edge-to-edge), so the keyboard's height is added as
+// bottom padding to the scroll content (hooks/use-keyboard-padding.ts) and, while the text field is focused, the
+// content is scrolled to the end: the field, its counter and error line, the reward line and Save. Android Back
+// closes the keyboard first (the system handles that), then reaches the discard check below.
 
 function leave() {
   if (router.canGoBack()) router.back();
@@ -46,6 +53,17 @@ export default function ReflectScreen() {
   const [text, setText] = useState('');
   const [saving, setSaving] = useState(false);
   const [pays, setPays] = useState<boolean | null>(null);// null: not known yet (or another day): the reward line shows
+  const keyboardPad = useKeyboardPadding();
+  const reduceMotion = useReduceMotion();
+  const scrollRef = useRef<ScrollView>(null);
+  const [textFocused, setTextFocused] = useState(false);
+
+  // Once the padding is in place (the frame after it renders), bring the field and Save above the keyboard
+  useEffect(() => {
+    if (!textFocused || keyboardPad === 0) return;
+    const frame = requestAnimationFrame(() => scrollRef.current?.scrollToEnd({animated: !reduceMotion}));
+    return () => cancelAnimationFrame(frame);
+  }, [textFocused, keyboardPad, reduceMotion]);
 
   // Whether this one would still earn XP. Only today's ticks are on hand; for another day the line stays positive.
   useEffect(() => {
@@ -118,7 +136,10 @@ export default function ReflectScreen() {
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          ref={scrollRef}
+          contentContainerStyle={[styles.content, {paddingBottom: spacing.xl + keyboardPad}]}
+          keyboardShouldPersistTaps="handled">
           <Pressable style={styles.backRow} onPress={goBack} hitSlop={12} accessibilityRole="button">
             <MaterialCommunityIcons name="chevron-left" size={22} color={colors.muted} />
             <Text style={styles.backText}>{SCREEN_BACK}</Text>
@@ -161,6 +182,8 @@ export default function ReflectScreen() {
               style={[styles.input, tooLong && styles.inputError]}
               value={text}
               onChangeText={setText}
+              onFocus={() => setTextFocused(true)}
+              onBlur={() => setTextFocused(false)}
               placeholder={TEXT_PLACEHOLDER}
               placeholderTextColor={colors.muted}
               selectionColor={colors.accent}

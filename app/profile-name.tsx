@@ -9,6 +9,7 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import {saveName} from '@/services/authActions';
 import {getFirebaseAuth} from '@/services/authInit';
 import {useProfileName} from '@/services/profileName';
+import {useKeyboardScroll} from '@/hooks/use-keyboard-scroll';
 import {useSessionUid} from '@/services/session';
 import {colors, fonts, radii, spacing} from '@/constants/theme';
 import {firstNameFor} from '@/utils/greeting';
@@ -30,6 +31,8 @@ function goBack() {
 
 export default function ProfileNameScreen() {
   const uid = useSessionUid();
+  const {padding: keyboardPad, scrollRef, innerRef, onScroll: onKeyboardScroll, onLayout: onKeyboardLayout, reveal: revealField} =
+    useKeyboardScroll('content');// Android: keeps the focused field and Save reachable above the keyboard
   const stored = useProfileName(uid);
   const auth = getFirebaseAuth().currentUser;
   // pre-filled from the copy on this phone; an older account without one starts from its displayName's first word
@@ -72,8 +75,17 @@ export default function ProfileNameScreen() {
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+      {/* iOS: padding lifts the content above the keyboard. Android: edge-to-edge, so the window doesn't resize;
+          the keyboard's height is added to the content instead (hooks/use-keyboard-scroll.ts) */}
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          ref={scrollRef}
+          innerViewRef={innerRef}
+          onScroll={onKeyboardScroll}
+          scrollEventThrottle={16}
+          onLayout={onKeyboardLayout}
+          contentContainerStyle={[styles.content, {paddingBottom: spacing.xl + keyboardPad}]}
+          keyboardShouldPersistTaps="handled">
           <Pressable style={styles.backRow} onPress={goBack} hitSlop={12} accessibilityRole="button">
             <MaterialCommunityIcons name="chevron-left" size={22} color={colors.muted} />
             <Text style={styles.backText}>Settings</Text>
@@ -86,6 +98,7 @@ export default function ProfileNameScreen() {
             value={firstName}
             onChangeText={edit(setFirstName)}
             onBlur={() => setTouched((t) => ({...t, first: true}))}
+            onFocus={revealField}
             error={visibleError(first, touched.first)}
             autoComplete="name-given"
             textContentType="givenName"
@@ -96,6 +109,7 @@ export default function ProfileNameScreen() {
             value={lastName}
             onChangeText={edit(setLastName)}
             onBlur={() => setTouched((t) => ({...t, last: true}))}
+            onFocus={revealField}
             error={visibleError(last, touched.last)}
             autoComplete="name-family"
             textContentType="familyName"
@@ -126,6 +140,7 @@ function NameField(props: {
   value: string;
   onChangeText: (text: string) => void;
   onBlur: () => void;
+  onFocus: () => void;
   error: string | undefined;
   autoComplete: 'name-given' | 'name-family';
   textContentType: 'givenName' | 'familyName';
@@ -139,6 +154,7 @@ function NameField(props: {
         value={props.value}
         onChangeText={props.onChangeText}
         onBlur={props.onBlur}
+        onFocus={props.onFocus}
         accessibilityLabel={props.label}
         autoComplete={props.autoComplete}
         textContentType={props.textContentType}

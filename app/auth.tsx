@@ -12,6 +12,7 @@ import {
   validateAge, validateConfirmPassword, validateEmail, validatePassword, validatePersonName,
 } from '@/validation/validators';
 import {visibleError} from '@/utils/profileName';
+import {useKeyboardScroll} from '@/hooks/use-keyboard-scroll';
 
 type Field = 'email' | 'password' | 'confirmPassword' | 'age' | 'firstName' | 'lastName';
 type FieldErrors = Partial<Record<Field, string>>;
@@ -57,6 +58,7 @@ function AuthInput(props: {
   textContentType?: 'emailAddress' | 'password' | 'newPassword' | 'givenName' | 'familyName' | 'none';
   editable: boolean;
   onBlur?: () => void;
+  onFocus?: () => void;
 }) {
   const isEmail = props.textContentType === 'emailAddress';
   const nameField = props.textContentType === 'givenName' ? 'name-given'
@@ -81,6 +83,7 @@ function AuthInput(props: {
           editable={props.editable}
           returnKeyType="done"
           onBlur={props.onBlur}
+          onFocus={props.onFocus}
           accessibilityLabel={props.placeholder}
         />
       </View>
@@ -90,6 +93,8 @@ function AuthInput(props: {
 }
 
 export default function AuthScreen() {
+  const {padding: keyboardPad, scrollRef, innerRef, onScroll: onKeyboardScroll, onLayout: onKeyboardLayout, reveal: revealField} =
+    useKeyboardScroll('content');// Android: keeps the focused field and the main button reachable above the keyboard
   const [mode, setMode] = useState<Mode>('signUp');
   const isSignUp = mode === 'signUp';
   const [email, setEmail] = useState('');
@@ -227,9 +232,17 @@ export default function AuthScreen() {
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
-      {/* iOS: padding lifts the content above the keyboard. Android: the window resizes, so no behaviour is set */}
+      {/* iOS: padding lifts the content above the keyboard. Android: edge-to-edge, so the window doesn't resize;
+          the keyboard's height is added to the content instead (hooks/use-keyboard-scroll.ts) */}
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          ref={scrollRef}
+          innerViewRef={innerRef}
+          onScroll={onKeyboardScroll}
+          scrollEventThrottle={16}
+          onLayout={onKeyboardLayout}
+          contentContainerStyle={[styles.content, {paddingBottom: spacing.xl + keyboardPad}]}
+          keyboardShouldPersistTaps="handled">
 
           <View style={styles.header}>
             <View style={styles.logoBadge}>
@@ -257,6 +270,7 @@ export default function AuthScreen() {
                 error={visibleError(firstResult, nameTouched.first)}
                 textContentType="givenName"
                 editable={!submitting}
+                onFocus={revealField}
               />
               <AuthInput
                 icon="account-outline"
@@ -267,6 +281,7 @@ export default function AuthScreen() {
                 error={visibleError(lastResult, nameTouched.last)}
                 textContentType="familyName"
                 editable={!submitting}
+                onFocus={revealField}
               />
             </>
           )}
@@ -279,6 +294,7 @@ export default function AuthScreen() {
             keyboardType="email-address"
             textContentType="emailAddress"
             editable={!submitting}
+            onFocus={revealField}
           />
           {!isReset && (
             <AuthInput
@@ -290,6 +306,7 @@ export default function AuthScreen() {
               secure
               textContentType={isSignUp ? 'newPassword' : 'password'}
               editable={!submitting}
+              onFocus={revealField}
             />
           )}
           {mode === 'signIn' && (
@@ -313,6 +330,7 @@ export default function AuthScreen() {
                 secure
                 textContentType="newPassword"
                 editable={!submitting}
+                onFocus={revealField}
               />
               <AuthInput
                 icon="calendar-account-outline"
@@ -323,6 +341,7 @@ export default function AuthScreen() {
                 keyboardType="number-pad"
                 textContentType="none"
                 editable={!submitting}
+                onFocus={revealField}
               />
             </>
           )}

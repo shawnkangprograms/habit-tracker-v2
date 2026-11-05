@@ -8,6 +8,7 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import * as Crypto from 'expo-crypto';
 
 import {getActiveHabitsWithDays} from '@/db/habits';
+import {useKeyboardPadding} from '@/hooks/use-keyboard-padding';
 import {packsStore} from '@/services/packsStore';
 import {checkAddFor} from '@/services/packLimits';
 import {useSessionUid} from '@/services/session';
@@ -52,6 +53,7 @@ export default function EditPackScreen() {
   const packId = typeof params.packId === 'string' && params.packId ? params.packId : null;
   const from = params.from;
   const uid = useSessionUid();
+  const keyboardPad = useKeyboardPadding();// Android only: the keyboard's height while it is open
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [name, setName] = useState('');
   const [touched, setTouched] = useState(false);// the name error shows once the user has typed or left the field
@@ -275,6 +277,9 @@ export default function EditPackScreen() {
             </Pressable>
           )}
         </View>
+        {/* Android: the window doesn't resize for the keyboard (edge-to-edge), so this spacer lifts the pinned
+            actions above it and shrinks the list; the name field near the top stays in view. 0 on iOS. */}
+        {keyboardPad > 0 && <View style={{height: keyboardPad}} />}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
