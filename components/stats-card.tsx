@@ -49,53 +49,81 @@ export function StatsCard(props: {
   doneToday: number;
   scheduledToday: number;
   vitality: Vitality;
+  placeholder?: boolean;// see StatsCardPlaceholder
 }) {
   const restDay = props.scheduledToday === 0;
   const streakLabel = `${props.currentStreak} day${props.currentStreak === 1 ? '' : 's'}`;
 
   return (
     <View style={styles.card}>
-      <View style={styles.top}>
-        <LevelBadge level={props.level} />
+      <View
+        style={styles.content}
+        importantForAccessibility={props.placeholder ? 'no-hide-descendants' : 'auto'}
+        accessibilityElementsHidden={props.placeholder}>
+        <View style={[styles.top, props.placeholder && styles.hidden]}>
+          <LevelBadge level={props.level} />
 
-        <View style={styles.middle}>
-          <View style={styles.row}>
-            <Text style={styles.levelText}>Level {props.level}</Text>
-            <View style={styles.streak} accessibilityLabel={`Current streak ${streakLabel}`}>
-              <MaterialCommunityIcons name="fire" size={16} color={colors.accent} />
-              <Text style={styles.streakText}>{streakLabel}</Text>
+          <View style={styles.middle}>
+            <View style={styles.row}>
+              <Text style={styles.levelText}>Level {props.level}</Text>
+              <View style={styles.streak} accessibilityLabel={`Current streak ${streakLabel}`}>
+                <MaterialCommunityIcons name="fire" size={16} color={colors.accent} />
+                <Text style={styles.streakText}>{streakLabel}</Text>
+              </View>
             </View>
+            <XpBar progress={props.progress} xpIntoLevel={props.xpIntoLevel} xpForNextLevel={props.xpForNextLevel} />
           </View>
-          <XpBar progress={props.progress} xpIntoLevel={props.xpIntoLevel} xpForNextLevel={props.xpForNextLevel} />
+
+          <View accessibilityLabel={restDay ? 'Rest day' : `${props.doneToday} of ${props.scheduledToday} habits done today`}>
+            <ProgressRing
+              progress={restDay ? 0 : props.doneToday / props.scheduledToday}
+              size={54}
+              strokeWidth={5}
+              color={restDay ? colors.muted : colors.green}>
+              <Text style={[styles.ringText, restDay && styles.ringTextRest]}>
+                {restDay ? 'Rest\nday' : `${props.doneToday}/${props.scheduledToday}`}
+              </Text>
+            </ProgressRing>
+          </View>
         </View>
 
-        <View accessibilityLabel={restDay ? 'Rest day' : `${props.doneToday} of ${props.scheduledToday} habits done today`}>
-          <ProgressRing
-            progress={restDay ? 0 : props.doneToday / props.scheduledToday}
-            size={54}
-            strokeWidth={5}
-            color={restDay ? colors.muted : colors.green}>
-            <Text style={[styles.ringText, restDay && styles.ringTextRest]}>
-              {restDay ? 'Rest\nday' : `${props.doneToday}/${props.scheduledToday}`}
-            </Text>
-          </ProgressRing>
+        <View style={props.placeholder && styles.hidden}>
+          <VitalityBar vitality={props.vitality} />
         </View>
       </View>
-
-      <VitalityBar vitality={props.vitality} />
     </View>
+  );
+}
+
+// Holds the stats card's exact space at launch, before the first stats load has finished (utils/homeLoading.ts):
+// the same component with fixed values and its content invisible, so its height can't drift from the real card.
+// An empty card, hidden from screen readers; never says anything.
+export function StatsCardPlaceholder() {
+  return (
+    <StatsCard
+      placeholder
+      level={1}
+      xpIntoLevel={0}
+      xpForNextLevel={100}
+      progress={0}
+      currentStreak={0}
+      doneToday={0}
+      scheduledToday={0}
+      vitality={{state: 'starting'}}
+    />
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    gap: spacing.sm,
     padding: spacing.md,
     borderRadius: radii.largeCard,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,
   },
+  content: {gap: spacing.sm},
+  hidden: {opacity: 0},
   top: {flexDirection: 'row', alignItems: 'center', gap: spacing.md},
   levelBadge: {
     borderRadius: radii.pill,

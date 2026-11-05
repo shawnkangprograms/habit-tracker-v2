@@ -20,7 +20,8 @@ import type {AppStats} from '@/utils/vitality';
 import {colors, fonts, radii, spacing, ICON_COLORS} from '@/constants/theme';
 import {HabitIcon} from '@/constants/habitIcons';
 import type {IconId} from '@/constants/habits';
-import {StatsCard} from '@/components/stats-card';
+import {StatsCard, StatsCardPlaceholder} from '@/components/stats-card';
+import {BLANK_STATUS, showAddControls, statsSlot} from '@/utils/homeLoading';// nothing untrue and no jump at launch
 import {HabitCheck} from '@/components/habit-check';
 import {XpFloat} from '@/components/xp-float';
 import {useReduceMotion} from '@/hooks/use-reduce-motion';
@@ -144,6 +145,25 @@ function TimeText({time, status}: {time: string; status: TimeStatus}) {
   return <Text style={styles.time}>{time}</Text>;
 }
 
+const NO_IDS: readonly string[] = [];
+
+// A habit row's space before habits are known at launch: the same card style and inner structure as a real row,
+// with no content (no shimmer, no animation), hidden from screen readers. Replaced by the real rows.
+function HabitRowPlaceholder() {
+  return (
+    <View
+      style={[styles.card, styles.placeholderRow]}
+      importantForAccessibility="no-hide-descendants"
+      accessibilityElementsHidden>
+      <View style={[styles.badge, styles.placeholderBadge]} />
+      <View style={styles.details}>
+        <Text style={styles.name}>{BLANK_STATUS}</Text>
+        <Text style={styles.subtitle}>{BLANK_STATUS}</Text>
+      </View>
+    </View>
+  );
+}
+
 function Bell() {
   return <MaterialCommunityIcons name="bell-ring-outline" size={11} color={colors.muted} />;
 }
@@ -242,6 +262,7 @@ export default function HomeScreen() {// default export, becomes the "index" tab
   const statsRef = useRef<StatsSnapshot | null>(null);// the same snapshot, readable at tap time
   const statsRequest = useRef(0);// id of the newest stats load; older responses are ignored
   const statsSettled = useRef(0);// id of the newest load that has finished
+  const [firstStatsSettled, setFirstStatsSettled] = useState(false);// a stats load has finished (either way): ends the placeholder
   const inFlight = useRef(new Set<string>());// habitIds whose toggle is still running
   const [floats, setFloats] = useState<Record<string, Float>>({});// "+N XP" labels by habitId
   const reduceMotion = useReduceMotion();
@@ -272,6 +293,7 @@ export default function HomeScreen() {// default export, becomes the "index" tab
     const published = publishStats(loaded, load);// for Profile and the tab icon; a no-op if nothing changed
     if (loaded) mark('stats:published');
     statsSettled.current = request;
+    setFirstStatsSettled(true);// no re-render once it is already true
     const unchanged = isDeepEqual(statsRef.current, snapshot);// every field, incl. streaks and badges
     if (!unchanged) {
       statsRef.current = snapshot;
@@ -499,6 +521,13 @@ export default function HomeScreen() {// default export, becomes the "index" tab
   const {other} = splitHomeRows(habits, list.all, weekdayOfDate(list.date));
   const daysById = new Map((list.all ?? []).map((h) => [h.habitId, h.days]));
 
+  // Before the first habit load nothing below the pack cards shows (utils/homeLoading.ts), and the stats card's
+  // space is held by a placeholder until a stats load has finished
+  const addControls = showAddControls({loaded});
+  const slot = statsSlot({statsSettled: firstStatsSettled, hasStats: stats !== null});
+  // each pack's saved habit ids: the placeholder rows an expanded card shows before habits are known
+  const savedHabitIds = new Map(packs?.parsed.kind === 'ok' ? packs.parsed.record.packs.map((p) => [p.id, p.habitIds] as const) : []);
+
   // Today's rows: each packed habit only inside its pack, the rest under "Habits"
   const groups = homeGroups(packs?.parsed ?? null, habits, list.all);
   const level = stats?.stats.level ?? null;
@@ -604,7 +633,9 @@ export default function HomeScreen() {// default export, becomes the "index" tab
             <Text style={styles.hello}>{greetingFor(currentHour(), firstName)}</Text>
           </View>
 
-          {stats && loaded && (
+          {/* the card's exact space is held from the first frame until the first stats load has finished; after a
+              failed load it stays hidden as before (utils/homeLoading.ts) */}
+          {slot === 'card' && loaded && stats ? (
             <StatsCard
               level={stats.stats.level}
               xpIntoLevel={stats.stats.xpIntoLevel}
@@ -615,7 +646,7 @@ export default function HomeScreen() {// default export, becomes the "index" tab
               scheduledToday={habits.length}
               vitality={stats.stats.vitality}
             />
-          )}
+          ) : slot !== 'none' && <StatsCardPlaceholder />}
 
           {/* keyed by uid: another account always gets a fresh card, never the previous one's insight */}
           {userId && <InsightCard key={userId} userId={userId} />}
@@ -654,26 +685,33 @@ export default function HomeScreen() {// default export, becomes the "index" tab
                     done={pack.done}
                     total={pack.rows.length}
                     hasHabits={pack.hasHabits}
+                    known={loaded}
+                    savedHabitIds={savedHabitIds.get(pack.packId) ?? NO_IDS}
+                    renderPlaceholder={(id) => <HabitRowPlaceholder key={id} />}
                     onEdit={() => router.push({pathname: '/packs/edit', params: {packId: pack.packId, from: 'home'}})}
                     addRest={packAddRest(pack.packId, pack.missing)}>
                     {pack.rows.map(renderToday)}
                   </PackCard>
                 ))}
-                <Pressable style={styles.addRow} onPress={createPackTap} accessibilityRole="button">
-                  <MaterialCommunityIcons name="view-grid-plus-outline" size={20} color={colors.accent} />
-                  <Text style={styles.addText}>{CREATE_PACK_BUTTON}</Text>
-                </Pressable>
-                {packCaption && <Text style={styles.limitCaption} accessibilityLiveRegion="polite">{packCaption}</Text>}
+                {addControls && (
+                  <>
+                    <Pressable style={styles.addRow} onPress={createPackTap} accessibilityRole="button">
+                      <MaterialCommunityIcons name="view-grid-plus-outline" size={20} color={colors.accent} />
+                      <Text style={styles.addText}>{CREATE_PACK_BUTTON}</Text>
+                    </Pressable>
+                    {packCaption && <Text style={styles.limitCaption} accessibilityLiveRegion="polite">{packCaption}</Text>}
+                  </>
+                )}
               </View>
-              <Text style={styles.sectionTitle} accessibilityRole="header">{HOME_HABITS_TITLE}</Text>
+              {addControls && <Text style={styles.sectionTitle} accessibilityRole="header">{HOME_HABITS_TITLE}</Text>}
             </>
           )}
 
           <View style={styles.list}>
             {groups.unpacked.map(renderToday)}
 
-            {/* hidden while the first-run card shows, so there is one clear action */}
-            {emptyState !== 'empty' && (
+            {/* hidden while the first-run card shows, so there is one clear action, and until habits are known */}
+            {emptyState !== 'empty' && addControls && (
               <>
                 <Pressable style={styles.addRow} onPress={addHabitTap} accessibilityRole="button">
                   <MaterialCommunityIcons name="plus" size={20} color={colors.accent} />
@@ -776,6 +814,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   details: {flex: 1, gap: 2},
+  placeholderRow: {backgroundColor: colors.track, borderColor: colors.border},// plain and dim: no shimmer, no animation
+  placeholderBadge: {borderColor: 'transparent'},
   name: {fontFamily: fonts.title, fontSize: 14, color: colors.text},
   subtitleRow: {flexDirection: 'row', alignItems: 'center', gap: 3},
   subtitle: {fontFamily: fonts.regular, fontSize: 10, color: colors.muted},

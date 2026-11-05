@@ -4,13 +4,16 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import Animated, {ReduceMotion, useAnimatedStyle, useSharedValue, withTiming} from 'react-native-reanimated';
 import {usePackExpanded} from '@/hooks/use-packs';
 import {colors, fonts, radii, spacing} from '@/constants/theme';
-import {ADD_REST, ADDING, editPackLabel, packProgress} from '@/utils/packs/copy';
+import {ADD_REST, ADDING, editPackLabel} from '@/utils/packs/copy';
+import {packStatusText, placeholderRows} from '@/utils/homeLoading';
 
 // One pack on Home (docs/PACKS_REPORTS_SPEC.md, section 4): name, "{x} of {n} done today", a progress bar and a
 // chevron; tapping the header expands or collapses it (expanded by default, remembered for the app run). The
 // bar and chevron move with transforms only, and there is no height animation: the habits just appear.
 // The rows themselves are Home's own (children), so ticking one works exactly as anywhere else on Home.
 // The pencil beside the chevron opens the pack's edit screen; it is its own button, never inside the header's.
+// Before Home's first habit load (known false) the status line is blank (same height, never "Nothing scheduled
+// today"), the bar is empty, and an expanded card shows one placeholder row per saved habit id instead of rows.
 
 export type AddRest = {
   adding: boolean;
@@ -25,6 +28,9 @@ export function PackCard(props: {
   done: number;
   total: number;
   hasHabits: boolean;// false: "No habits yet"
+  known: boolean;// Home's habits have loaded at least once
+  savedHabitIds: readonly string[];// from the pack record: how many placeholder rows to show while not known
+  renderPlaceholder: (key: string) => ReactNode;// one placeholder row, sized like Home's own rows
   onEdit: () => void;
   addRest: AddRest | null;// null: nothing missing
   children: ReactNode;
@@ -43,7 +49,8 @@ export function PackCard(props: {
 
   const fillStyle = useAnimatedStyle(() => ({transform: [{scaleX: Math.min(1, Math.max(0, fill.value))}]}));
   const chevronStyle = useAnimatedStyle(() => ({transform: [{rotate: `${turn.value * 180}deg`}]}));
-  const status = packProgress(props.done, props.total, props.hasHabits);
+  const status = packStatusText({known: props.known, done: props.done, total: props.total, hasHabits: props.hasHabits});
+  const placeholders = placeholderRows({known: props.known, expanded, habitIds: props.savedHabitIds});
 
   return (
     <View style={styles.card}>
@@ -53,7 +60,7 @@ export function PackCard(props: {
           onPress={toggle}
           accessibilityRole="button"
           accessibilityState={{expanded}}
-          accessibilityLabel={`${props.name}, ${status}`}>
+          accessibilityLabel={props.known ? `${props.name}, ${status}` : props.name}>
           <View style={styles.headerText}>
             <Text style={styles.name} numberOfLines={1}>{props.name}</Text>
             <Text style={styles.status}>{status}</Text>
@@ -84,7 +91,7 @@ export function PackCard(props: {
 
       {expanded && (
         <View style={styles.body}>
-          {props.children}
+          {placeholders > 0 ? props.savedHabitIds.slice(0, placeholders).map((id) => props.renderPlaceholder(id)) : props.children}
           {props.addRest && (
             <>
               <Pressable
