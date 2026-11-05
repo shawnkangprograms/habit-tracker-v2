@@ -3,16 +3,21 @@
 import {describe, test} from 'node:test';
 import assert from 'node:assert/strict';
 import './helpers/alias.ts'; // must come before the dynamic imports below
-import type {AppStats} from '../utils/vitality.ts';
+import type {AppStats} from '../utils/appStats.ts';
 
 // Same module instances the store subscribes to (the alias resolves "@/db/..." to these files)
 const {emitLocalChange, onLocalChange} = await import('../db/localChanges.js');
 const {emitRemoteChange, onRemoteChange} = await import('../db/remoteChanges.js');
 const store = await import('../services/statsStore.ts');
 const {computeGamification} = await import('../utils/gamification.ts');
+const {computeRadar} = await import('../utils/radar/score.ts');
 
 const TODAY = '2026-10-21';
-const BASE: AppStats = {...computeGamification([], [], TODAY), vitality: {state: 'starting'}};
+const BASE: AppStats = {
+  ...computeGamification([], [], TODAY),
+  vitality: {state: 'starting'},
+  radar: computeRadar({habits: [], completions: [], today: TODAY, packs: null, areas: {}}),
+};
 const withStreak = (currentStreak: number): AppStats => ({...BASE, currentStreak, longestStreak: currentStreak});
 
 // The store is module state: every test signs in a user of its own

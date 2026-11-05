@@ -9,7 +9,7 @@
 // registered before any screen's listener, and the change emitters call listeners in subscription order:
 // markStale always runs before a screen's handler for the same change can call beginLoad.
 
-import type {AppStats} from '@/utils/vitality';
+import type {AppStats} from '@/utils/appStats';
 import {isDeepEqual} from '@/utils/equality';
 import {onLocalChange} from '@/db/localChanges';
 import {onRemoteChange} from '@/db/remoteChanges';

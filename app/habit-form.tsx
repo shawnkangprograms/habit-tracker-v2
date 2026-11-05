@@ -28,7 +28,10 @@ import {useKeyboardScroll} from '@/hooks/use-keyboard-scroll';
 import {packsStore} from '@/services/packsStore';
 import {checkAddFor} from '@/services/packLimits';
 import {HABIT_PACK_LABEL, NO_PACK} from '@/utils/packs/copy';
-import {moveHabit, packOf} from '@/utils/packs/manage';
+import {areasStore} from '@/services/areasStore';
+import {iconArea, isAreaValue, type AreaValue} from '@/utils/radar/areas';
+import {AREA_NOT_COUNTED, AREA_ROW_HELPER, AREA_ROW_LABEL} from '@/utils/radar/copy';
+import {AREA_ORDER, moveHabit, packArea, packOf} from '@/utils/packs/manage';
 
 // For the timing line under the chips: a plain function so the React Compiler lint doesn't treat it as a render-time read
 function clockNow(): Date {
@@ -74,6 +77,9 @@ export default function HabitFormScreen() {
   const [packChoice, setPackChoice] = useState<string | null>(null);
   const [initialPack, setInitialPack] = useState<string | null>(null);
   const [limitMessage, setLimitMessage] = useState<string | null>(null);// adding only: the habit limit
+  // The radar area (docs/PACKS_REPORTS_SPEC.md, section 11), for a habit whose pack has no area: null = not chosen,
+  // so it follows the icon. Saved on this phone only, after the habit, and only once chosen (or already stored).
+  const [areaPick, setAreaPick] = useState<AreaValue | null>(null);
 
   useEffect(() => {
     if (!userId) {
@@ -99,10 +105,12 @@ export default function HabitFormScreen() {
         setReminder(habit.reminderTime ?? '');
         setAlarm(habit.alarm);
         setLead(habit.remindBeforeMin);
-        return packsStore.read(userId).then((parsed) => {
+        return Promise.all([packsStore.read(userId), areasStore.read(userId)]).then(([parsed, areas]) => {
           const owner = parsed.kind === 'ok' ? packOf(parsed.record, habitId)?.id ?? null : null;
           setPackChoice(owner);
           setInitialPack(owner);
+          const stored = areas[habitId];
+          if (isAreaValue(stored)) setAreaPick(stored);
           setIsLoaded(true);
         });
       })
@@ -194,6 +202,8 @@ export default function HabitFormScreen() {
           return next === parsed.record ? null : next;
         });
       }
+      // never throws; a failed write leaves the habit on its icon's area
+      if (savedId && showAreaRow && areaPick !== null) await areasStore.write(userId, savedId, areaPick);
       if (reminderTime !== null) await askForReminderPermission();// services/reminderPermission.ts; never throws
       goBack();
     } catch (err) {
@@ -225,6 +235,10 @@ export default function HabitFormScreen() {
   if (!isLoaded) return <SafeAreaView style={styles.screen} />;
 
   const packOptions = packs?.parsed.kind === 'ok' ? [...packs.parsed.record.packs].sort((a, b) => a.order - b.order) : [];
+  // AREA shows whenever the chosen pack has no area: None, no packs, or a custom pack without one
+  const chosenPack = packOptions.find((p) => p.id === packChoice);
+  const showAreaRow = !chosenPack || packArea(chosenPack) === null;
+  const areaShown: AreaValue | null = areaPick ?? (icon ? iconArea(icon) : null);
 
   const nameLength = Array.from(habitName.trim()).length; // trimmed code points, as the validator counts
   const timingLine = reminderOn ? timingNoteText(reminderTimingNote({
@@ -364,6 +378,30 @@ export default function HabitFormScreen() {
                   );
                 })}
               </View>
+            </View>
+          )}
+
+          {/* AREA: the radar area, only when the chosen pack has none; pre-filled from the icon */}
+          {showAreaRow && (
+            <View style={styles.section}>
+              <Text style={[styles.label, styles.labelGap]}>{AREA_ROW_LABEL}</Text>
+              <View style={styles.chips} accessibilityRole="radiogroup" accessibilityLabel={AREA_ROW_LABEL}>
+                {[...AREA_ORDER, 'none' as const].map((option) => {
+                  const selected = areaShown === option;
+                  return (
+                    <Pressable
+                      key={option}
+                      onPress={() => setAreaPick(option)}
+                      style={[styles.chip, selected ? styles.pillSelected : styles.pillUnselected]}
+                      hitSlop={4}
+                      accessibilityRole="radio"
+                      accessibilityState={{selected}}>
+                      <Text style={[styles.chipText, selected && styles.whiteText]}>{option === 'none' ? AREA_NOT_COUNTED : option}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <Text style={styles.helperText}>{AREA_ROW_HELPER}</Text>
             </View>
           )}
 

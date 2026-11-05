@@ -135,7 +135,7 @@ Renumbered 2026-11-04 (earlier numbering: 1 packs, 2 management, 3 calendar, 4 r
 2. Pack management and limits: create, edit and delete packs, the habit form pack row, and limit enforcement on every add path through one shared function, with the caption under the add controls. Over-limit accounts keep everything (section 16).
 3. Reflections and XP rebalance: the reflection bar and screen, reflection XP and the on-device record (section 12), and the XP rebalance (section 16). Nothing leaves the phone in this stage; the consent switch moved to stage 9.
 4. Vitality (section 13) on the Home stats card, with the shared per-day completion module (built).
-5. Live radar (section 11): area tags in use, the habit form Area row, the Home card and the Summary radar.
+5. Live radar (section 11): area tags in use, the habit form Area row, the Home card and the Summary radar (built).
 6. Per-habit streak calendar.
 7. Report engine (stats, rules, template sentences), Reports screen, the Home "New report" card, and the merged weekly flow with the checkup (section 14).
 8. Notification scheduling (reports and the daily checkup), copy table, Settings switches.
@@ -149,11 +149,14 @@ Also, as each stage lands: every template has exactly one area and it equals its
 
 ## 11. Live radar
 
-- **Axes:** the six built-in pack areas, in the onboarding radar's order: Learning (study_sprint), Mind (calm_mind), Career (career_builder), Discipline (daily_discipline), Relations (close_circle), Health (steady_energy).
-- **Score per area:** the completion rate over the window, counting only scheduled days (the streak calendar's rule): completed scheduled days / scheduled days, over every active habit in that area. Window switch Week (last 7 days, default) / Month (last 28 days); whether today's open day counts is settled in the stage 5 plan. The per-day completion data comes from the same module as Vitality (section 13).
-- **Empty states:** an area with habits but no scheduled day in the window shows no data (a gap at that axis, not zero). An area with no habits sits at the centre with "No habits here yet", and tapping it suggests one habit from that area's pack.
-- **Habit to area:** a packed habit uses its pack's area (a custom pack's area is chosen when it is created, stage 2). An unpacked habit has an "Area" row in the habit form: the six areas plus "Not counted", pre-filled from its icon (table below), changeable by the user. Stored on the device only as `areas:v1:<uid>` = `{habitId: area | 'none'}`, for unpacked habits only; never Firestore, sync or Gemini. A habit pulled from another device has no stored area and uses the icon pre-fill until the user picks one.
-- **Icon to area pre-fill (proposed, awaiting approval):**
+Built in Stage 5.
+
+- **Axes:** the six built-in pack areas, in the onboarding radar's order: Learning (study_sprint) at the top, then clockwise Mind (calm_mind), Career (career_builder), Discipline (daily_discipline), Relations (close_circle), Health (steady_energy).
+- **Score per area:** done / scheduled over the window's closed days, summed over every active habit in that area, with the per-day counts from utils/dailyCompletion.ts (the perfect-day rule: deleted habits are ignored, a habit counts from its creation day, rest days add nothing, so they never count against an axis). Today never counts. Window Week = the last 7 closed days (default), Month = the last 28 closed days. Summary's own stats keep their 30-day month; only the radar uses 28. Derived on every load (Home's stats load, Summary's load), never stored. Maths in utils/radar/score.ts.
+- **Axis states:** a score; **no data** (the area has habits but none was scheduled in the window); **empty** (no habits in the area). An axis without a score sits at the centre of the shape with a dashed spoke and no dot. When no axis has a score the radar shows "Starts after your first full day." instead of a shape.
+- **Habit to area** (utils/radar/areas.ts), first match wins: the habit's pack's area; for a habit in no pack, or in a custom pack with no area, the value stored on this phone; otherwise the icon pre-fill below. The habit form shows an "AREA" row (Health, Mind, Discipline, Career, Learning, Relations, Not counted; helper "Used for your radar. Habits in a pack use the pack's area.") whenever the selected pack has no area (None, no packs, or an area-less custom pack), pre-filled from the icon until the user picks one; a pick is saved after the habit, and a failed save leaves the icon's area.
+- **Area map:** `areas:v1:<uid>` = `{habitId: area | 'none'}` in AsyncStorage, on this phone only: never Firestore, sync or Gemini, kept on sign-out like the packs and reflections records. A habit pulled onto a new phone has no entry and falls back to the icon pre-fill. Entries of deleted habits (and of habits later moved into a pack, where the pack wins) are left in place. It is read once per app run inside the stats load, in parallel with SQLite; a failed or corrupt read counts as an empty map, never as a stats failure.
+- **Icon to area pre-fill (approved):**
 
 | Icon | Area |
 |---|---|
@@ -165,10 +168,16 @@ Also, as each stage lands: every template has exactly one area and it equals its
 | star | Not counted |
 
   Discipline has no icon of its own (none of the 12 fits it), so it is only ever chosen by hand or through a pack.
-- **Starting outline:** a faint outline of the onboarding Habit Profile behind the live shape, stored as six rounded numbers only (the profile scores, 1 to 5) under `profile:outline:v1:<uid>`. Local, never synced, kept or cleared exactly like the onboarding record (currently kept on sign-out). The answers are still never stored. A retake replaces the outline.
-- **The dashed shape today:** on the current onboarding radar the dashed inner polygon is a fixed reference at 2 of 5 on every axis (`RADAR_BASELINE` in utils/onboarding/scoring.ts). It is not user data. On the live radar the faint starting outline takes its place.
-- **Where:** a compact radar card on Home above Today (tappable, opens Summary); the full radar with the Week / Month switch on Summary.
-- **Motion and cost:** transforms and opacity only, plain fade or none under reduced motion. Computed when the screen is focused, never at cold start; on Home only after `home:usable`.
+- **Starting outline:** the onboarding Habit Profile as six whole numbers 1 to 5 under `profile:outline:v1:<uid>`, written by onboarding's results step (when the plan is built, before the Habit Profile shows) on every run that reaches it: the first run (opened from Home after sign-up or by the onboarding gate) and a Settings retake, which replaces it. Written from the in-memory scores, clamped 1 to 5; a failed write is ignored and never blocks onboarding. The answers are still never stored. Kept or cleared like the onboarding record (currently kept on sign-out). Drawn faintly (dashed, muted) behind the live shape on the Summary radar only, whenever one is stored; nothing is drawn when none is. Accounts that onboarded before Stage 5 have none until a retake.
+- **The dashed shape on the onboarding radar** is a fixed reference at 2 of 5 on every axis (`RADAR_BASELINE` in utils/onboarding/scoring.ts). It is not user data.
+- **Where:**
+  - Home: a compact card below the habit lists (after "Other days"), at a fixed height whose space is held by an empty placeholder until the first stats load has finished. Left: a small radar without labels or outline, with "Last 7 days" or "Last 28 days" directly under it. Right: "Habit radar", "Strongest: {area} {n}%", and "Needs care: {area} {n}%" only when the lowest scored axis is below 75% and is not the strongest (ties: the first in axis order), then a Week/Month switch. The radar and the text open Summary.
+  - Summary: directly after the Week bars / Month heat strip and before "By habit", under its own "Habit radar" header (hidden whenever Summary shows its empty card): the full radar with two-line labels (line 1 the area name, line 2 "{n}%" or "–", 12 px, the label colour), the starting outline, the window caption directly under it, then one row per area: its percentage and "{done} of {scheduled}", "No data", or "No habits here yet". Summary's Week/Month toggle drives it; there is no second switch. The Home compact radar has no labels.
+  - One Week/Month choice in memory, shared by both, Week after every launch.
+  - "Try {template}" for an empty area is deferred.
+- **Accessibility:** every value in words, never colour alone: "Habit radar, last 7 days: Learning no data, Mind 100 percent, … Relations no habits yet." (or "…: Starts after your first full day."). On Home it is the card button's label, with the hint "Opens Summary"; the switch is its own control.
+- **Small screens:** the two-line labels have their own fit (utils/radar/fit.ts, fitRadarTwoLine; the onboarding radar keeps fitRadar unchanged). The radius is sized from the wider line of each label (the area names), with the onboarding radar's conservative width estimate, and the drawing has room for a two-line label above the shape and one below; side labels grow away from it, upper ones stacking upward and lower ones downward. Every label fits at 300 to 430 dp (tested). Radius: 57 px at 300 dp, 68 at 320, 91 at 360 (the Itel, pinned in the tests), 100 (the maximum) at 430. One-line "{Area} 100%" labels had left 12, 23, 46 and 87.
+- **Motion and cost:** the live shape fades and grows from the centre once (opacity and transform only); none under reduce motion. No extra SQL query; nothing computed is stored.
 
 ## 12. Reflections and reflection XP
 

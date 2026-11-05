@@ -8,7 +8,6 @@
 // it is a gain, so a loss appears when the day closes (at midnight Home reloads its stats).
 
 import type {DayCount} from '@/utils/dailyCompletion';
-import type {GamificationStats} from '@/utils/gamification';
 
 export const VITALITY_START = 50;
 export const VITALITY_MAX = 100;
@@ -63,7 +62,3 @@ export function vitalityValueText(value: number): string {
 export function vitalityA11yLabel(value: number): string {
   return `Vitality ${value} out of ${VITALITY_MAX}`;
 }
-
-// ---------- The stats every screen loads (services/gamificationStats.ts) ----------
-
-export type AppStats = GamificationStats & {vitality: Vitality};

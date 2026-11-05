@@ -25,6 +25,7 @@ import {RoutineCard} from '@/components/onboarding/routine-card';
 import {RoutineReminder} from '@/components/onboarding/routine-reminder';
 import {RoutineGroup} from '@/components/onboarding/routine-group';
 import {packsStore} from '@/services/packsStore';
+import {profileOutlineStore} from '@/services/profileOutlineStore';// the radar's starting outline (six numbers)
 import {checkAddFor} from '@/services/packLimits';
 import {packsAfterRun, routineGroups, runPacks, type RunJoin} from '@/utils/packs/choose';
 import type {HabitRef} from '@/utils/packs/membership';
@@ -263,7 +264,9 @@ export default function OnboardingScreen() {
     if (shouldCloseForSession(userId)) closeFlow();
   }, [userId]);
 
-  // After Q11: Building Profile shows while the plan is built (a local read and pure maths)
+  // After Q11: Building Profile shows while the plan is built (a local read and pure maths). Once it is, the radar's
+  // starting outline (services/profileOutlineStoreCore.ts) is saved from the in-memory scores, on every run that
+  // gets here (first run and Settings retake). Never awaited, never throws: a failed write never blocks onboarding.
   const startResults = () => {
     const result = validateAnswers(answers);
     if (!result.valid) return;
@@ -272,6 +275,7 @@ export default function OnboardingScreen() {
     setPhase('building');
     loadPlan(userId, result.value).then((next) => {
       if (request !== planRequest.current) return;
+      if (userId) profileOutlineStore.write(userId, next.plan.scores);
       setPlan(next.plan);
       setContext(next.context);
       setSelected(new Set(next.plan.picks.map((p) => p.id)));

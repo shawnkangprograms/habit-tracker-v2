@@ -16,7 +16,7 @@ import {getFirebaseAuth} from '@/services/authInit';// only for an optional disp
 import {useSessionUid} from '@/services/session';// the user whose local data Home shows (presumed or confirmed)
 import {getLocalDateString} from '@/utils/dates';
 import {isDeepEqual} from '@/utils/equality';// skip a re-render when a reload returned what is already shown
-import type {AppStats} from '@/utils/vitality';
+import type {AppStats} from '@/utils/appStats';
 import {colors, fonts, radii, spacing, ICON_COLORS} from '@/constants/theme';
 import {HabitIcon} from '@/constants/habitIcons';
 import type {IconId} from '@/constants/habits';
@@ -27,6 +27,8 @@ import {XpFloat} from '@/components/xp-float';
 import {useReduceMotion} from '@/hooks/use-reduce-motion';
 import {useCelebrations, type TickStats} from '@/hooks/use-celebrations';// overlays, banner and toasts after a tick
 import {CelebrationLayer} from '@/components/celebration-layer';
+import {RadarCard, RadarCardPlaceholder} from '@/components/radar/radar-card';// the live radar, below the lists
+import {setRadarWindow, useRadarWindow} from '@/hooks/use-radar-window';
 import {useReflectionBar} from '@/hooks/use-reflection-bar';// the reflection offer after a tick
 import {ReflectionBar} from '@/components/reflections/reflection-bar';
 import {reflectionsStore} from '@/services/reflectionsStore';
@@ -269,6 +271,8 @@ export default function HomeScreen() {// default export, becomes the "index" tab
   const celebration = useCelebrations(userId);
   const {onTick, onReflection} = celebration;
   const reflection = useReflectionBar(userId);
+  const radarWindow = useRadarWindow();// shared with Summary's Week/Month toggle
+  const openSummary = useCallback(() => router.navigate('/summary'), []);
   const {dayChanged: reflectionDayChanged, untick: reflectionUntick, offer: offerReflection} = reflection;// stable callbacks
   useNotificationPrefs();// loads the saved settings, so the soft prompt below knows whether it was answered
   const [reminderPrompt, setReminderPrompt] = useState(false);
@@ -764,6 +768,11 @@ export default function HomeScreen() {// default export, becomes the "index" tab
               </View>
             </>
           )}
+
+          {/* the live radar, below the habit lists; its space is held from the first frame like the stats card's */}
+          {slot === 'card' && loaded && stats && emptyState === 'hidden' ? (
+            <RadarCard radar={stats.stats.radar} window={radarWindow} onWindow={setRadarWindow} onOpen={openSummary} />
+          ) : (slot === 'placeholder' || (slot === 'card' && !loaded)) && <RadarCardPlaceholder />}
 
         </ScrollView>
 

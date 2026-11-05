@@ -137,6 +137,40 @@ describe('Vitality modules (on-device only, Stage 4)', () => {
   });
 });
 
+const RADAR_FILES = [
+  ...files('utils/radar'), ...files('services/areasStore.ts'), ...files('services/areasStoreCore.ts'),
+  ...files('services/profileOutlineStore.ts'), ...files('services/profileOutlineStoreCore.ts'),
+  ...files('components/radar'), ...files('hooks/use-radar-window.ts'), ...files('utils/appStats.ts'),
+];
+
+describe('radar modules (on-device only, Stage 5)', () => {
+  test('exist, are covered by the ESLint block, and import nothing that reaches Firebase, sync or the network', () => {
+    for (const file of ['utils/radar/areas.ts', 'utils/radar/score.ts', 'utils/radar/copy.ts', 'services/areasStoreCore.ts',
+      'services/areasStore.ts', 'services/profileOutlineStoreCore.ts', 'services/profileOutlineStore.ts',
+      'components/radar/radar-drawing.tsx', 'components/radar/radar-card.tsx', 'components/radar/radar-summary.tsx',
+      'components/radar/window-switch.tsx', 'hooks/use-radar-window.ts', 'utils/appStats.ts']) {
+      assert.ok(RADAR_FILES.map(rel).includes(file), `${file} is scanned`);
+    }
+    const config = readFileSync(join(ROOT, 'eslint.config.js'), 'utf8');
+    for (const glob of ["'utils/radar/**'", "'services/areasStore*.ts'", "'services/profileOutline*.ts'", "'components/radar/**'",
+      "'hooks/use-radar-window.ts'", "'utils/appStats.ts'"]) {
+      assert.ok(config.includes(glob), glob);
+    }
+    for (const file of RADAR_FILES) {
+      for (const spec of specifiers(readFileSync(file, 'utf8'))) {
+        assert.ok(!FORBIDDEN.some((re) => re.test(spec)), `${rel(file)} imports ${spec}`);
+      }
+    }
+  });
+
+  test('the maths in utils/radar imports only pure modules', () => {
+    const allowed = /^@\/utils\/(radar\/\w+|packs\/(manage|record)|onboarding\/(types|radar)|gamification|dailyCompletion)$/;
+    for (const file of files('utils/radar')) {
+      for (const spec of specifiers(readFileSync(file, 'utf8'))) assert.match(spec, allowed, `${rel(file)} imports ${spec}`);
+    }
+  });
+});
+
 describe('sync, the database, the insight request, the Cloud Functions and the admin screens', () => {
   test('never mention packs', () => {
     const outbound = [
@@ -169,6 +203,19 @@ describe('sync, the database, the insight request, the Cloud Functions and the a
     ];
     assert.ok(outbound.length > 15);
     for (const file of outbound) assert.doesNotMatch(readFileSync(file, 'utf8'), /vitality|dailyCompletion/i, rel(file));
+  });
+
+  test('never mention the radar, its areas map or the starting outline', () => {
+    const outbound = [
+      ...files('sync'), ...files('db'), ...files('functions/src'), ...files('functions/index.js'),
+      ...files('services/firestore.js'), ...files('services/firebaseInit.js'), ...files('services/insights.ts'),
+      ...files('services/insightCache.ts'), ...files('utils/insightInput.ts'), ...files('utils/insightSchedule.ts'),
+      ...files('services/admin.js'), ...files('services/adminAudit.js'), ...files('app/admin'),
+    ];
+    assert.ok(outbound.length > 15);
+    for (const file of outbound) {
+      assert.doesNotMatch(readFileSync(file, 'utf8'), /utils\/radar|areasStore|areas:v1|profile:outline|profileOutline/, rel(file));
+    }
   });
 
   test('the insight function rejects a request carrying a reflections field', async () => {
