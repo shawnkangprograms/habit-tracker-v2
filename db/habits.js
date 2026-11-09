@@ -4,6 +4,7 @@ import {enqueueWrite} from '@/db/writeQueue';
 import {emitLocalChange} from '@/db/localChanges';
 import {ensureTodayRows, requireUserId, SCHEDULED_ON_DAY_SQL} from '@/db/completions';
 import * as core from '@/db/habitsCore';
+import {STAMP_UPDATE_SQL} from '@/db/stamp';// updatedAt = max(now, previous + 1): S-1
 import {getLocalDateString, getLocalWeekdayKey} from '@/utils/dates';
 import {validateHabitInput} from '@/validation/validators';
 
@@ -105,7 +106,7 @@ export async function updateHabit(userId, habitId, input) {
             const result = await db.runAsync(
                 `UPDATE habits
                 SET habitName = ?, icon = ?, frequencyType = ?, reminderTime = ?, alarm = ?, remindBeforeMin = ?,
-                    updatedAt = ?, synced = 0
+                    updatedAt = ${STAMP_UPDATE_SQL}, synced = 0
                 WHERE habitId = ? AND userId = ? AND deleted = 0`,
                 [habit.habitName, habit.icon, habit.frequency.type, habit.reminderTime, habit.alarm ? 1 : 0,
                     habit.remindBeforeMin, Date.now(), habitId, userId]
@@ -127,7 +128,7 @@ export async function softDeleteHabit(userId, habitId) {
     await enqueueWrite(async () => {
         const db = await getDatabase();
         const result = await db.runAsync(
-            `UPDATE habits SET deleted = 1, updatedAt = ?, synced = 0
+            `UPDATE habits SET deleted = 1, updatedAt = ${STAMP_UPDATE_SQL}, synced = 0
             WHERE habitId = ? AND userId = ? AND deleted = 0`,
             [Date.now(), habitId, userId]
         );

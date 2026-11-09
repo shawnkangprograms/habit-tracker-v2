@@ -13,6 +13,10 @@ import type {IconId, RemindBeforeMin, WeekdayKey} from '@/constants/habits';
 
 export const BATCH_LIMIT = 450; // Firestore allows 500 writes per batch; headroom for safety
 
+// The rules refuse an updatedAt more than one day ahead of server time (firestore.rules). Rows stamped further
+// ahead than this by the phone's clock are re-stamped before a push (S-1, db/syncCore.js restampFutureRows).
+export const FUTURE_STAMP_LIMIT_MS = 24 * 60 * 60 * 1000;
+
 // Version of the remote-doc parsing rules (docToHabit / docToCompletion and the validators behind them).
 // Bump it whenever parsing accepts something new (e.g. new icons): the pull cursors then reset and every
 // phone re-reads all docs once, so docs it skipped as invalid before are picked up.

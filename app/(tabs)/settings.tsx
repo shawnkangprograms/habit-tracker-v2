@@ -21,6 +21,7 @@ import {TRACE_ON} from '@/utils/startupTrace';
 import {SETTINGS_ROW} from '@/utils/onboarding/copy';
 import {NAME_ROW} from '@/utils/profileName';
 import {SETTINGS_PACKS_ROW} from '@/utils/packs/copy';
+import {useClockLine} from '@/hooks/use-clock-line';// S-1: the one sync message, here only
 
 // DEV ONLY: long-press the title to seed early-praise history (logs first, a second long press confirms)
 const devSeed = devSeedEarlyPraise;
@@ -49,6 +50,7 @@ export default function SettingsScreen (){
     const {isAdmin, recheckIfFailed} = useIsAdmin();
     const celebrationsOn = useCelebrationsEnabled();
     const notificationPrefs = useNotificationPrefs();
+    const clockMessage = useClockLine();
     const [permission, setPermission] = useState<PermissionState | null>(null);
     const [asking, setAsking] = useState(false);
     const [available] = useState(notificationsAvailable);// fixed for the app run: the module loads once or never
@@ -109,6 +111,7 @@ export default function SettingsScreen (){
         <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
             <ScrollView contentContainerStyle={styles.content}>
               <Text style={styles.title} onLongPress={onTitleLongPress}>Settings</Text>
+              {clockMessage ? <Text style={styles.clockLine}>{clockMessage}</Text> : null}
 
               <View style={styles.list}>
                 <SwitchRow
@@ -268,6 +271,7 @@ const styles = StyleSheet.create({
   rowText: {flex: 1, fontFamily: fonts.semiBold, fontSize: 15, color: colors.text},
   disabledRow: {opacity: 0.5},
   testLine: {fontFamily: fonts.regular, fontSize: 12, color: colors.muted, paddingHorizontal: spacing.xs},
+  clockLine: {fontFamily: fonts.regular, fontSize: 13, color: colors.muted, marginTop: -spacing.sm},// S-1; wraps freely
   chips: {flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, paddingHorizontal: spacing.xs},
   chip: {height: 34, paddingHorizontal: 14, borderRadius: radii.pill, alignItems: 'center', justifyContent: 'center'},
   chipSelected: {backgroundColor: colors.accent},

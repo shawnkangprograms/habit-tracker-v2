@@ -1,4 +1,4 @@
-import {mergeHabit} from '@/sync/merge';
+import {FUTURE_STAMP_LIMIT_MS, mergeHabit} from '@/sync/merge';
 
 // SQLite side of sync. Every function takes the database and the uid explicitly (never the signed-in user)
 // and filters through habits.userId. The db is anything with getAllAsync / getFirstAsync / runAsync /
@@ -107,6 +107,32 @@ export async function markCompletionSynced(db, uid, habitId, date, pushedUpdated
         [habitId, date, pushedUpdatedAt, uid]
     );
     return result.changes === 1;
+}
+
+// Rows stuck with a future updatedAt (stamped while the phone's clock was more than a day ahead, so the rules
+// refused them) are re-stamped to now, in one transaction (docs/HABITQUEST_DESIGN.md, S-1). Only this uid's
+// UNSYNCED rows: a synced row matches the server already, and another user's rows are never touched. System rows
+// (updatedAt = 0) can't match. Those versions never reached the server, so the server's copy is older than now.
+// `now` is read when this runs (inside the write queue), not when it was asked for.
+export async function restampFutureRows(db, uid, now) {
+    requireUid(uid);
+    let habits = 0;
+    let completions = 0;
+    await db.withTransactionAsync(async () => {
+        const at = now();
+        const limit = at + FUTURE_STAMP_LIMIT_MS;
+        habits = (await db.runAsync(
+            'UPDATE habits SET updatedAt = ? WHERE userId = ? AND synced = 0 AND updatedAt > ?',
+            [at, uid, limit]
+        )).changes;
+        completions = (await db.runAsync(
+            `UPDATE completions SET updatedAt = ?
+            WHERE synced = 0 AND updatedAt > ?
+                AND habitId IN (SELECT habitId FROM habits WHERE userId = ?)`,
+            [at, limit, uid]
+        )).changes;
+    });
+    return {habits, completions};
 }
 
 // ---------- Pull side ----------

@@ -21,6 +21,11 @@ export function markCompletionSynced(uid, habitId, date, pushedUpdatedAt) {
     return enqueueWrite(async () => core.markCompletionSynced(await getDatabase(), uid, habitId, date, pushedUpdatedAt));
 }
 
+// S-1: re-stamp this uid's unsynced rows stuck with a future updatedAt; now is read inside the queued task
+export function restampFutureRows(uid, now) {
+    return enqueueWrite(async () => core.restampFutureRows(await getDatabase(), uid, now));
+}
+
 export function applyRemoteHabits(uid, remoteHabits) {
     return enqueueWrite(async () => core.applyRemoteHabits(await getDatabase(), uid, remoteHabits));
 }

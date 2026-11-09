@@ -15,7 +15,7 @@ added for tests; new test files are picked up by the existing `tests/*.test.ts` 
 
 | Id | Rule | Where it is recorded |
 |---|---|---|
-| S-1 | Every user write stamps `updatedAt = max(now, row.updatedAt + 1)` (monotonic per row). Rows stuck with a future `updatedAt` are handled (mechanism proposed for Phase 1b). Cross-device clock skew is a documented last-write-wins limit. | HABITQUEST_DESIGN.md |
+| S-1 | Every user write stamps `updatedAt = max(now, row.updatedAt + 1)` (monotonic per row). Unsynced rows more than a day ahead are re-stamped to now before a push (guarded). A "clock suspect" counter drives one muted Settings line. Cross-device clock skew is a documented last-write-wins limit. **Built in Phase 1b.** | HABITQUEST_DESIGN.md |
 | S-2 | A habit's `createdDate` is clamped to `min(createdDate, today)`, and only that, wherever it is computed with `today`. | HABITQUEST_DESIGN.md |
 | S-4 | Template-creating actions ("Add the rest", a Settings retake, later a report's "Add" suggestion) wait for the first pull of this uid on this phone. | PACKS_REPORTS_SPEC.md §17, ONBOARDING_SPEC.md §5 |
 | S-6 | Notification and celebration settings are device settings, shared by every account on the phone. | HABITQUEST_DESIGN.md |
@@ -40,7 +40,7 @@ keyboard).
 
 | # | Rule | Odd state | Test of the odd state | Rule now |
 |---|---|---|---|---|
-| S-1 | Last-write-wins on client `updatedAt` | Clock behind or moved back: the edit is refused or replaced by the next pull. Clock more than a day ahead: nothing pushes. | tests/clock-skew.test.ts (todo until 1b) | Decided |
+| S-1 | Last-write-wins on client `updatedAt` | Clock behind or moved back: the edit is refused or replaced by the next pull. Clock more than a day ahead: nothing pushes. | tests/clock-skew.test.ts, sync-status-line.test.ts, stamp.test.ts | Built (1b) |
 | S-2 | `createdAt` from the client clock | A habit created with the clock ahead is unscheduled until its future date | tests/decided-rules.test.ts (todo) | Decided |
 | S-3 | Completions after today are ignored | A tick made with the clock ahead counts later | gamification, summary, fixture clockAhead | Keep |
 | S-4 | Sync at launch, foreground, every 5 min | New phone offline before its first pull: "Add the rest" or a retake re-creates templates that exist on the other phone | 1b | Decided |
@@ -94,7 +94,7 @@ keyboard).
 | Y1 | Two phones converge after syncing with no new writes | engineCore + merge | no | Phase 3 |
 | Y2 | Deletes are sticky | `mergeHabit` | yes | yes (engine) |
 | Y3 | System rows never leave the phone | `isPushable` | yes | yes |
-| Y4 | A user's latest write is never lost | not enforced under clock skew | clock-skew (todo) | Phase 3 |
+| Y4 | A user's latest write is never lost (except the documented cross-phone skew limit) | `db/stamp.js`, `restampFutureRows` (S-1) | clock-skew | partial (clock-skew sequences); Phase 3 |
 | Y5 | A uid switch never applies data to the other uid | engineCore | yes | yes |
 | ST | Every store: per uid, round-trips, never throws, tolerates unknown fields | each `*Core` | yes; unknown fields todo (P-8) | Phase 3 |
 
@@ -243,7 +243,38 @@ Mutation score: the suite as committed killed 31 of 33 mutants. Survivors: M08 (
 already in another pack; a real gap) and M20 (`isScheduledOn` ignoring `deleted`; equivalent today, since every
 caller filters deleted habits first). With the new tests and the two killers: 33 of 33.
 
+**Phase 1b, S-1 (2026-11-09).** Built: `db/stamp.js` (the monotonic stamp at updateHabit, softDeleteHabit and
+toggleCompletion), `restampFutureRows` (guarded), the engine's `clockSuspectCycles`, `utils/syncStatusLine.ts` and the
+Settings line. Its three todo tests are normal tests now. Suite: 992 tests, 989 pass, 3 todo (S-2, F-1, P-8).
+
 ### Phase 1b test cases (written with the fixes)
+
+S-1, monotonic stamp, stuck rows and the clock line (done; tests/clock-skew.test.ts unless noted):
+- S1-1 to S1-3: clock moved back on one phone, B one hour behind renaming, and B un-ticking: the edit reaches the server
+  and the other phone (were todo).
+- S1-4: the cross-phone last-write-wins limit (pinned, unchanged).
+- S1-5: two edits in the same millisecond: the second stamp is the first + 1.
+- S1-6: the same for two toggles of today's completion.
+- S1-7: clock moved back: the edit and the delete stamp previous + 1.
+- S1-8: a new habit is stamped now; a tick over a system row (0) is stamped now.
+- S1-9: system rows keep 0 and are never pushed.
+- S1-10: a pulled row keeps the remote `updatedAt`.
+- S1-11: re-stamp: this uid's unsynced habits and completions more than a day ahead become now.
+- S1-12: re-stamp never touches synced rows.
+- S1-13: re-stamp never touches another uid's rows.
+- S1-14: boundaries: exactly a day ahead and system rows are left alone.
+- S1-15: guarded: no re-stamp when no dirty row needs it.
+- S1-16: end to end: refused while 3 days ahead; re-stamped and pushed once the clock is fixed; the other phone gets it.
+- S1-17: an edit queued just before or just after the re-stamp keeps its content and is pushed.
+- S1-18: clock 2 days ahead: counter 1 (hidden), 2 (line shown); fixed clock and an accepted push: 0 (hidden).
+- S1-19: not suspect when the pull did not reach the end, or when the refused row was stamped more than a day ago.
+- S1-20: stop() and start() reset the counter.
+- S1-21: the counter rule as a pure function.
+- S1-22 (sync-status-line.test.ts): `clockLine` hidden below 2 cycles, the exact copy from 2.
+- S1-23 (sync-status-line.test.ts): only Settings, its hook, the engine and the copy module reference the clock state.
+- S1-24 (stamp.test.ts): `nextUpdatedAt` and both SQL fragments agree on node:sqlite.
+- S1-25: the app's store (db/sync.js) provides `restampFutureRows` (optional in the engine's type) through the write
+  queue.
 
 S-4, template-creating actions wait for this uid's first pull:
 - S4-1: "Add the rest" with the first pull not done creates nothing and says it is waiting; after it, it creates.

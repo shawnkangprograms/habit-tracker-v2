@@ -1,6 +1,7 @@
 import {getDatabase} from '@/db/database';
 import {enqueueWrite} from '@/db/writeQueue';
 import {emitLocalChange} from '@/db/localChanges';
+import {STAMP_UPSERT_SQL} from '@/db/stamp';// updatedAt = max(now, previous + 1): S-1; a system row's 0 gives now
 import {getLocalDateString, getLocalWeekdayKey} from '@/utils/dates';
 import {validateCompleted} from '@/validation/validators';
 
@@ -33,7 +34,9 @@ export async function ensureTodayRows(userId, today = getLocalDateString(), week
     });
 }
 
-// User action: set today's completion for one habit. Only today's row is ever touched.
+// User action: set today's completion for one habit. Only today's row is ever touched. Its updatedAt is the
+// monotonic stamp (db/stamp.js), which Home also reads as the tick time (completedAt): known limitation, after the
+// clock moved back that time is the previous stamp + 1 ms, not the tap (docs/HABITQUEST_DESIGN.md, S-1).
 export async function toggleCompletion(userId, habitId, completed) {
     requireUserId(userId);
     const check = validateCompleted(completed);
@@ -59,7 +62,7 @@ export async function toggleCompletion(userId, habitId, completed) {
                 VALUES (?, ?, ?, ?, 0)
                 ON CONFLICT (habitId, date) DO UPDATE SET
                     completed = excluded.completed,
-                    updatedAt = excluded.updatedAt,
+                    updatedAt = ${STAMP_UPSERT_SQL},
                     synced = 0`,
                 [habitId, today, check.value ? 1 : 0, Date.now()]
             );

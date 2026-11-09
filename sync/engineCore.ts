@@ -17,8 +17,15 @@
 //   A PERMANENT pull failure (rules, missing index) is recorded as pullError and the push still runs,
 //   so local changes keep being backed up. Permanent push rejections retry that batch one doc at a time;
 //   docs still rejected are skipped with a per-doc backoff (in memory), reset when updatedAt changes.
+// - S-1 (docs/HABITQUEST_DESIGN.md): before a push, this uid's unsynced rows stamped more than a day ahead of
+//   now() are re-stamped to now() in one queued transaction (only when a dirty row needs it). A refusal of a row
+//   stamped within the last day, in a cycle whose pull reached the end, marks the cycle "clock suspect"; the count
+//   of such cycles (status.clockSuspectCycles) drives the one line Settings may show, and resets on any accepted
+//   write, stop() and start().
 
-import {chunk, completionDocId, completionToDoc, docToCompletion, docToHabit, habitToDoc, isPushable} from '@/sync/merge';
+import {
+  chunk, completionDocId, completionToDoc, docToCompletion, docToHabit, FUTURE_STAMP_LIMIT_MS, habitToDoc, isPushable,
+} from '@/sync/merge';
 import type {CompletionDoc, HabitDoc, LocalCompletion, LocalHabit} from '@/sync/merge';
 import type {CursorState, PullCursor} from '@/sync/cursorStore';
 
@@ -34,6 +41,9 @@ export type SyncStore = {
   markCompletionSynced(uid: string, habitId: string, date: string, pushedUpdatedAt: number): Promise<boolean>;
   applyRemoteHabits(uid: string, habits: LocalHabit[]): Promise<{written: number}>;
   applyRemoteCompletions(uid: string, completions: LocalCompletion[]): Promise<{applied: number}>;
+  // S-1: re-stamps this uid's unsynced rows whose updatedAt is more than a day ahead of now() (read when it runs,
+  // inside the write queue). The app's store (db/sync.js) always has it; a test store may leave it out.
+  restampFutureRows?(uid: string, now: () => number): Promise<{habits: number; completions: number}>;
 };
 
 // The Firestore side. Each write call is one batch; the adapter adds serverUpdatedAt.
@@ -63,7 +73,28 @@ export type SyncStatus = {
   pullError: ErrorKind | null; // why the last pull stopped early, if it did (push may still have run)
   rejectedCount: number; // docs the rules rejected and that are waiting in backoff
   pullCounts: {received: number; invalid: number; changed: number}; // last cycle (dev log)
+  // S-1 "clock suspect": cycles that ended while a refused push looked like the phone's clock is wrong (see
+  // nextClockSuspectCycles). Read only by Settings (utils/syncStatusLine.ts); never by Home or startup.
+  clockSuspectCycles: number;
 };
+
+// What one cycle did, for the clock-suspect counter
+export type CycleOutcome = {
+  reachedPush: boolean;// the cycle got to the push phase
+  failed: boolean;// it ended with a transient failure (offline, timeout, auth, unknown)
+  pushedOk: boolean;// at least one write was accepted
+  suspect: boolean;// a refused row was just stamped (within a day, by this phone's clock) and the pull reached the end
+};
+
+// The counter after a cycle: 0 after any accepted write ("disappears after the next successful push"); +1 when the
+// cycle marked a suspect refusal, or when it was already suspect and the cycle reached the push without success;
+// unchanged by a cycle that stopped before the push or failed (offline). Settings shows its line from 2.
+export function nextClockSuspectCycles(previous: number, cycle: CycleOutcome): number {
+  if (cycle.pushedOk) return 0;
+  if (cycle.suspect) return previous + 1;
+  if (!cycle.reachedPush || cycle.failed) return previous;
+  return previous > 0 ? previous + 1 : 0;
+}
 
 export type SyncEngineOptions = {
   getUid: () => string | null;
@@ -85,7 +116,7 @@ const PERMANENT_CODES = ['permission-denied', 'invalid-argument', 'failed-precon
 const INITIAL_STATUS: SyncStatus = {
   state: 'off', lastSuccessAt: null, lastAttemptAt: null, lastPullAt: null, initialPullDone: false,
   pendingCount: 0, lastErrorKind: null, pullError: null, rejectedCount: 0,
-  pullCounts: {received: 0, invalid: 0, changed: 0},
+  pullCounts: {received: 0, invalid: 0, changed: 0}, clockSuspectCycles: 0,
 };
 
 class Aborted extends Error {}
@@ -130,6 +161,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 }
 
 type Pending<T> = {key: string; updatedAt: number; item: T; mark: () => Promise<boolean>};
+type CycleFlags = {pulledToEnd: boolean; pushedOk: boolean; suspect: boolean};
 type Rejection = {updatedAt: number; failures: number; skipUntil: number};
 
 export function createSyncEngine(options: SyncEngineOptions) {
@@ -148,6 +180,7 @@ export function createSyncEngine(options: SyncEngineOptions) {
   let resetRequested = false; // full re-pull at the start of the next cycle
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
   const rejected = new Map<string, Map<string, Rejection>>(); // uid -> doc key -> backoff
+  let clockSuspectUid: string | null = null; // whose cycles status.clockSuspectCycles counts
 
   function setStatus(patch: Partial<SyncStatus>) {
     status = {...status, ...patch};
@@ -274,6 +307,7 @@ export function createSyncEngine(options: SyncEngineOptions) {
     pendings: Pending<T>[],
     write: (uid: string, items: T[]) => Promise<void>,
     check: () => void,
+    flags: CycleFlags,
   ) {
     for (const batch of chunk(pendings)) {
       check();
@@ -283,10 +317,11 @@ export function createSyncEngine(options: SyncEngineOptions) {
         check(); // a sign-out wins over any error
         const kind = classifyError(err);
         if (kind !== 'permanent') throw new CycleStop(kind);
-        await pushOneByOne(uid, batch, write, check);
+        await pushOneByOne(uid, batch, write, check, flags);
         continue;
       }
       check();
+      flags.pushedOk = true;
       for (const p of batch) {
         check();
         await p.mark(); // false = changed during the push: stays unsynced for the next cycle
@@ -299,6 +334,7 @@ export function createSyncEngine(options: SyncEngineOptions) {
     batch: Pending<T>[],
     write: (uid: string, items: T[]) => Promise<void>,
     check: () => void,
+    flags: CycleFlags,
   ) {
     for (const p of batch) {
       check();
@@ -309,19 +345,35 @@ export function createSyncEngine(options: SyncEngineOptions) {
         const kind = classifyError(err);
         if (kind !== 'permanent') throw new CycleStop(kind);
         recordRejection(uid, p.key, p.updatedAt);
+        // S-1 clock suspect: the row was just stamped (within a day, by this phone's clock) and this cycle's pull
+        // reached the end, so no newer server copy is known: the likely refusal is "more than a day ahead"
+        if (flags.pulledToEnd && p.updatedAt >= now() - FUTURE_STAMP_LIMIT_MS) flags.suspect = true;
         continue;
       }
       check();
+      flags.pushedOk = true;
       rejectionsFor(uid).delete(p.key);
       await p.mark();
     }
   }
 
-  async function push(uid: string, check: () => void) {
-    const habits = await store.getDirtyHabits(uid);
+  async function push(uid: string, check: () => void, flags: CycleFlags) {
+    let habits = await store.getDirtyHabits(uid);
     check();
-    const completions = (await store.getDirtyCompletions(uid)).filter((c) => isPushable(c.updatedAt));
+    let completions = (await store.getDirtyCompletions(uid)).filter((c) => isPushable(c.updatedAt));
     check();
+
+    // S-1: rows stuck with a future updatedAt are re-stamped first, in one queued transaction. Guarded: only when a
+    // dirty row needs it, so a normal push costs no extra SQL (the statement scans completions).
+    const limit = now() + FUTURE_STAMP_LIMIT_MS;
+    if (store.restampFutureRows && (habits.some((h) => h.updatedAt > limit) || completions.some((c) => c.updatedAt > limit))) {
+      await store.restampFutureRows(uid, now);
+      check();
+      habits = await store.getDirtyHabits(uid);
+      check();
+      completions = (await store.getDirtyCompletions(uid)).filter((c) => isPushable(c.updatedAt));
+      check();
+    }
 
     const habitKey = (habitId: string) => `h:${habitId}`;
     const completionKey = (c: LocalCompletion) => `c:${completionDocId(c.habitId, c.date)}`;
@@ -345,8 +397,8 @@ export function createSyncEngine(options: SyncEngineOptions) {
       }));
 
     // habits before completions
-    await pushPhase(uid, habitPendings, (u, items) => remote.writeHabits(u, items), check);
-    await pushPhase(uid, completionPendings, (u, items) => remote.writeCompletions(u, items), check);
+    await pushPhase(uid, habitPendings, (u, items) => remote.writeHabits(u, items), check, flags);
+    await pushPhase(uid, completionPendings, (u, items) => remote.writeCompletions(u, items), check, flags);
   }
 
   async function countPending(uid: string): Promise<number> {
@@ -370,6 +422,8 @@ export function createSyncEngine(options: SyncEngineOptions) {
     let failure: ErrorKind | null = null;
     let pullError: ErrorKind | null = null;
     let pulledToEnd = false;
+    let reachedPush = false;
+    const flags: CycleFlags = {pulledToEnd: false, pushedOk: false, suspect: false};
     let state: CursorState | null = null;
     try {
       // local, so initialPullDone is known even when offline
@@ -416,7 +470,9 @@ export function createSyncEngine(options: SyncEngineOptions) {
       }
 
       // PUSH
-      await push(uid, check);
+      reachedPush = true;
+      flags.pulledToEnd = pulledToEnd;
+      await push(uid, check, flags);
     } catch (err) {
       if (err instanceof Aborted) {
         setStatus({state: stopped ? 'off' : 'idle'});
@@ -434,11 +490,18 @@ export function createSyncEngine(options: SyncEngineOptions) {
     if (!isCurrent()) return;
 
     const rejectedCount = rejectionsFor(uid).size;
+    // the counter belongs to the uid it was counted for; another uid starts from 0
+    const previousSuspect = clockSuspectUid === uid ? status.clockSuspectCycles : 0;
+    clockSuspectUid = uid;
+    const clockSuspectCycles = nextClockSuspectCycles(previousSuspect, {
+      reachedPush, failed: failure !== null, pushedOk: flags.pushedOk, suspect: flags.suspect,
+    });
     const pullPatch = {
       pullCounts: counts,
       pullError,
       initialPullDone: state?.initialPullDone ?? status.initialPullDone,
       ...(pulledToEnd ? {lastPullAt: now()} : {}),
+      clockSuspectCycles,
     };
     if (failure === null) {
       setStatus({
@@ -496,6 +559,7 @@ export function createSyncEngine(options: SyncEngineOptions) {
   function start() {
     stopped = false;
     generation += 1;
+    clockSuspectUid = null;
     setStatus({...INITIAL_STATUS, state: 'idle'});
   }
 
@@ -508,6 +572,7 @@ export function createSyncEngine(options: SyncEngineOptions) {
     if (debounceTimer) clearTimeout(debounceTimer);
     debounceTimer = null;
     rejected.clear();
+    clockSuspectUid = null;
     setStatus({...INITIAL_STATUS});
   }
 

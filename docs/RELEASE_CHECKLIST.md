@@ -33,8 +33,11 @@ Two phones (iPhone and Itel, same account)
 - [ ] Edit the same habit on both; the later edit wins on both.
 - [ ] Delete on one; it disappears on the other and does not come back.
 - [ ] Tick offline on one, reconnect; the tick arrives on the other.
-- [ ] One phone's clock set 1 hour behind: an edit there still reaches the other phone (S-1; expected to fail until
-      Phase 1b ships).
+- [ ] One phone's clock set 1 hour behind: an edit there still reaches the other phone (S-1).
+- [ ] One phone's clock set 2 days ahead: edit a habit there; after two syncs (pull to refresh twice) Settings shows,
+      muted under its title, "Backup paused: your phone's date and time look wrong. Set them to automatic and your
+      changes will back up." Home shows nothing. Set the clock back to automatic and pull to refresh: the line goes,
+      and the edit reaches the other phone.
 
 Time
 - [ ] Midnight with the app open: Home moves to the new day; yesterday's loss appears on Vitality.

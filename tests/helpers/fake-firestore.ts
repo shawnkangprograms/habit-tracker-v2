@@ -6,7 +6,9 @@
 // unchanged there); the model-based tests (docs/TEST_STRATEGY.md, Part D) reuse this one.
 
 import {createTestDatabase, type TestDb} from './sqlite-adapter.ts';
-import {createWriteQueue} from '../../db/writeQueue.js';
+// The app's one write queue: user writes (db/habits.js, db/completions.js) and sync writes interleave exactly as in
+// the app. Devices share it in tests, which only serialises them further.
+import {enqueueWrite} from '../../db/writeQueue.js';
 
 type PullCollection = 'habits' | 'completions';
 type Ts = {seconds: number; nanoseconds: number};
@@ -26,15 +28,18 @@ export function createFakeServer(serverNow: () => number) {
   const after = (d: ServerDoc, c: Cursor) =>
     d.ts.seconds !== c.seconds ? d.ts.seconds > c.seconds : d.ts.nanoseconds !== c.nanoseconds ? d.ts.nanoseconds > c.nanoseconds : d.id > c.docId;
   const rejections: {uid: string; id: string; reason: string}[] = [];
-  return {
+  const server = {
     rejections,
+    // test switches: refuse a write for another reason (a string), or fail every pull with a permanent error
+    refuse: null as ((data: Record<string, unknown>) => string | null) | null,
+    failPull: false,
     get: (uid: string, name: PullCollection, id: string) => col(uid, name).get(id)?.data,
     commit(uid: string, name: PullCollection, items: {id: string; data: Record<string, unknown>}[]) {
       for (const {id, data} of items) {
         const stored = col(uid, name).get(id)?.data;
-        const reason = (data.updatedAt as number) > serverNow() + 86_400_000 ? 'updatedAt more than a day ahead'
+        const reason = server.refuse?.(data) ?? ((data.updatedAt as number) > serverNow() + 86_400_000 ? 'updatedAt more than a day ahead'
           : stored && (stored.updatedAt as number) > (data.updatedAt as number) ? 'updatedAt went back'
-            : stored && stored.deleted === true && data.deleted === false ? 'undelete' : null;
+            : stored && stored.deleted === true && data.deleted === false ? 'undelete' : null);
         if (reason) {
           rejections.push({uid, id, reason});
           throw fail('permission-denied');
@@ -45,12 +50,14 @@ export function createFakeServer(serverNow: () => number) {
       for (const {id, data} of items) col(uid, name).set(id, {id, data, ts});
     },
     page(uid: string, name: PullCollection, cursor: Cursor | null, pageSize: number) {
+      if (server.failPull) throw fail('permission-denied');
       return [...col(uid, name).values()]
         .sort((a, b) => a.ts.seconds - b.ts.seconds || (a.id < b.id ? -1 : 1))
         .filter((d) => !cursor || after(d, cursor))
         .slice(0, pageSize);
     },
   };
+  return server;
 }
 export type FakeServer = ReturnType<typeof createFakeServer>;
 
@@ -60,9 +67,14 @@ export async function createDevice(server: FakeServer, uid: string, clock: {now:
   const {createSyncEngine} = await import('../../sync/engineCore.ts');
   const {createCursorStore} = await import('../../sync/cursorStore.ts');
   const db: TestDb = await createTestDatabase();
-  const queue = createWriteQueue();
+  const queue = enqueueWrite;
   const storage = new Map<string, string>();
+  const calls = {restamp: 0};
   const store = {
+    restampFutureRows: (u: string, now: () => number) => {
+      calls.restamp += 1;
+      return queue(() => core.restampFutureRows(db, u, now));
+    },
     getDirtyHabits: (u: string) => core.getDirtyHabits(db, u),
     getDirtyCompletions: (u: string) => core.getDirtyCompletions(db, u),
     markHabitSynced: (u: string, id: string, at: number) => queue(() => core.markHabitSynced(db, u, id, at)),
@@ -91,6 +103,6 @@ export async function createDevice(server: FakeServer, uid: string, clock: {now:
     now: () => clock.now, timeoutMs: 1000, debounceMs: 5,
   });
   engine.start();
-  return {db, engine, clock, uid};
+  return {db, engine, clock, uid, store, calls};
 }
 export type Device = Awaited<ReturnType<typeof createDevice>>;
