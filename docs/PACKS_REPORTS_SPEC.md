@@ -37,6 +37,7 @@ Stored in AsyncStorage under `packs:v1:<uid>`, kept on sign-out like the onboard
 - A pack's `createdAt` anchors its yearly report; the combined yearly report uses the earliest `createdAt`.
 - Ids for custom packs come from the same generator used for habit ids.
 - A corrupt record is treated as "no packs" and left untouched until the user changes something.
+- Fields this build doesn't know are kept when it re-saves the record (P-8, section 17).
 
 ## 2b. Limits by level
 
@@ -68,7 +69,7 @@ Rules:
 - **Existing users and skippers (Stage 1b):** a Home card "Choose your habit packs" lets them pick up to {n} of the 6 built-in packs by hand, where {n} is the pack limit for their level (section 2b). The same picker opens from Settings > "Habit packs" for everyone. Packs the user already has show as picked and can't be unpicked there (they are edited or deleted from their Home card, section 4); a pick that would go past the limit is refused with the pack limit message. Saving adds the new packs after the existing ones and adopts same-named habits (next rule); a corrupt record is replaced, since saving is the user changing something. Stage 2 adds "Create your own pack" to the picker; there is no separate "Manage packs" screen.
 - **Custom packs (Stage 2):** created from Home or the picker (section 4), with a name, an area and any of the user's habits (none is fine). Their id comes from the habit id generator.
 - **Adopting existing habits:** when a built-in pack is created and the user already has an active, unpacked habit with a template's name, that habit joins the pack instead of a duplicate being offered. Names match after trimming, collapsing inner spaces and ignoring case. In onboarding, only habits that existed before the run are adopted.
-- **"Add the rest"** (built-in packs): creates the pack's missing templates (not adopted, not dropped) through the normal add-habit path, with the default 20:00 reminder, one at a time, stopping at the first failure and never creating a habit twice; the created ids are added to the pack after each success. Permission is requested through the shared reminder permission helper, only after habits exist.
+- **"Add the rest"** (built-in packs): creates the pack's missing templates (not adopted, not dropped) through the normal add-habit path, with the default 20:00 reminder, one at a time, stopping at the first failure and never creating a habit twice; the created ids are added to the pack after each success. Permission is requested through the shared reminder permission helper, only after habits exist. It waits for this uid's first pull on this phone (S-4), and a template whose only habit was renamed counts as dropped (P-2); section 17.
 
 ## 4. Home and pack screens
 
@@ -155,7 +156,7 @@ Built in Stage 5.
 - **Score per area:** done / scheduled over the window's closed days, summed over every active habit in that area, with the per-day counts from utils/dailyCompletion.ts (the perfect-day rule: deleted habits are ignored, a habit counts from its creation day, rest days add nothing, so they never count against an axis). Today never counts. Window Week = the last 7 closed days (default), Month = the last 28 closed days. Summary's own stats keep their 30-day month; only the radar uses 28. Derived on every load (Home's stats load, Summary's load), never stored. Maths in utils/radar/score.ts.
 - **Axis states:** a score; **no data** (the area has habits but none was scheduled in the window); **empty** (no habits in the area). An axis without a score sits at the centre of the shape with a dashed spoke and no dot. When no axis has a score the radar shows "Starts after your first full day." instead of a shape.
 - **Habit to area** (utils/radar/areas.ts), first match wins: the habit's pack's area; for a habit in no pack, or in a custom pack with no area, the value stored on this phone; otherwise the icon pre-fill below. The habit form shows an "AREA" row (Health, Mind, Discipline, Career, Learning, Relations, Not counted; helper "Used for your radar. Habits in a pack use the pack's area.") whenever the selected pack has no area (None, no packs, or an area-less custom pack), pre-filled from the icon until the user picks one; a pick is saved after the habit, and a failed save leaves the icon's area.
-- **Area map:** `areas:v1:<uid>` = `{habitId: area | 'none'}` in AsyncStorage, on this phone only: never Firestore, sync or Gemini, kept on sign-out like the packs and reflections records. A habit pulled onto a new phone has no entry and falls back to the icon pre-fill. Entries of deleted habits (and of habits later moved into a pack, where the pack wins) are left in place. It is read once per app run inside the stats load, in parallel with SQLite; a failed or corrupt read counts as an empty map, never as a stats failure.
+- **Area map:** `areas:v1:<uid>` = `{habitId: area | 'none'}` in AsyncStorage, on this phone only: never Firestore, sync or Gemini, kept on sign-out like the packs and reflections records. A habit pulled onto a new phone has no entry and falls back to the icon pre-fill. Entries of habits later moved into a pack (where the pack wins) are left in place; entries of deleted habits are pruned at the next write (R-1, section 17; until Phase 1b ships they are left in place). It is read once per app run inside the stats load, in parallel with SQLite; a failed or corrupt read counts as an empty map, never as a stats failure.
 - **Icon to area pre-fill (approved):**
 
 | Icon | Area |
@@ -195,7 +196,7 @@ Rewritten in Stage 3 (replaces "Notes and note XP": the inline "Add a note" chip
 
   Free text "ANYTHING ELSE? (OPTIONAL)", placeholder "A few words for yourself", at most 200 characters after trimming (control characters removed, line breaks kept), counter "{n}/200", error "Use 200 characters or fewer.". "Save reflection" is enabled once all four questions are answered. One reflection per habit per day; not editable in Stage 3.
 - **XP:** 20 per reflection (`REFLECTION_XP`), earned by answering the four questions; the free text never affects XP. It counts only while that day's completion of the habit is ticked, and at most 3 a day (the earliest saved among those that count). Like all XP it is derived, never stored: un-ticking removes it, re-ticking restores it if it is still among that day's first 3.
-- **Storage:** AsyncStorage `reflections:v1:<uid>` = `{version: 1, days: {date: {habitId: {feel, amount, helped, blocker, text?, savedAt}}}}`, on this phone only; never synced, never in Firestore or the admin screens. Kept on sign-out like the packs record. Kept when the habit is un-ticked or deleted (its XP follows the completion rule: deleted habits keep their XP). A corrupt record reads as none and is replaced by the next save; unreadable storage is never written over. Size: about 1 KB a day at most with the cap, under Android's per-item read limit for years.
+- **Storage:** AsyncStorage `reflections:v1:<uid>` = `{version: 1, days: {date: {habitId: {feel, amount, helped, blocker, text?, savedAt}}}}`, on this phone only; never synced, never in Firestore or the admin screens. Kept on sign-out like the packs record. Kept when the habit is un-ticked or deleted (its XP follows the completion rule: deleted habits keep their XP). A corrupt record reads as none and is replaced by the next save; unreadable storage is never written over. Size: about 1 KB a day at most with the cap; a single item reaches Android's per-item read limit (about 2 MB) in roughly 5 years, so the record is split per year and a failed read never lowers XP or level (F-1, section 17; the key layout is proposed in the Phase 1b plan).
 - **AI rule (applies from stage 9; nothing is sent in Stage 3):** tags are always usable by the AI analysis (counts only). Free text reaches Gemini only when the user turns on "Use my notes in AI summaries" in Settings (off by default; the switch arrives in stage 9), with consent wording that says the text is processed outside Kenya. Only recent short excerpts are sent: at most the last 7 reflections, at most 200 characters each. Reflections on replace habits (from Q10: phone and social, pornography, smoking or vaping, gaming, junk food, alcohol, procrastination, matched by name since Q10 is never stored) never leave the phone, whatever the switch says. Habit names are never sent. Stage 9 adds exactly one audited export path for this.
 - **Backlog:** reflections must be covered by in-app data deletion before the Play release.
 
@@ -206,11 +207,11 @@ Built in Stage 4.
 - A bar on the Home stats card, named Vitality (Health is a radar axis).
 - **Computed from history on every stats load, never stored** (no key, no table, no sync, no network). It is computed inside the existing stats load (services/gamificationStats.ts) from the rows that load already reads: no extra SQLite query and no storage read. Maths in utils/vitality.ts over the shared per-day counts in utils/dailyCompletion.ts (which the radar, section 11, reuses).
 - **Per closed day** with at least one scheduled habit: delta = round(10 x done / scheduled) - 4 (halves round up; computed in whole numbers), so +6 for a full day, +1 for half, 0 at 40%, -4 for none; with 8 habits: 8 done +6, 6 done +4, 4 done +1, 3 done 0, 2 done -1, 0 done -4. Clamped to 0..100 after every day. A day with nothing scheduled changes nothing. Days the app wasn't opened have no ticks, so they count as 0 done.
-- **Start:** before any day with a scheduled habit has closed, the card shows "Starts after your first full day." with an empty bar. After the first such day the value is 50 + that day's delta.
+- **Start:** before any day with a scheduled habit has closed, the card shows "Starts after your first full day." with an empty bar, or "Restarts after your first full day." when the account already has completion history (V-2, section 17). After the first such day the value is 50 + that day's delta.
 - **Today** is never part of the closed history. The shown value is the value after the last closed day plus today's provisional delta only if it is a gain (capped at 100); a loss applies when the day closes. Home already reloads its stats at local midnight, so yesterday's loss appears then.
 - **Who counts on a day (the perfect-day rule):** habits not deleted, created on or before that date (the creation day counts), daily or due on that weekday; done = those with a completed row that date. Completion rows after today are ignored. Days are stepped by calendar day numbers, so daylight saving and clock changes can't add or skip a day.
   - Deleted habits drop out of every day, past ones included, exactly as for perfect days. So a perfect day is always +6 and a day that breaks the streak is always -4. **Known disagreement with the streak:** the streak still counts a past day on which only a now-deleted habit was ticked; Vitality scores that day as 0 done among the remaining habits. Deleting every habit returns the bar to its starting message.
-  - **Known limitation (shared with XP and streaks):** the current schedule is applied to past days, so changing a habit's frequency can change past Vitality. Fixing it would need a schedule history.
+  - **Known limitation (shared with XP and streaks):** the current schedule is applied to past days, so changing a habit's frequency can change past Vitality. Fixing it would need a schedule history. Pinned by a test so a change is deliberate (V-1, section 17).
 - No game over. A low bar shows "Low. Today is a fresh start."
 - **Strings (approved):** label "Vitality"; value "{n} / 100"; low (under 25) "Low. Today is a fresh start."; steady (25 to 74) "Steady. Keep the days ticking."; strong (75 and over) "Strong. You're on a roll."; before the first closed day "Starts after your first full day."; accessibility "Vitality {n} out of 100".
 - **Layout:** below the stats card's existing row, inside the card: one text line ("Vitality" and "{n} / 100" on the left, the message on the right, strictly one line, ellipsized) and a full-width 6 dp bar under it. The same height in every state (one shared line height), about 26 dp. The fill is green, amber below 25 (orange is the XP bar's); contrast against the track: green 5.43:1, amber 8.46:1. It animates with scaleX from the left (transform only) and jumps under reduce motion. Not tappable.
@@ -244,3 +245,46 @@ Built in Stage 4.
 - XP and level are read only on the phone (Home stats card and limits, Profile, the celebrations, services/packLimits.ts) through services/gamificationStats.ts. They are not stored, synced, sent to the insight function or shown in the admin screens, so the recalculation touches nothing outside the phone.
 - Over-limit rule (applies from Stage 2): habit and pack limits only ever block ADDING. Nothing is deleted, hidden or disabled when a level drop puts an account over its limit.
 - Ticks are self-reported; reflections add context but do not prove completion. The final report must state this as a limitation.
+
+## 17. Decisions from the test-strategy audit (2026-11-09)
+
+Rules decided after the spec red-team in docs/TEST_STRATEGY.md (Part B). Each has an "Odd states" line: what happens
+for an account that is not in a "normal" state, and the test that checks it. Fixes land in Phase 1b unless marked
+"pinned" (today's behaviour, kept on purpose).
+
+- **S-4, template-creating actions wait for the first pull.** "Add the rest", a Settings retake (ONBOARDING_SPEC
+  section 5) and, later, a report's "Add" suggestion create nothing until this uid's first pull from Firestore has
+  finished on this phone. Picking packs (which only adopts) is not blocked.
+  - Odd states: a new phone, a reinstall, or a sign-in while offline: the other phones' habits are not here yet, so
+    name matching can't see them and the templates would be created twice. Once the first pull has finished, later
+    offline use is not blocked. A different uid on the same phone waits for its own first pull. Tests: S4-1 to S4-5
+    (docs/TEST_STRATEGY.md, Phase 1b).
+- **P-2, a renamed template habit leaves its built-in pack's templates.** Renaming the only habit in a built-in pack
+  that carries a template's name adds that template to the pack's `dropped`, so "Add the rest" doesn't create it
+  again; renaming it back to the template's name takes it out of `dropped` (the existing "putting it back" rule).
+  - Odd states: two members with the template's name (renaming one changes nothing); a rename that only changes case
+    or spacing (still the template); an unpacked habit or one in a custom pack (no pack changes). Tests: P2-1 to P2-5.
+- **P-8, older code never drops newer fields.** Every record's parser accepts and ignores fields it doesn't know, and
+  a save keeps them, so an OTA rollback or a launch from the embedded bundle can re-save a record without losing what
+  a newer update added. The packs record and its mirror follow this rule.
+  - Odd states: a record written by a newer update and re-saved by an older one. Exception: the onboarding record
+    keeps its privacy whitelist (only the known fields are ever written, so answers and Q10 can never reach storage).
+    Tests: tests/decided-rules.test.ts (P-8; todo until Phase 1b).
+- **F-1, reflections split per year; a failed read never lowers XP or level.** The reflections record is stored in
+  one item per year; the key layout is proposed in the Phase 1b plan. A read that fails is "unknown", never "no
+  reflections": the stats load keeps what it last showed rather than recomputing without them.
+  - Odd states: a record past Android's per-item read limit, unreadable storage, a corrupt year (reads as none for
+    that year only). Tests: tests/decided-rules.test.ts (F-1; todo until Phase 1b), fixture large.
+- **V-1, the current schedule applies to past days (pinned).** Unchanged accepted limitation (section 13).
+  - Odd states: a daily habit changed to one weekday loses its past perfect days and streak days on the other
+    weekdays; its tick XP stays. Test: tests/decided-rules.test.ts (V-1).
+- **V-2, "Restarts after your first full day."** When Vitality is starting and the account has completion history
+  (any completed row dated before today, deleted habits included), the card says "Restarts after your first full
+  day." instead of "Starts after your first full day."; the accessibility label uses the same text. The string goes
+  through the usual copy approval.
+  - Odd states: every habit deleted and recreated (fixture recreated); only un-ticked or future-dated rows (not
+    history). Tests: V2-1 to V2-4.
+- **R-1, area entries of deleted habits are pruned.** The next write to `areas:v1:<uid>` removes entries whose habit
+  is deleted. Entries of habits moved into a pack are kept (used again if the habit leaves the pack).
+  - Odd states: a large account with many deleted habits; unreadable storage (never written over, so nothing is
+    pruned); a read (never writes). Tests: R1-1 to R1-4.

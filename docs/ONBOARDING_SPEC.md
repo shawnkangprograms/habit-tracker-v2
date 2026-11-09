@@ -124,6 +124,8 @@ Icons: use the existing icon set; if a category has no fitting icon yet, fall ba
 
 Retake (Settings): runs the same flow, then shows only templates not in `addedTemplateIds` and not already an active habit with that name (compared ignoring case and extra spaces).
 
+- **Odd states (2026-11-09, S-4):** on a phone where this uid's first pull from Firestore has not finished (a new phone, a reinstall, offline since sign-in), the habits from other phones are not here yet, so name dedupe can't see them: a retake creates no habits until that first pull has finished (docs/PACKS_REPORTS_SPEC.md, section 17). A habit renamed by the user is no longer the template and is offered again (by design). A run killed after its first habit is not reopened; a retake offers the rest.
+
 ## 6. Animations
 
 Principles: transforms and opacity only, run on the UI thread, nothing during cold start, honour the system reduced-motion setting (replace with plain fades), no animation inside long lists, and check cost in the startup trace.
@@ -203,4 +205,4 @@ Option labels map to enum values in the order of the enum lists in section 1 (Q5
 
 - The catalog has 24 templates (section 4), each with an area. Starters come from two built-in packs chosen from the scores (section 4; docs/PACKS_REPORTS_SPEC.md, sections 1 and 3); the time caps, count, sleep force and Q10 rules are unchanged. This replaces the "pool stays the 14 templates" line in section 10.
 - The Recommended Routine groups its cards under the pack each will join, then "Other habits" (the forced sleep pick from another pack, a retake fill-in, the Q10 replace pick, and habits made with "Add your own habit"). Copy in ONBOARDING_COPY.md section 7.
-- Every run writes the pack record (only the two pack ids and their names) right after each onboarding record save; never on Skip. The two packs are created once the run has made a habit and the user has no packs (no record, or an empty one), including a Settings run after a skip. When packs exist, a run only adds starters to packs the user already has. The pack record's failure never blocks onboarding, and onboarding never checks the habit or pack limits.
+- Every run writes the pack record (only the two pack ids and their names) right after each onboarding record save; never on Skip. The two packs are created once the run has made a habit and the user has no packs (no record, or an empty one), including a Settings run after a skip. When packs exist, a run only adds starters to packs the user already has. The pack record's failure never blocks onboarding. The first run never checks the habit or pack limits; a Settings retake is checked (docs/PACKS_REPORTS_SPEC.md, section 2b: the selected cards are created while there is room, then the habit limit message shows under Start). (Reworded 2026-11-09, P-4: this line used to say onboarding never checks the limits, which contradicted section 2b and the code.)
