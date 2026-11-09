@@ -5,7 +5,7 @@ import {describe, test} from 'node:test';
 import assert from 'node:assert/strict';
 import './helpers/alias.ts'; // must come before the dynamic imports below
 import type {HabitInput} from '../validation/validators.ts';
-import type {CompleteAnswers} from '../utils/onboarding/types.ts';
+import type {CompleteAnswers, TemplateId} from '../utils/onboarding/types.ts';
 import type {OnboardingRecord} from '../utils/onboarding/record.ts';
 import type {CreateSession, Plan} from '../utils/onboarding/plan.ts';
 
@@ -73,6 +73,37 @@ describe('buildPlan', () => {
   test('retake: the replace habit is left out when the user already has a habit with its name', () => {
     const pl = plan({}, {kind: 'none'}, ['Clear-headed evening']);
     assert.equal(pl.picks.some((pick) => pick.kind === 'replace'), false);
+  });
+
+  // Packs Calm Mind and Steady Energy. A Settings retake on an account whose Calm Mind already holds every template
+  // (lights_out and screens_off came from "Add the rest", so they are not in addedTemplateIds)
+  const MIND_RETAKE: CompleteAnswers = {
+    ...ANSWERS, focus: ['mental'], derails: 'stress', sleep: 'struggle', values: ['peace_of_mind'], confidence: 8,
+  };
+  const ADDED_BEFORE = {
+    kind: 'ok' as const,
+    record: {...r.completedRecord(null, 1), addedTemplateIds: ['breathe5', 'journal3', 'walk20', 'stretch10'] as TemplateId[]},
+  };
+  const CALM_MIND_NAMES = ['Breathe for 5 minutes', 'Write 3 lines in a journal', 'Lights out at a set time', 'No screens 30 min before bed'];
+
+  test('retake: a template the user already has as an active habit is left out, even when not in addedTemplateIds', () => {
+    const before = p.buildPlan(MIND_RETAKE, ADDED_BEFORE, []);
+    assert.deepEqual(before.packs, ['calm_mind', 'steady_energy']);
+    assert.ok(before.picks.some((pick) => pick.id === 'lights_out') && before.picks.some((pick) => pick.id === 'screens_off'));
+    const pl = p.buildPlan(MIND_RETAKE, ADDED_BEFORE, CALM_MIND_NAMES);
+    const ids = pl.picks.map((pick) => pick.id);
+    assert.equal(ids.includes('lights_out'), false);
+    assert.equal(ids.includes('screens_off'), false);
+    assert.equal(pl.picks.filter((pick) => pick.kind === 'catalog').length, 4);// the slots go to other templates
+  });
+
+  test('retake: names are compared trimmed, with inner spaces collapsed and case ignored (the replace habit too)', () => {
+    const names = ['  lights OUT at a set   time ', 'NO screens 30 min before bed', 'clear-headed   EVENING'];
+    const pl = p.buildPlan(MIND_RETAKE, ADDED_BEFORE, names);
+    const ids = pl.picks.map((pick) => pick.id);
+    assert.equal(ids.includes('lights_out'), false);
+    assert.equal(ids.includes('screens_off'), false);
+    assert.equal(ids.includes('replace'), false);
   });
 
   test('retake with every template added and no Q10: nothing left to pick', () => {

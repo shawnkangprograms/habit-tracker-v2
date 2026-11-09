@@ -6,8 +6,10 @@
 // pack's first, the second pack's first, the focus pack's second, and so on. Only when every template left in
 // both packs is already picked (a retake) does the rest of the catalog fill in, by area rank. Sleep struggle or
 // irregular forces one sleep template, from Calm Mind even when that pack wasn't chosen: it takes a free slot, or
-// the last one. Retake passes the catalog ids already added (they are left out before picking) and the names of
-// the user's habits (a replace habit with one of those names is left out, since Q10 is never stored).
+// the last one. Retake passes the catalog ids already added and the names of the user's active habits: a template
+// in either is left out before picking (a template habit made by "Add the rest", the packs picker or by hand is
+// not in addedTemplateIds), and a replace habit with one of those names is left out, since Q10 is never stored.
+// Names are compared with normaliseHabitName (trimmed, inner spaces collapsed, case ignored).
 //
 // Time budget (Q1): no single catalog pick longer than the budget's `single` cap, and the catalog picks together
 // at most its `total` cap (twice the budget). A template that doesn't fit is skipped and picking continues down
@@ -25,6 +27,7 @@ import {
 import {rankAxes, scoreAxes} from '@/utils/onboarding/scoring';
 import {builtinPack} from '@/utils/packs/builtin';
 import {chooseOnboardingPacks} from '@/utils/packs/choose';
+import {normaliseHabitName} from '@/utils/packs/membership';
 import {
   REPLACE_ANSWERS, TEMPLATE_IDS, isOneOf, type Axis, type CompleteAnswers, type ReplaceAnswer, type TemplateId,
   type TimeBudget,
@@ -119,14 +122,13 @@ export function starterCount(answers: Pick<CompleteAnswers, 'confidence' | 'badH
   return Math.min(MAX_STARTERS, baseStarterCount(answers.confidence) + (replaceAnswer(answers) ? 1 : 0));
 }
 
-const normalName = (name: string) => name.trim().toLowerCase();
-
 export function pickStarters(
   answers: CompleteAnswers,
   options: {excludeIds?: readonly string[]; existingHabitNames?: readonly string[]} = {},
 ): StarterPick[] {
   const excluded = new Set(options.excludeIds ?? []);
-  const pool = CATALOG.filter((t) => !excluded.has(t.id));
+  const existing = new Set((options.existingHabitNames ?? []).map(normaliseHabitName));
+  const pool = CATALOG.filter((t) => !excluded.has(t.id) && !existing.has(normaliseHabitName(t.habitName)));
   const scores = scoreAxes(answers);
   const ranked = rankAxes(scores, answers.focus);
   const base = baseStarterCount(answers.confidence);
@@ -165,8 +167,7 @@ export function pickStarters(
   }));
 
   const replace = replaceAnswer(answers);
-  const existing = new Set((options.existingHabitNames ?? []).map(normalName));
-  if (replace && !existing.has(normalName(REPLACE_NAMES[replace]))) {
+  if (replace && !existing.has(normaliseHabitName(REPLACE_NAMES[replace]))) {
     picks.push({
       kind: 'replace', id: REPLACE_PICK_ID, habitName: REPLACE_NAMES[replace], icon: REPLACE_ICONS[replace],
       reason: REPLACE_REASONS[replace],

@@ -122,7 +122,7 @@ Icons: use the existing icon set; if a category has no fitting icon yet, fall ba
 3. Habit Profile (Figma): radar plus "Your plan will focus on <focus axis>" card.
 4. Recommended Routine (Figma): the picked habits as toggleable cards, each with its reason line. A reminder-time picker (default 8:00 pm) sits at the bottom, wired to the existing reminder setup. Buttons: "Add your own habit" and "Start". Toggled-off cards are not created.
 
-Retake (Settings): runs the same flow, then shows only templates not in `addedTemplateIds`.
+Retake (Settings): runs the same flow, then shows only templates not in `addedTemplateIds` and not already an active habit with that name (compared ignoring case and extra spaces).
 
 ## 6. Animations
 

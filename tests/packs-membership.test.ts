@@ -125,6 +125,52 @@ describe('what an onboarding run writes (packsAfterRun)', () => {
   });
 });
 
+describe('a Settings retake never adds a second habit for a template its pack already has', () => {
+  // Calm Mind holds all four templates; lights_out and screens_off came from "Add the rest", so the onboarding
+  // record only knows breathe5 and journal3 (and the Steady Energy ones from an earlier run)
+  const answers: CompleteAnswers = {
+    timeBudget: 'min60', occupation: 'early_career', habitsFeel: 'thriving', focus: ['mental'], challenge: 'focus',
+    derails: 'stress', sleep: 'struggle', days: 'predictable', values: ['peace_of_mind'], badHabit: null, confidence: 8,
+  };
+  const stored = {
+    kind: 'ok' as const,
+    record: {version: 1 as const, skipped: false, answers: null, completedAt: 1, addedTemplateIds: ['breathe5', 'journal3', 'walk20', 'stretch10'] as TemplateId[]},
+  };
+  const existing: HabitRef[] = [
+    {habitId: 'h1', habitName: 'Breathe for 5 minutes'},
+    {habitId: 'h2', habitName: 'Write 3 lines in a journal'},
+    {habitId: 'h3', habitName: 'Lights out at a set time'},
+    {habitId: 'h4', habitName: 'No screens 30 min before bed'},
+  ];
+  const packs = record(packOf('calm_mind', ['h1', 'h2', 'h3', 'h4']));
+
+  test('the run creates no habit for those templates, and Calm Mind keeps its four habits', async () => {
+    const p = await import('../utils/onboarding/plan.ts');
+    const plan = p.buildPlan(answers, stored, existing.map((h) => h.habitName));
+    const adds: string[] = [];
+    const joins: {templateId: TemplateId; habitId: string}[] = [];
+    let saved: PacksRecord = packs;
+    let n = 0;
+    await p.createPlannedHabits({
+      addHabit: async (input: HabitInput) => {
+        adds.push(input.habitName);
+        n += 1;
+        return `n${n}`;
+      },
+      saveRecord: async () => {
+        saved = ch.packsAfterRun({kind: 'ok', record: saved}, {chosen: plan.packs, create: true, joins, existing, now: NOW}) ?? saved;
+      },
+      now: () => NOW,
+      onCreated: (pickId, habitId) => {
+        if (habitId && st.CATALOG.some((t) => t.id === pickId)) joins.push({templateId: pickId as TemplateId, habitId});
+      },
+    }, {plan, selected: new Set(plan.picks.map((pick) => pick.id)), reminderTime: '20:00', session: {created: new Set(), saved: null}});
+    assert.deepEqual(saved.packs.find((pk) => pk.id === 'calm_mind')?.habitIds, ['h1', 'h2', 'h3', 'h4']);
+    assert.equal(adds.includes('Lights out at a set time'), false);
+    assert.equal(adds.includes('No screens 30 min before bed'), false);
+  });
+});
+
 describe('the routine\'s groups', () => {
   const BASE: CompleteAnswers = {
     timeBudget: 'min60', occupation: 'early_career', habitsFeel: 'thriving', focus: ['career'], challenge: 'focus',
@@ -236,6 +282,15 @@ describe('"Add the rest"', () => {
     const result = await ar.addTheRest(second.deps, input({record: failed.record, habits: nowHabits}));
     assert.deepEqual(second.adds(), ['Drink water with each meal', 'Eat one fruit or vegetable']);
     assert.deepEqual(result.record.packs[0].habitIds, ['w', 'new1', 'b1', 'b2']);
+  });
+
+  test('a pack habit whose name differs only in case or spacing counts as the template: nothing is created again', async () => {
+    const odd: HabitRef[] = [{habitId: 'w', habitName: '  walk FOR 20   minutes '}, {habitId: 's', habitName: 'STRETCH for 10 minutes'}];
+    const rec = record({...packOf('steady_energy', ['w', 's']), dropped: ['water_meals', 'eat_produce']});
+    const h = harness();
+    const result = await ar.addTheRest(h.deps, input({record: rec, habits: odd}));
+    assert.deepEqual(h.events, []);
+    assert.deepEqual(result.record.packs[0].habitIds, ['w', 's']);
   });
 
   test('stops at the habit limit with the rest still missing; above the limit adds nothing', async () => {

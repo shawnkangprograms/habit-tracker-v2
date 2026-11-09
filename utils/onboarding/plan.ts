@@ -37,8 +37,8 @@ export type Plan = {
   previous: OnboardingRecord | null;// the record before this run (retake keeps its addedTemplateIds)
 };
 
-// Retake: templates added by earlier runs are left out before picking, and a replace habit whose name the user
-// already has is left out (Q10 is never stored, so names are the only way to tell)
+// Retake: templates added by earlier runs, and templates or a replace habit whose name the user already has as an
+// active habit, are left out before picking (Q10 is never stored, so names are the only way to tell for it)
 export function buildPlan(answers: CompleteAnswers, stored: ParsedRecord, existingHabitNames: readonly string[]): Plan {
   const previous = stored.kind === 'ok' ? stored.record : null;
   const scores = scoreAxes(answers);
