@@ -348,3 +348,20 @@ describe('strings', () => {
     assert.deepEqual(m.AREA_ORDER, ['Health', 'Mind', 'Discipline', 'Career', 'Learning', 'Relations']);
   });
 });
+
+describe('Job B diagnostic: the last limit check is kept in memory only, numbers only', () => {
+  test('the trace holds the time, kind, level, count, adding, room and named level; packLimits keeps it unstored', () => {
+    const refused = {level: 3, kind: 'habits' as const, count: 23, adding: 2};
+    assert.deepEqual(lim.limitCheckTrace(refused, lim.checkAdd(refused), 1234),
+      {at: 1234, kind: 'habits', level: 3, count: 23, adding: 2, room: 0, namedLevel: 7});
+    const allowed = {level: 1, kind: 'packs' as const, count: 0};
+    assert.deepEqual(lim.limitCheckTrace(allowed, lim.checkAdd(allowed), 5),
+      {at: 5, kind: 'packs', level: 1, count: 0, adding: 1, room: 2, namedLevel: null});
+    // set by the one check every screen calls, held in a module variable: no storage, no names
+    const service = source('../services/packLimits.ts');
+    assert.match(service, /const check = checkAdd\(input\);\s*lastCheck = limitCheckTrace\(input, check, Date\.now\(\)\);/);
+    assert.doesNotMatch(service, /AsyncStorage|setItem|SecureStore|habitName|\.name\b/);
+    // shown only by the hidden trace panel (required lazily by Settings in a trace build)
+    assert.match(source('../components/startup-trace-panel.tsx'), /lastLimitCheck\(\)[\s\S]*activeHabitCount\(uid\)/);
+  });
+});

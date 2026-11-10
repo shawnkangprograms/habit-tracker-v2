@@ -1,24 +1,55 @@
-import {useEffect, useState} from 'react';
+import {useCallback, useEffect, useState} from 'react';
 import {Pressable, Share, StyleSheet, Text, View} from 'react-native';
+import {useFocusEffect} from 'expo-router';
+import {activeHabitCount, lastLimitCheck} from '@/services/packLimits';
+import {getSessionUid} from '@/services/session';
 import {clearTraces, loadTraces} from '@/services/startupTraceStore';
 import {otaLine, summarise, traceToText, type TraceRecord} from '@/utils/startupTrace';
+import type {LimitCheckTrace} from '@/utils/packs/limits';
 import {colors, fonts, radii, spacing} from '@/constants/theme';
+
+// Diagnostic (Job B): the last limit check of this app run (memory only, numbers only) beside a fresh count
+function limitLines(check: LimitCheckTrace | null, activeNow: number | null | undefined): string[] {
+  const now = activeNow === undefined ? '...' : activeNow === null ? 'unreadable' : String(activeNow);
+  if (!check) return ['Last limit check: none this run', `Active habits now: ${now}`];
+  return [
+    `Last limit check: ${new Date(check.at).toLocaleTimeString()} · ${check.kind} · level ${check.level} · count ${check.count}` +
+      ` · adding ${check.adding} · room ${check.room} · named ${check.namedLevel ?? 'none (allowed)'}`,
+    `Active habits now: ${now}`,
+  ];
+}
 
 // Preview build only: the last saved startup traces, opened by a long press on Settings' version line.
 // Required lazily by Settings, so other builds never evaluate it. The current launch is saved 10-25 s after
 // Home is usable (once the update check ends), so it appears here on a later open, not instantly.
 export function StartupTracePanel() {
   const [records, setRecords] = useState<TraceRecord[] | null>(null);
+  const [limitCheck, setLimitCheck] = useState<LimitCheckTrace | null>(null);
+  const [activeNow, setActiveNow] = useState<number | null | undefined>(undefined);
 
   useEffect(() => {
     loadTraces().then(setRecords);
   }, []);
 
+  // Re-read on every focus: Settings stays mounted while the habit form or a pack screen runs a check
+  useFocusEffect(useCallback(() => {
+    setLimitCheck(lastLimitCheck());
+    const uid = getSessionUid();
+    if (!uid) {
+      setActiveNow(null);
+      return;
+    }
+    let live = true;
+    activeHabitCount(uid).then((n) => { if (live) setActiveNow(n); });
+    return () => { live = false; };
+  }, []));
+
   const latest = records?.[0];
+  const limitText = limitLines(limitCheck, activeNow);
 
   const share = () => {
     if (!records || records.length === 0) return;
-    Share.share({message: traceToText(records)}).catch(() => {});
+    Share.share({message: `${traceToText(records)}\n${limitText.join('\n')}`}).catch(() => {});
   };
 
   const clear = () => {
@@ -28,6 +59,7 @@ export function StartupTracePanel() {
   return (
     <View style={styles.panel}>
       <Text style={styles.title} accessibilityRole="header">Startup trace</Text>
+      {limitText.map((line) => <Text key={line} style={styles.muted} selectable>{line}</Text>)}
 
       {records === null && <Text style={styles.muted}>Loading...</Text>}
       {records !== null && !latest && (

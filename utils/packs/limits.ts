@@ -56,3 +56,29 @@ export function checkAdd(input: {level: number; kind: LimitKind; count: number; 
   if (room >= Math.max(1, input.adding ?? 1)) return {ok: true, room};
   return {ok: false, room, message: limitMessageFor(input.kind, input.level, input.count)};
 }
+
+// ---------- Diagnostic (Job B): the last limit check, kept in memory only ----------
+// services/packLimits.ts keeps one of these for the hidden trace panel (Settings, long press on the version line).
+// Numbers only: no habit or pack names, and it is never stored, synced or sent. namedLevel: the level the refusal
+// message named (null when the add was allowed).
+
+export type LimitCheckTrace = {
+  at: number;
+  kind: LimitKind;
+  level: number;
+  count: number;
+  adding: number;
+  room: number;
+  namedLevel: number | null;
+};
+
+export function limitCheckTrace(
+  input: {level: number; kind: LimitKind; count: number; adding?: number},
+  check: AddCheck,
+  at: number,
+): LimitCheckTrace {
+  return {
+    at, kind: input.kind, level: input.level, count: input.count, adding: input.adding ?? 1, room: check.room,
+    namedLevel: check.ok ? null : nextLimitLevel(input.level, input.kind, input.count),
+  };
+}

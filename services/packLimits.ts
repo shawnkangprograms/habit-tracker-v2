@@ -11,7 +11,15 @@ import {getGamificationStats} from '@/services/gamificationStats';
 import {packsStore} from '@/services/packsStore';
 import {loadShared} from '@/services/statsStore';
 import {getLocalDateString} from '@/utils/dates';
-import {checkAdd, type AddCheck, type LimitKind} from '@/utils/packs/limits';
+import {checkAdd, limitCheckTrace, type AddCheck, type LimitCheckTrace, type LimitKind} from '@/utils/packs/limits';
+
+// Diagnostic (Job B): the last check made through checkAddFor in this app run, for the hidden trace panel. Memory
+// only (lost on restart), numbers only.
+let lastCheck: LimitCheckTrace | null = null;
+
+export function lastLimitCheck(): LimitCheckTrace | null {
+  return lastCheck;
+}
 
 export async function currentLevel(uid: string): Promise<number> {
   try {
@@ -34,5 +42,18 @@ async function countOf(uid: string, kind: LimitKind): Promise<number> {
 
 export async function checkAddFor(uid: string, kind: LimitKind, adding = 1): Promise<AddCheck> {
   const [level, count] = await Promise.all([currentLevel(uid), countOf(uid, kind)]);
-  return checkAdd({level, kind, count, adding});
+  const input = {level, kind, count, adding};
+  const check = checkAdd(input);
+  lastCheck = limitCheckTrace(input, check, Date.now());
+  return check;
+}
+
+// A fresh count of this account's active habits, for the trace panel to show beside the last check. null if it
+// can't be read (unlike countOf, which treats that as 0 so an add can still run)
+export async function activeHabitCount(uid: string): Promise<number | null> {
+  try {
+    return ((await getActiveHabitsWithDays(uid)) as unknown[]).length;
+  } catch {
+    return null;
+  }
 }
