@@ -11,7 +11,9 @@ import type {StepKey} from '@/utils/onboarding/flow';
 // ---------- Questions ----------
 
 export const SKIP_SETUP = 'Skip setup';
-export const SKIP_THIS_ONE = 'Skip this one';
+export const SKIP_QUESTION = 'Skip this question';// on every step, under Continue (replaced Q10's "Skip this one")
+export const SKIPPED_CONFIDENCE = '–';// Q11's number after the step was skipped, until the slider is touched
+export const SKIPPED_CONFIDENCE_A11Y = 'Not answered';// what a screen reader says for that "–" (proposed)
 export const BACK = 'Back';
 export const CONTINUE = 'Continue';
 export const FIRST_STEP_NOTICE = 'Your answers stay on this phone. Skip anything you like.';
@@ -270,6 +272,10 @@ export const FOCUS_CARDS: Record<Axis, {displayName: string; subtitle: string}> 
     subtitle: 'Small, regular moments of connection with the people who matter.',
   },
 };
+
+// When no scoring question was answered (approved 2026-11-10): on the Habit Profile instead of the focus card, and
+// on the Recommended Routine above the cards
+export const BALANCED_LINE = 'You skipped the questions, so we picked a balanced set. You can retake this from Settings any time.';
 
 export function focusTitle(axis: Axis): string {
   return `Your plan will focus on ${FOCUS_CARDS[axis].displayName}`;

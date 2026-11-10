@@ -18,19 +18,23 @@
 // Which picks join a pack is decided by utils/packs/choose.ts (routineGroups, packsAfterRun).
 //
 // Q10 never becomes part of an id: the replace pick's id is always REPLACE_PICK_ID.
+//
+// Skipped questions (docs/ONBOARDING_SPEC.md, section 4) contribute no signal: a skipped Q1 gets the min15 caps, a
+// skipped Q11 the default count (3), a skipped Q7 no sleep force, a skipped Q10 no replace pick. When no scoring
+// question (Q2 to Q9) was answered, the picks are the balanced set (BALANCED_TEMPLATE_IDS) instead of the packs.
 
 import type {IconId} from '@/constants/habits';
 import type {HabitInput} from '@/validation/validators';
 import {
   REPLACE_NAMES, REPLACE_REASONS, TEMPLATE_NAMES, TEMPLATE_REASONS,
 } from '@/utils/onboarding/copy';
-import {rankAxes, scoreAxes} from '@/utils/onboarding/scoring';
+import {hasAreaSignal, rankAxes, scoreAxes} from '@/utils/onboarding/scoring';
 import {builtinPack} from '@/utils/packs/builtin';
 import {chooseOnboardingPacks} from '@/utils/packs/choose';
 import {normaliseHabitName} from '@/utils/packs/membership';
 import {
-  REPLACE_ANSWERS, TEMPLATE_IDS, isOneOf, type Axis, type CompleteAnswers, type ReplaceAnswer, type TemplateId,
-  type TimeBudget,
+  CONFIDENCE_DEFAULT, REPLACE_ANSWERS, TEMPLATE_IDS, isOneOf, type Axis, type CompleteAnswers, type ReplaceAnswer,
+  type TemplateId, type TimeBudget,
 } from '@/utils/onboarding/types';
 
 // minutes: a typical day's time; habits that take no real time (lights out, water with meals) are 1.
@@ -107,11 +111,24 @@ export type StarterPick =
   | {kind: 'catalog'; id: TemplateId; habitName: string; icon: IconId; reason: string}
   | {kind: 'replace'; id: typeof REPLACE_PICK_ID; habitName: string; icon: IconId; reason: string};
 
-export function baseStarterCount(confidence: number): number {
-  if (confidence <= 3) return 2;
-  if (confidence <= 7) return 3;
+// A skipped Q11 counts as the slider's default (5), so 3 starters
+export function baseStarterCount(confidence: number | null): number {
+  const c = confidence ?? CONFIDENCE_DEFAULT;
+  if (c <= 3) return 2;
+  if (c <= 7) return 3;
   return 4;
 }
+
+// A skipped Q1 gets gentle caps (approved 2026-11-10): no single habit over 15 minutes, 30 in total
+export const SKIPPED_TIME_BUDGET: TimeBudget = 'min15';
+
+// The balanced starter set (approved 2026-11-10), used when no scoring question (Q2 to Q9) was answered: one short
+// habit per area in this order, then the fallbacks when a retake leaves some out. All 5 minutes or less; the first
+// four fit even the smallest budget (9 of 10 minutes).
+export const BALANCED_TEMPLATE_IDS: readonly TemplateId[] = [
+  'water_meals', 'breathe5', 'make_bed', 'thank_someone',
+  'eat_produce', 'lights_out', 'work_win', 'teach_back', 'plan_top1',
+];
 
 function replaceAnswer(answers: Pick<CompleteAnswers, 'badHabit'>): ReplaceAnswer | null {
   return isOneOf(REPLACE_ANSWERS, answers.badHabit) ? answers.badHabit : null;
@@ -132,7 +149,7 @@ export function pickStarters(
   const scores = scoreAxes(answers);
   const ranked = rankAxes(scores, answers.focus);
   const base = baseStarterCount(answers.confidence);
-  const caps = BUDGET_CAPS[answers.timeBudget];
+  const caps = BUDGET_CAPS[answers.timeBudget ?? SKIPPED_TIME_BUDGET];
 
   const picked: Template[] = [];
   const total = () => picked.reduce((sum, t) => sum + t.minutes, 0);
@@ -144,12 +161,17 @@ export function pickStarters(
     }
   };
 
-  const [first, second] = chooseOnboardingPacks(scores, answers.focus).map((id) => builtinPack(id).templates);
-  const inTurn = first.flatMap((id, i) => [id, second[i]]).flatMap((id) => pool.filter((t) => t.id === id));
-  take(inTurn);
-  if (inTurn.every((t) => picked.includes(t))) {
-    // both packs used up: the rest of the catalog by area rank (a stable sort keeps catalog order within an area)
-    take([...pool].sort((a, b) => ranked.indexOf(a.area) - ranked.indexOf(b.area)));
+  if (!hasAreaSignal(answers)) {
+    // no scoring answer: the balanced set, in its order (no packs, no fill-in; Q7 was skipped too, so no sleep force)
+    take(BALANCED_TEMPLATE_IDS.flatMap((id) => pool.filter((t) => t.id === id)));
+  } else {
+    const [first, second] = chooseOnboardingPacks(scores, answers.focus).map((id) => builtinPack(id).templates);
+    const inTurn = first.flatMap((id, i) => [id, second[i]]).flatMap((id) => pool.filter((t) => t.id === id));
+    take(inTurn);
+    if (inTurn.every((t) => picked.includes(t))) {
+      // both packs used up: the rest of the catalog by area rank (a stable sort keeps catalog order within an area)
+      take([...pool].sort((a, b) => ranked.indexOf(a.area) - ranked.indexOf(b.area)));
+    }
   }
 
   if ((answers.sleep === 'struggle' || answers.sleep === 'irregular')

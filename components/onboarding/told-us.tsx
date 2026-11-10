@@ -1,15 +1,14 @@
 import {StyleSheet, Text, View} from 'react-native';
 import Animated, {Easing, Keyframe, ReduceMotion} from 'react-native-reanimated';
 import {colors, fonts, radii, spacing} from '@/constants/theme';
-import {
-  CHALLENGE_CARD_LABEL, CHALLENGE_LINES, DAY1_MOVES, DAY1_TITLE, DERAILS_CARD_LABEL, DERAIL_LINES, RHYTHM_CARD_LABEL,
-  RHYTHM_LINES, TOLD_US_TITLE,
-} from '@/utils/onboarding/copy';
+import {DAY1_MOVES, DAY1_TITLE, TOLD_US_TITLE} from '@/utils/onboarding/copy';
 import {ITEM_ENTER_MS, ITEM_OFFSET_PX, TOLD_US_STAGGER_MS, shouldAnimate, staggerDelay} from '@/utils/onboarding/motion';
+import {toldUsCards} from '@/utils/onboarding/results';
 import type {Axis, CompleteAnswers} from '@/utils/onboarding/types';
 
-// "What you told us" (docs/ONBOARDING_SPEC.md, section 5): three first-person cards reflecting the challenge,
-// the rhythm of the days and what derails the user, then the focus axis's three day-1 moves (copy doc section 5).
+// "What you told us" (docs/ONBOARDING_SPEC.md, section 5): up to three first-person cards reflecting the challenge,
+// the rhythm of the days and what derails the user (only for the questions answered), then the focus axis's three
+// day-1 moves (copy doc section 5). A balanced plan never shows this screen (utils/onboarding/results.ts).
 // Each move's WHEN label sits above its title, in the cards' label style, so no fixed-width column can split
 // a word at larger system font sizes.
 // Motion (stage 4): the six items fade and rise in, 60 ms apart (the last starts at 300 ms). Enter only; none
@@ -30,11 +29,7 @@ export function ToldUs({answers, focus, reduceMotion}: {
 }) {
   const animate = shouldAnimate(reduceMotion);
   const entering = (index: number) => (animate ? itemEntering(index) : undefined);
-  const cards = [
-    {label: CHALLENGE_CARD_LABEL, line: CHALLENGE_LINES[answers.challenge]},
-    {label: RHYTHM_CARD_LABEL, line: RHYTHM_LINES[answers.days]},
-    {label: DERAILS_CARD_LABEL, line: DERAIL_LINES[answers.derails]},
-  ];
+  const cards = toldUsCards(answers);// answered questions only (a skipped one has no card)
   return (
     <View style={styles.wrap}>
       <Text style={styles.title} accessibilityRole="header">{TOLD_US_TITLE}</Text>

@@ -27,6 +27,7 @@ export const FOCUS_AREA_AXIS: Record<FocusArea, Axis> = {
 // Last tie-break, after the order the user picked their Q4 focus areas in
 export const TIE_ORDER: readonly Axis[] = ['Discipline', 'Health', 'Mind', 'Career', 'Learning', 'Relations'];
 
+// A skipped question (null, or [] for Q4 and Q9) adds no points: it contributes no signal.
 export function scoreAxes(a: ScoringInput): Scores {
   const focus = (area: FocusArea) => (a.focus.includes(area) ? 2 : 0);
   const point = (condition: boolean) => (condition ? 1 : 0);
@@ -37,10 +38,11 @@ export function scoreAxes(a: ScoringInput): Scores {
       + point(a.habitsFeel === 'overwhelmed') + point(a.derails === 'stress'),
     Discipline: focus('discipline') + point(a.challenge === 'procrastination') + point(a.derails === 'low_motivation')
       + point(a.habitsFeel === 'struggling' || a.habitsFeel === 'overwhelmed') + point(a.days === 'chaotic'),
+    // a skipped Q2 (null) adds neither the Career nor the Learning point
     Career: focus('career') + point(a.values.includes('achievement'))
-      + point(a.occupation !== 'student') + point(a.challenge === 'time' || a.challenge === 'balance'),
+      + point(a.occupation !== null && a.occupation !== 'student') + point(a.challenge === 'time' || a.challenge === 'balance'),
     Learning: focus('education') + point(a.occupation === 'student')
-      + point((STUDENT_ONLY_CHALLENGES as readonly string[]).includes(a.challenge)),
+      + point(a.challenge !== null && (STUDENT_ONLY_CHALLENGES as readonly string[]).includes(a.challenge)),
     Relations: focus('relationships') + point(a.values.includes('connection')) + point(a.derails === 'social_pressure'),
   };
   const scores = {} as Scores;
@@ -60,6 +62,13 @@ export function rankAxes(scores: Scores, focus: readonly FocusArea[]): Axis[] {
 
 export function focusAxis(scores: Scores, focus: readonly FocusArea[]): Axis {
   return rankAxes(scores, focus)[0];
+}
+
+// Did the user answer any scoring question (Q2 to Q9)? If not, the plan has no area signal: the balanced starter
+// set, no focus, no packs created and no starting outline saved (docs/ONBOARDING_SPEC.md, sections 4 and 5)
+export function hasAreaSignal(a: ScoringInput): boolean {
+  return a.occupation !== null || a.habitsFeel !== null || a.focus.length > 0 || a.challenge !== null
+    || a.derails !== null || a.sleep !== null || a.days !== null || a.values.length > 0;
 }
 
 // The radar's points, in AXES order, as a share of the maximum (0.2..1)

@@ -230,7 +230,7 @@ describe('matches docs/ONBOARDING_SPEC.md', () => {
       timeBudget: c.TIME_BUDGET_LABELS, occupation: c.OCCUPATION_LABELS, habitsFeel: c.HABITS_FEEL_LABELS, focus: c.FOCUS_LABELS,
       derails: c.DERAIL_LABELS, sleep: c.SLEEP_LABELS, days: c.DAYS_LABELS, values: c.VALUE_LABELS, badHabit: c.BAD_HABIT_LABELS,
     };
-    const split = (cell: string) => cell.replace(/\s*\(plus a "Skip this one" text button\)$/, '').split(' / ');
+    const split = (cell: string) => cell.replace(/\s*\(plus the "Skip this question" text button every step has\)$/, '').split(' / ');
 
     f.STEPS.forEach((key, i) => {
       if (key === 'challenge') return;// two rows, checked below
@@ -248,7 +248,7 @@ describe('matches docs/ONBOARDING_SPEC.md', () => {
     assert.deepEqual(split(student.options), t.STUDENT_CHALLENGES.map((v) => c.CHALLENGE_LABELS[v]));
     assert.deepEqual(split(others.options), t.GENERAL_CHALLENGES.map((v) => c.CHALLENGE_LABELS[v]));
 
-    assert.ok(byStep.get('10')!.options.includes(`"${c.SKIP_THIS_ONE}"`));
+    assert.ok(byStep.get('10')!.options.includes(`"${c.SKIP_QUESTION}"`));
     const slider = byStep.get('11')!.options;
     assert.ok(slider.includes(`"${c.CONFIDENCE_LOW_LABEL}"`) && slider.includes(`"${c.CONFIDENCE_HIGH_LABEL}"`));
     assert.ok(SPEC_DOC.includes(`"${c.SKIP_SETUP}"`));

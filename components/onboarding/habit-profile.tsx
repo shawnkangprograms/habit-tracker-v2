@@ -1,19 +1,21 @@
 import {StyleSheet, Text, View} from 'react-native';
 import {colors, fonts, radii, spacing} from '@/constants/theme';
 import {HabitRadar} from '@/components/onboarding/habit-radar';
-import {FOCUS_CARDS, PROFILE_TITLE, focusTitle} from '@/utils/onboarding/copy';
-import type {Scores} from '@/utils/onboarding/scoring';
-import type {Axis} from '@/utils/onboarding/types';
+import {PROFILE_TITLE} from '@/utils/onboarding/copy';
+import type {Plan} from '@/utils/onboarding/plan';
+import {profileCard} from '@/utils/onboarding/results';
 
-// Habit Profile (docs/ONBOARDING_SPEC.md, section 5): the radar and the "Your plan will focus on ..." card
-export function HabitProfile({scores, focus}: {scores: Scores; focus: Axis}) {
+// Habit Profile (docs/ONBOARDING_SPEC.md, section 5): the radar and the "Your plan will focus on ..." card, or, when no
+// scoring question was answered, the balanced line instead of a focus (utils/onboarding/results.ts)
+export function HabitProfile({plan}: {plan: Pick<Plan, 'scores' | 'focus' | 'balanced'>}) {
+  const card = profileCard(plan);
   return (
     <View style={styles.wrap}>
       <Text style={styles.title} accessibilityRole="header">{PROFILE_TITLE}</Text>
-      <HabitRadar scores={scores} />
+      <HabitRadar scores={plan.scores} />
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>{focusTitle(focus)}</Text>
-        <Text style={styles.cardText}>{FOCUS_CARDS[focus].subtitle}</Text>
+        <Text style={styles.cardTitle}>{card.title}</Text>
+        {card.subtitle !== null && <Text style={styles.cardText}>{card.subtitle}</Text>}
       </View>
     </View>
   );

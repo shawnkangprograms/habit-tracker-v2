@@ -7,13 +7,15 @@ import Animated, {
 import {scheduleOnRN} from 'react-native-worklets';
 import {colors, fonts, spacing} from '@/constants/theme';
 import {selectionHaptic} from '@/services/haptics';
-import {CONFIDENCE_HIGH_LABEL, CONFIDENCE_LOW_LABEL} from '@/utils/onboarding/copy';
+import {
+  CONFIDENCE_HIGH_LABEL, CONFIDENCE_LOW_LABEL, SKIPPED_CONFIDENCE, SKIPPED_CONFIDENCE_A11Y,
+} from '@/utils/onboarding/copy';
 import {
   NUMBER_BUMP_DOWN_MS, NUMBER_BUMP_SCALE, NUMBER_BUMP_UP_MS, THUMB_GLIDE_MS, THUMB_HOLD_MS, THUMB_HOLD_SCALE,
   shouldAnimate,
 } from '@/utils/onboarding/motion';
 import {SLIDER_THUMB as THUMB, sliderValueAt} from '@/utils/onboarding/slider';
-import {CONFIDENCE_MAX, CONFIDENCE_MIN} from '@/utils/onboarding/types';
+import {CONFIDENCE_DEFAULT, CONFIDENCE_MAX, CONFIDENCE_MIN} from '@/utils/onboarding/types';
 
 // The Q11 slider, 1 to 10. Custom (no slider package in the build): gesture-handler for drag and tap, with the
 // thumb and fill moved on the UI thread by Reanimated; the value reaches React only when the step changes, with
@@ -28,16 +30,21 @@ const RANGE = CONFIDENCE_MAX - CONFIDENCE_MIN;
 const SYSTEM = ReduceMotion.System;// a backstop for the first render, before useReduceMotion has read the setting
 const EASE = Easing.out(Easing.quad);
 
+// value null: the step was skipped. The number shows "–" and the thumb rests at the default; any touch (even on the
+// default) answers it again (docs/ONBOARDING_SPEC.md, section 1).
 export function ConfidenceSlider({value, onChange, label, reduceMotion}: {
-  value: number;
+  value: number | null;
   onChange: (value: number) => void;
   label: string;// read by screen readers with the value
   reduceMotion: boolean;
 }) {
   const animate = shouldAnimate(reduceMotion);
+  const at = value ?? CONFIDENCE_DEFAULT;// where the thumb rests
   const width = useSharedValue(0);// the track's width, from layout
-  const shown = useSharedValue(value);// the step picked: set on the UI thread while dragging, and from `value`
-  const position = useSharedValue(value);// where the thumb is drawn: glides to `shown`
+  // the step picked: set on the UI thread while dragging, and from `value`; 0 (no step) while skipped, so a touch on
+  // the default still counts as a change
+  const shown = useSharedValue(value ?? 0);
+  const position = useSharedValue(at);// where the thumb is drawn: glides to `shown`
   const held = useSharedValue(0);
   const bump = useSharedValue(1);
   const lastValue = useRef(value);
@@ -45,8 +52,8 @@ export function ConfidenceSlider({value, onChange, label, reduceMotion}: {
   // assigning .value to them (Reanimated's accessors are the compiler-safe form)
 
   useEffect(() => {
-    shown.set(value);
-    position.set(animate ? withTiming(value, {duration: THUMB_GLIDE_MS, easing: EASE, reduceMotion: SYSTEM}) : value);
+    shown.set(value ?? 0);
+    position.set(animate ? withTiming(at, {duration: THUMB_GLIDE_MS, easing: EASE, reduceMotion: SYSTEM}) : at);
     if (value !== lastValue.current && animate) {
       bump.set(withSequence(
         withTiming(NUMBER_BUMP_SCALE, {duration: NUMBER_BUMP_UP_MS, easing: EASE, reduceMotion: SYSTEM}),
@@ -54,7 +61,7 @@ export function ConfidenceSlider({value, onChange, label, reduceMotion}: {
       ));
     }
     lastValue.current = value;
-  }, [value, animate, shown, position, bump]);
+  }, [value, at, animate, shown, position, bump]);
 
   // Stable as long as onChange is (the parent's setter wrapper is); a new one only updates the gesture's
   // callbacks in place (gesture-handler reattaches only when the gesture types change)
@@ -113,7 +120,12 @@ export function ConfidenceSlider({value, onChange, label, reduceMotion}: {
     width.set(e.nativeEvent.layout.width);
   };
 
+  // while skipped, either action answers with the default (where the thumb rests)
   const onAccessibilityAction = (e: AccessibilityActionEvent) => {
+    if (value === null) {
+      if (e.nativeEvent.actionName === 'increment' || e.nativeEvent.actionName === 'decrement') changed(CONFIDENCE_DEFAULT);
+      return;
+    }
     if (e.nativeEvent.actionName === 'increment' && value < CONFIDENCE_MAX) changed(value + 1);
     if (e.nativeEvent.actionName === 'decrement' && value > CONFIDENCE_MIN) changed(value - 1);
   };
@@ -124,11 +136,13 @@ export function ConfidenceSlider({value, onChange, label, reduceMotion}: {
       accessible
       accessibilityRole="adjustable"
       accessibilityLabel={label}
-      accessibilityValue={{min: CONFIDENCE_MIN, max: CONFIDENCE_MAX, now: value, text: `${value} of ${CONFIDENCE_MAX}`}}
+      accessibilityValue={value === null
+        ? {min: CONFIDENCE_MIN, max: CONFIDENCE_MAX, text: SKIPPED_CONFIDENCE_A11Y}
+        : {min: CONFIDENCE_MIN, max: CONFIDENCE_MAX, now: value, text: `${value} of ${CONFIDENCE_MAX}`}}
       accessibilityActions={[{name: 'increment'}, {name: 'decrement'}]}
       onAccessibilityAction={onAccessibilityAction}>
       <Animated.View style={numberStyle}>
-        <Text style={styles.number}>{value}</Text>
+        <Text style={styles.number}>{value ?? SKIPPED_CONFIDENCE}</Text>
       </Animated.View>
 
       <GestureHandlerRootView style={styles.root}>

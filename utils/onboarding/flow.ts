@@ -84,11 +84,13 @@ export function isAtMax(answers: Answers, key: MultiKey): boolean {
 const isConfidence = (n: unknown): n is number =>
   typeof n === 'number' && Number.isInteger(n) && n >= CONFIDENCE_MIN && n <= CONFIDENCE_MAX;
 
+// Also how a touch on the slider answers Q11 again after it was skipped
 export function setConfidence(answers: Answers, value: number): Answers {
   return isConfidence(value) ? {...answers, confidence: value} : answers;
 }
 
-// Continue needs an answer on every step. Q10 is the one step that can be skipped instead (canSkip).
+// Continue needs an answer on every step. The Q11 slider starts at its default, so Continue works there until the
+// step is skipped (then it needs a touch on the slider).
 export function canContinue(answers: Answers, step: StepKey): boolean {
   switch (step) {
     case 'focus':
@@ -103,8 +105,24 @@ export function canContinue(answers: Answers, step: StepKey): boolean {
   }
 }
 
-export function canSkip(step: StepKey): boolean {
-  return step === 'badHabit';
+// "Skip this question" is on every step (docs/ONBOARDING_SPEC.md, section 1)
+export function canSkip(_step: StepKey): boolean {
+  return true;
+}
+
+// "Skip this question": that step's answer is removed (null, [] for the multi questions, null for the slider), so
+// it contributes nothing to the plan and Back shows it empty. Skipping Q2 leaves Q5 alone: with no occupation Q5
+// shows the general list, and an answer from it stays valid.
+export function skipStep(answers: Answers, step: StepKey): Answers {
+  switch (step) {
+    case 'focus':
+    case 'values':
+      return {...answers, [step]: []};
+    case 'occupation':
+      return {...answers, occupation: null, challenge: isStudent(answers.occupation) ? null : answers.challenge};
+    default:
+      return {...answers, [step]: null};
+  }
 }
 
 // A real array of known values, no duplicates, 1..max long
@@ -113,26 +131,49 @@ function validMulti<T extends string>(list: readonly T[], value: unknown, max: n
     && value.every((v) => isOneOf(list, v)) && new Set(value).size === value.length;
 }
 
+// A skipped single answer is null or missing; anything else must be one of the list
+function optional<T extends string>(list: readonly T[], value: unknown): {ok: true; value: T | null} | {ok: false} {
+  if (value === null || value === undefined) return {ok: true, value: null};
+  return isOneOf(list, value) ? {ok: true, value} : {ok: false};
+}
+
+// A skipped multi answer is [] or missing; anything else must be a valid pick list
+function optionalMulti<T extends string>(list: readonly T[], value: unknown, max: number): {ok: true; value: T[]} | {ok: false} {
+  if (value === undefined || (Array.isArray(value) && value.length === 0)) return {ok: true, value: []};
+  return validMulti(list, value, max) ? {ok: true, value: [...value]} : {ok: false};
+}
+
 // A finished questionnaire, ready for scoring and picking, rebuilt from the known fields only (anything else is
-// dropped). The answers are held in memory only: the local record no longer stores them (record.ts).
+// dropped). Every step is answered or skipped (null, or [] for the multi questions); a value that is present must be
+// valid, never coerced. The answers are held in memory only: the local record never stores them (record.ts).
 export function validateAnswers(input: unknown): Result<CompleteAnswers> {
   if (typeof input !== 'object' || input === null || Array.isArray(input)) return fail('answers');
   const o = input as Record<string, unknown>;
-  if (!isOneOf(TIME_BUDGETS, o.timeBudget)) return fail('timeBudget');
-  if (!isOneOf(OCCUPATIONS, o.occupation)) return fail('occupation');
-  if (!isOneOf(HABITS_FEEL, o.habitsFeel)) return fail('habitsFeel');
-  if (!validMulti(FOCUS_AREAS, o.focus, FOCUS_MAX)) return fail('focus');
-  if (!isOneOf(challengeOptions(o.occupation), o.challenge)) return fail('challenge');
-  if (!isOneOf(DERAILS, o.derails)) return fail('derails');
-  if (!isOneOf(SLEEP, o.sleep)) return fail('sleep');
-  if (!isOneOf(DAYS, o.days)) return fail('days');
-  if (!validMulti(VALUES, o.values, VALUES_MAX)) return fail('values');
-  if (!isConfidence(o.confidence)) return fail('confidence');
-  const badHabit = o.badHabit ?? null;
-  if (badHabit !== null && !isOneOf(BAD_HABITS, badHabit)) return fail('badHabit');
+  const timeBudget = optional(TIME_BUDGETS, o.timeBudget);
+  if (!timeBudget.ok) return fail('timeBudget');
+  const occupation = optional(OCCUPATIONS, o.occupation);
+  if (!occupation.ok) return fail('occupation');
+  const habitsFeel = optional(HABITS_FEEL, o.habitsFeel);
+  if (!habitsFeel.ok) return fail('habitsFeel');
+  const focus = optionalMulti(FOCUS_AREAS, o.focus, FOCUS_MAX);
+  if (!focus.ok) return fail('focus');
+  const challenge = optional(challengeOptions(occupation.value), o.challenge);
+  if (!challenge.ok) return fail('challenge');
+  const derails = optional(DERAILS, o.derails);
+  if (!derails.ok) return fail('derails');
+  const sleep = optional(SLEEP, o.sleep);
+  if (!sleep.ok) return fail('sleep');
+  const days = optional(DAYS, o.days);
+  if (!days.ok) return fail('days');
+  const values = optionalMulti(VALUES, o.values, VALUES_MAX);
+  if (!values.ok) return fail('values');
+  const confidence = o.confidence ?? null;
+  if (confidence !== null && !isConfidence(confidence)) return fail('confidence');
+  const badHabit = optional(BAD_HABITS, o.badHabit);
+  if (!badHabit.ok) return fail('badHabit');
   return ok({
-    timeBudget: o.timeBudget, occupation: o.occupation, habitsFeel: o.habitsFeel, focus: [...o.focus],
-    challenge: o.challenge, derails: o.derails, sleep: o.sleep, days: o.days, values: [...o.values], badHabit,
-    confidence: o.confidence,
+    timeBudget: timeBudget.value, occupation: occupation.value, habitsFeel: habitsFeel.value, focus: focus.value,
+    challenge: challenge.value, derails: derails.value, sleep: sleep.value, days: days.value, values: values.value,
+    badHabit: badHabit.value, confidence,
   });
 }

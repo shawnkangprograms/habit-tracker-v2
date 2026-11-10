@@ -65,7 +65,9 @@ export const CONFIDENCE_DEFAULT = 5;
 export const FOCUS_MAX = 3;
 export const VALUES_MAX = 2;
 
-// In progress: null = not answered yet. focus and values keep the order they were picked in (ties use it).
+// In progress: null (or [] for focus and values) = not answered yet, or skipped with "Skip this question".
+// focus and values keep the order they were picked in (ties use it). confidence starts at the slider's default;
+// skipping Q11 makes it null (docs/ONBOARDING_SPEC.md, section 1).
 export type Answers = {
   timeBudget: TimeBudget | null;
   occupation: Occupation | null;
@@ -76,23 +78,24 @@ export type Answers = {
   sleep: Sleep | null;
   days: DaysPattern | null;
   values: Value[];
-  badHabit: BadHabit | null;// null = skipped (or not answered yet)
-  confidence: number;
+  badHabit: BadHabit | null;
+  confidence: number | null;
 };
 
-// Every required step answered and valid
+// A finished questionnaire: every step answered or skipped. A skipped step is null ([] for focus and values) and
+// contributes no signal to the plan. In memory only, never stored.
 export type CompleteAnswers = {
-  timeBudget: TimeBudget;
-  occupation: Occupation;
-  habitsFeel: HabitsFeel;
+  timeBudget: TimeBudget | null;
+  occupation: Occupation | null;
+  habitsFeel: HabitsFeel | null;
   focus: FocusArea[];
-  challenge: Challenge;
-  derails: Derail;
-  sleep: Sleep;
-  days: DaysPattern;
+  challenge: Challenge | null;
+  derails: Derail | null;
+  sleep: Sleep | null;
+  days: DaysPattern | null;
   values: Value[];
   badHabit: BadHabit | null;
-  confidence: number;
+  confidence: number | null;
 };
 
 export function isOneOf<T extends string>(list: readonly T[], value: unknown): value is T {

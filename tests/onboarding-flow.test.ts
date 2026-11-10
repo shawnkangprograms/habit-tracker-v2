@@ -22,9 +22,9 @@ const SINGLE_ENUMS: [SingleKey, readonly string[]][] = [
 const withOccupation = (occupation: Answers['occupation']): Answers => ({...f.emptyAnswers(), occupation});
 
 describe('steps', () => {
-  test('11 fixed steps, Q10 is the only skippable one, confidence starts at 5', () => {
+  test('11 fixed steps, every one can be skipped ("Skip this question"), confidence starts at 5', () => {
     assert.equal(f.STEP_COUNT, 11);
-    assert.deepEqual(f.STEPS.filter(f.canSkip), ['badHabit']);
+    assert.deepEqual(f.STEPS.filter(f.canSkip), [...f.STEPS]);
     assert.equal(f.emptyAnswers().confidence, 5);
   });
 
@@ -155,13 +155,14 @@ describe('validateAnswers', () => {
   test('anything off is rejected, never coerced', () => {
     const cases: [string, unknown][] = [
       ['answers', null], ['answers', []], ['answers', 'x'],
-      ['timeBudget', {...COMPLETE, timeBudget: 'min10'}], ['timeBudget', {...COMPLETE, timeBudget: undefined}],
+      // a missing answer (null, undefined, []) is a skip and valid since 2026-11-10 (tests/onboarding-skip.test.ts)
+      ['timeBudget', {...COMPLETE, timeBudget: 'min10'}], ['timeBudget', {...COMPLETE, timeBudget: ''}],
       ['occupation', {...COMPLETE, occupation: 'Student'}],
-      ['habitsFeel', {...COMPLETE, habitsFeel: undefined}],
-      ['focus', {...COMPLETE, focus: []}], ['focus', {...COMPLETE, focus: ['health', 'mental', 'career', 'education']}],
+      ['habitsFeel', {...COMPLETE, habitsFeel: 0}],
+      ['focus', {...COMPLETE, focus: ['health', 'mental', 'career', 'education']}],
       ['focus', {...COMPLETE, focus: ['health', 'health']}], ['focus', {...COMPLETE, focus: 'health'}],
       ['challenge', {...COMPLETE, challenge: 'memory'}], ['challenge', {...COMPLETE, occupation: 'student', challenge: 'time'}],
-      ['derails', {...COMPLETE, derails: 'stress '}], ['sleep', {...COMPLETE, sleep: 1}], ['days', {...COMPLETE, days: null}],
+      ['derails', {...COMPLETE, derails: 'stress '}], ['sleep', {...COMPLETE, sleep: 1}], ['days', {...COMPLETE, days: false}],
       ['values', {...COMPLETE, values: ['freedom', 'connection', 'achievement']}], ['values', {...COMPLETE, values: ['health']}],
       ['confidence', {...COMPLETE, confidence: 0}], ['confidence', {...COMPLETE, confidence: '5'}],
       ['confidence', {...COMPLETE, confidence: 7.5}], ['badHabit', {...COMPLETE, badHabit: 'vaping'}],

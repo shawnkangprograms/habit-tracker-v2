@@ -16,7 +16,7 @@
 
 import type {HabitInput} from '@/validation/validators';
 import {completedRecord, withAddedTemplates, type OnboardingRecord, type ParsedRecord} from '@/utils/onboarding/record';
-import {focusAxis, radarValues, scoreAxes, type Scores} from '@/utils/onboarding/scoring';
+import {focusAxis, hasAreaSignal, radarValues, scoreAxes, type Scores} from '@/utils/onboarding/scoring';
 import {addedTemplateIdsOf, pickStarters, toHabitInput, type StarterPick} from '@/utils/onboarding/starters';
 import type {Axis, CompleteAnswers} from '@/utils/onboarding/types';
 import type {BuiltinPackId} from '@/utils/packs/builtin';
@@ -35,6 +35,9 @@ export type Plan = {
   packs: [BuiltinPackId, BuiltinPackId];// the two packs the starters come from (only these ids are ever stored)
   picks: StarterPick[];
   previous: OnboardingRecord | null;// the record before this run (retake keeps its addedTemplateIds)
+  // No scoring question (Q2 to Q9) was answered: the balanced starter set, no focus shown, no packs created and no
+  // starting outline saved (utils/onboarding/results.ts). focus and packs are then only the tie-break defaults.
+  balanced: boolean;
 };
 
 // Retake: templates added by earlier runs, and templates or a replace habit whose name the user already has as an
@@ -50,6 +53,7 @@ export function buildPlan(answers: CompleteAnswers, stored: ParsedRecord, existi
     packs: chooseOnboardingPacks(scores, answers.focus),
     picks: pickStarters(answers, {excludeIds: previous?.addedTemplateIds ?? [], existingHabitNames}),
     previous,
+    balanced: !hasAreaSignal(answers),
   };
 }
 

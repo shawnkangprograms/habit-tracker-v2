@@ -32,14 +32,15 @@ import type {HabitRef} from '@/utils/packs/membership';
 import type {ParsedPacks} from '@/utils/packs/record';
 import {
   STEPS, STEP_COUNT, canContinue, canSkip, emptyAnswers, isAtMax, multiOptions, selectSingle, setConfidence,
-  singleOptions, toggleMulti, validateAnswers, type MultiKey, type SingleKey,
+  singleOptions, skipStep, toggleMulti, validateAnswers, type MultiKey, type SingleKey,
 } from '@/utils/onboarding/flow';
 import {
-  ADD_OWN_HABIT, BAD_HABIT_LABELS, CHALLENGE_LABELS, CONTINUE, CREATE_FAILED, DAYS_LABELS, DERAIL_LABELS,
-  DONE, FIRST_STEP_NOTICE, FOCUS_LABELS, HABITS_FEEL_LABELS, NOTHING_LEFT, OCCUPATION_LABELS, OWN_HABIT_REASON,
-  ROUTINE_HINT, ROUTINE_OTHER_GROUP, ROUTINE_TITLE, SKIP_THIS_ONE, SLEEP_LABELS, START, STEP_HINTS, STEP_TITLES,
-  STUDENT_CHALLENGE_TITLE, TIME_BUDGET_LABELS, VALUE_LABELS, routineSubtitle,
+  ADD_OWN_HABIT, BAD_HABIT_LABELS, BALANCED_LINE, CHALLENGE_LABELS, CONTINUE, CREATE_FAILED, DAYS_LABELS,
+  DERAIL_LABELS, DONE, FIRST_STEP_NOTICE, FOCUS_LABELS, HABITS_FEEL_LABELS, NOTHING_LEFT, OCCUPATION_LABELS,
+  OWN_HABIT_REASON, ROUTINE_HINT, ROUTINE_OTHER_GROUP, ROUTINE_TITLE, SKIP_QUESTION, SLEEP_LABELS, START, STEP_HINTS,
+  STEP_TITLES, STUDENT_CHALLENGE_TITLE, TIME_BUDGET_LABELS, VALUE_LABELS, routineSubtitle,
 } from '@/utils/onboarding/copy';
+import {createsPacks, savesOutline, showsToldUs} from '@/utils/onboarding/results';
 import {entryFromParam, recordOnSkip, shouldCloseForSession} from '@/utils/onboarding/gate';
 import {
   LEAVING_AUTO_MS, skipCopy, skipDialogNext, type SkipDialogEvent, type SkipDialogState,
@@ -208,7 +209,13 @@ export default function OnboardingScreen() {
     } else if (phase === 'toldUs') {
       setDirection('back');// Q11 comes back in from the left, answers kept
       setPhase('questions');
-    } else if (phase === 'profile') setPhase('toldUs');
+    } else if (phase === 'profile') {
+      if (!plan || showsToldUs(plan)) setPhase('toldUs');
+      else {
+        setDirection('back');// no "What you told us" for this plan: back to Q11
+        setPhase('questions');
+      }
+    }
     else if (phase === 'routine' && !anyCreated && !running) setPhase('profile');
   };
 
@@ -266,16 +273,18 @@ export default function OnboardingScreen() {
 
   // After Q11: Building Profile shows while the plan is built (a local read and pure maths). Once it is, the radar's
   // starting outline (services/profileOutlineStoreCore.ts) is saved from the in-memory scores, on every run that
-  // gets here (first run and Settings retake). Never awaited, never throws: a failed write never blocks onboarding.
-  const startResults = () => {
-    const result = validateAnswers(answers);
+  // gets here (first run and Settings retake) and answered at least one scoring question (utils/onboarding/results.ts).
+  // Never awaited, never throws: a failed write never blocks onboarding. `final`: the answers as they end Q11 (a skip
+  // there changes them in the same tap, before the state has updated).
+  const startResults = (final: Answers) => {
+    const result = validateAnswers(final);
     if (!result.valid) return;
     const request = ++planRequest.current;
     setPlan(null);
     setPhase('building');
     loadPlan(userId, result.value).then((next) => {
       if (request !== planRequest.current) return;
-      if (userId) profileOutlineStore.write(userId, next.plan.scores);
+      if (userId && savesOutline(next.plan)) profileOutlineStore.write(userId, next.plan.scores);
       setPlan(next.plan);
       setContext(next.context);
       setSelected(new Set(next.plan.picks.map((p) => p.id)));
@@ -283,17 +292,19 @@ export default function OnboardingScreen() {
   };
 
   // The pack record, written right after each onboarding record save (utils/packs/choose.ts): the packs are created
-  // once this run has made a habit and the user has none. Never throws.
+  // once this run has made a habit and the user has none, unless the plan is balanced (no scoring answer, so no
+  // packs to choose). Never throws.
   const existing = context.existing;
   const savePacks = useCallback((uid: string, current: Plan) => packsStore.update(uid, (parsed) => packsAfterRun(parsed, {
-    chosen: current.packs, create: madeHabit.current, joins: joins.current, existing, now: clockNow(),
+    chosen: current.packs, create: madeHabit.current && createsPacks(current), joins: joins.current, existing, now: clockNow(),
   })), [existing]);
 
-  const onBuilt = () => setPhase('toldUs');// stable: the React Compiler memoizes it
+  // "What you told us" is left out when it would be empty (a balanced plan); the plan is built by then
+  const onBuilt = () => setPhase(plan && !showsToldUs(plan) ? 'profile' : 'toldUs');
 
   const nextQuestion = () => {
     if (!canContinue(answers, step)) return;
-    if (stepIndex === STEP_COUNT - 1) startResults();
+    if (stepIndex === STEP_COUNT - 1) startResults(answers);
     else forward();
   };
 
@@ -302,10 +313,13 @@ export default function OnboardingScreen() {
     setStepIndex(stepIndex + 1);
   };
 
-  // Q10's "Skip this one": no answer, on to the next step
+  // "Skip this question", on every step: the answer is removed and the flow moves on like Continue (on Q11, to the
+  // results). Back then shows the step empty.
   const skipQuestion = () => {
-    setAnswers((a) => selectSingle(a, 'badHabit', null));
-    forward();
+    const next = skipStep(answers, step);
+    setAnswers(next);
+    if (stepIndex === STEP_COUNT - 1) startResults(next);
+    else forward();
   };
 
   // A light haptic only when the answer actually changes (a tap on the picked option, or on a dimmed one, doesn't)
@@ -417,7 +431,10 @@ export default function OnboardingScreen() {
 
   // The routine's groups: each card under the pack it will join (runPacks previews the packs this run joins, or
   // creates once a card is added), the rest under "Other habits". The stagger runs down the cards in that order.
-  const groups = plan ? routineGroups(plan.picks, runPacks(context.packs, plan.packs, true, 0), plan.packs) : null;
+  // A balanced plan previews no new packs and no "Built from your packs" subtitle (its packs are only tie-breaks)
+  const groups = plan
+    ? routineGroups(plan.picks, runPacks(context.packs, plan.packs, createsPacks(plan), 0), plan.balanced ? [] : plan.packs)
+    : null;
   const cardOrder = groups ? [...groups.packs.flatMap((g) => g.picks), ...groups.other] : [];
   const pickCard = (pick: StarterPick) => (
     <RoutineCard
@@ -502,11 +519,12 @@ export default function OnboardingScreen() {
 
         {phase === 'toldUs' && plan && <ToldUs answers={plan.answers} focus={plan.focus} reduceMotion={reduceMotion} />}
 
-        {phase === 'profile' && plan && <HabitProfile scores={plan.scores} focus={plan.focus} />}
+        {phase === 'profile' && plan && <HabitProfile plan={plan} />}
 
         {phase === 'routine' && plan && (
           <View style={styles.routine}>
             <Text style={styles.title} accessibilityRole="header">{ROUTINE_TITLE}</Text>
+            {plan.balanced && <Text style={styles.hint}>{BALANCED_LINE}</Text>}
             {groups?.subtitle && plan.picks.length > 0 && (
               <Text style={styles.hint}>{routineSubtitle(...groups.subtitle)}</Text>
             )}
@@ -555,8 +573,12 @@ export default function OnboardingScreen() {
             <>
               <PressButton label={CONTINUE} enabled={continueOn} reduceMotion={reduceMotion} onPress={nextQuestion} />
               {canSkip(step) && (
-                <Pressable style={styles.textButton} onPress={skipQuestion} hitSlop={8} accessibilityRole="button">
-                  <Text style={styles.textButtonText}>{SKIP_THIS_ONE}</Text>
+                <Pressable
+                  style={styles.textButton}
+                  onPress={skipQuestion}
+                  accessibilityRole="button"
+                  accessibilityLabel={SKIP_QUESTION}>
+                  <Text style={styles.textButtonText}>{SKIP_QUESTION}</Text>
                 </Pressable>
               )}
             </>
@@ -650,7 +672,8 @@ const styles = StyleSheet.create({
   },
   secondaryText: {fontFamily: fonts.semiBold, fontSize: 15, color: colors.accent},
   off: {opacity: 0.4},
-  textButton: {alignSelf: 'center', paddingVertical: spacing.sm},
+  // "Skip this question": a real 48 dp target (not hitSlop), under Continue in the pinned footer
+  textButton: {alignSelf: 'center', minHeight: 48, minWidth: 48, justifyContent: 'center', paddingHorizontal: spacing.md},
   textButtonText: {fontFamily: fonts.semiBold, fontSize: 14, color: colors.muted},
   error: {fontFamily: fonts.medium, fontSize: 13, color: colors.error, textAlign: 'center'},
 });
