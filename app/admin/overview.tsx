@@ -32,6 +32,7 @@ async function fetchOverview() {
 }
 
 const QUICK_ACTIONS: {label: string; icon: GlyphName; href: Href}[] = [
+  {label: 'Stats', icon: 'chart-line', href: '/admin/stats'},
   {label: 'Users', icon: 'account-group-outline', href: '/admin/users'},
   {label: 'Catalog', icon: 'format-list-checks', href: '/admin/catalog'},
   {label: 'Audit log', icon: 'history', href: '/admin/audit'},

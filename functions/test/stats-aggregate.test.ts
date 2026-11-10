@@ -83,12 +83,12 @@ describe('computeDayStats', () => {
     assert.equal(stats.all.signups.day, 1);// u-real-2
     const weeks = stats.all.signups.perWeek;
     assert.equal(weeks.length, agg.SIGNUP_WEEKS);
-    assert.equal(weeks.at(-1).weekStart, '2026-11-09');// DAY is a Monday
-    assert.equal(weeks.at(-1).count, 1);// u-real-2 (u-empty is after DAY)
-    assert.equal(weeks.at(-2).weekStart, '2026-11-02');
-    assert.equal(weeks.at(-2).count, 1);// u-test-1
-    assert.equal(weeks.find((w: {weekStart: string}) => w.weekStart === '2026-09-28').count, 1);// u-real-1, Thu 1 Oct
-    assert.equal(stats.real.signups.perWeek.at(-2).count, 0);
+    assert.equal(weeks.at(-1)!.weekStart, '2026-11-09');// DAY is a Monday
+    assert.equal(weeks.at(-1)!.count, 1);// u-real-2 (u-empty is after DAY)
+    assert.equal(weeks.at(-2)!.weekStart, '2026-11-02');
+    assert.equal(weeks.at(-2)!.count, 1);// u-test-1
+    assert.equal(weeks.find((w: {weekStart: string}) => w.weekStart === '2026-09-28')!.count, 1);// u-real-1, Thu 1 Oct
+    assert.equal(stats.real.signups.perWeek.at(-2)!.count, 0);
   });
 
   test('completion rate rebuilt from schedules: deleted habits out, unticked rows not done, S-2 clamp', () => {

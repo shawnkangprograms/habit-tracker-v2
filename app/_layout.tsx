@@ -221,6 +221,7 @@ export default function RootLayout() {
         {/* admin screens: reachable only while signed in AND the admins/{uid} check said yes; Firestore rules are the real guard */}
         <Stack.Protected guard={!!isLoggedIn && admin.isAdmin}>
           <Stack.Screen name="admin/overview" options={{headerShown: false}} />
+          <Stack.Screen name="admin/stats" options={{headerShown: false}} />
           <Stack.Screen name="admin/users" options={{headerShown: false}} />
           <Stack.Screen name="admin/catalog" options={{headerShown: false}} />
           <Stack.Screen name="admin/catalog-form" options={{headerShown: false}} />

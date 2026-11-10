@@ -44,5 +44,6 @@ export function useAdminData<T>(fetcher: () => Promise<T>) {
     fetchData();
   }, [fetchData]);
 
-  return {load, retry};
+  // reloads while the current data stays on screen (no spinner); skipped if a load is already running
+  return {load, retry, reload: fetchData};
 }
