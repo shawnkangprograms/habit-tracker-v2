@@ -35,7 +35,7 @@ const QUICK_ACTIONS: {label: string; icon: GlyphName; href: Href}[] = [
   {label: 'Stats', icon: 'chart-line', href: '/admin/stats'},
   {label: 'Users', icon: 'account-group-outline', href: '/admin/users'},
   {label: 'Catalog', icon: 'format-list-checks', href: '/admin/catalog'},
-  {label: 'Audit log', icon: 'history', href: '/admin/audit'},
+  {label: 'Audit', icon: 'history', href: '/admin/audit'},
 ];
 
 function goBackToSettings() {
@@ -64,7 +64,8 @@ export default function AdminOverviewScreen() {
         {load.status === 'ready' && (
           <View style={styles.grid}>
             <View style={styles.gridRow}>
-              <StatCard label="TOTAL USERS" value={load.data.stats.total} />
+              {/* counts users/{uid} docs; an account whose profile write failed has no doc, so Stats (Firebase Auth) can show more */}
+              <StatCard label="USER PROFILES" value={load.data.stats.total} />
               <StatCard label="DISABLED USERS" value={load.data.stats.disabledUsers} />
             </View>
             <View style={styles.gridRow}>

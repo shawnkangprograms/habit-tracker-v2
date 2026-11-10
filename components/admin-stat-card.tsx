@@ -55,15 +55,22 @@ export function SplitBar({title, split, leftColor, rightColor, accessibilityLabe
         {total > 0 && split.left.count > 0 && split.right.count > 0 && <View style={styles.gap} />}
         {total > 0 && split.right.count > 0 && <View style={{flex: split.right.count, backgroundColor: rightColor}} />}
       </View>
+      {/* each side: marker and label on line 1, "count · %" on line 2; left side aligned left, right side right */}
       <View style={styles.splitLabels}>
-        <Text style={styles.splitLabel} numberOfLines={2}>
-          <Text style={[styles.dot, {color: leftColor}]}>● </Text>
-          {split.left.label} <Text style={styles.splitValue}>{split.left.count} · {split.left.percent}%</Text>
-        </Text>
-        <Text style={[styles.splitLabel, styles.right]} numberOfLines={2}>
-          {split.right.label} <Text style={styles.splitValue}>{split.right.count} · {split.right.percent}%</Text>
-          <Text style={[styles.dot, {color: rightColor}]}> ■</Text>
-        </Text>
+        <View style={styles.side}>
+          <View style={styles.sideHead}>
+            <View style={[styles.marker, styles.round, {backgroundColor: leftColor}]} />
+            <Text style={styles.splitLabel} numberOfLines={1}>{split.left.label}</Text>
+          </View>
+          <Text style={styles.splitValue}>{split.left.count} · {split.left.percent}%</Text>
+        </View>
+        <View style={[styles.side, styles.sideRight]}>
+          <View style={[styles.sideHead, styles.sideHeadRight]}>
+            <View style={[styles.marker, {backgroundColor: rightColor}]} />
+            <Text style={[styles.splitLabel, styles.right]} numberOfLines={1}>{split.right.label}</Text>
+          </View>
+          <Text style={[styles.splitValue, styles.right]}>{split.right.count} · {split.right.percent}%</Text>
+        </View>
       </View>
     </View>
   );
@@ -89,8 +96,13 @@ const styles = StyleSheet.create({
   track: {flexDirection: 'row', height: 10, borderRadius: 5, overflow: 'hidden', backgroundColor: colors.track},
   gap: {width: 2},
   splitLabels: {flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md},
-  splitLabel: {flex: 1, fontFamily: fonts.medium, fontSize: 12, color: colors.text},
+  side: {flex: 1, gap: 2, alignItems: 'flex-start'},
+  sideRight: {alignItems: 'flex-end'},
+  sideHead: {flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: '100%'},
+  sideHeadRight: {justifyContent: 'flex-end'},
+  marker: {width: 9, height: 9, borderRadius: 2},// left: round, right: square, so shape tells the sides apart too
+  round: {borderRadius: 4.5},
+  splitLabel: {flexShrink: 1, fontFamily: fonts.medium, fontSize: 12, color: colors.text},
   right: {textAlign: 'right'},
-  splitValue: {fontFamily: fonts.regular, color: colors.muted},
-  dot: {fontSize: 11},
+  splitValue: {fontFamily: fonts.regular, fontSize: 12, color: colors.muted},
 });

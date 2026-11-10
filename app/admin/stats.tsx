@@ -7,15 +7,15 @@ import {getStatsDocs, refreshTodayStats} from '@/services/adminStats';
 import {useAdminData} from '@/services/useAdminData';
 import {AdminStatus} from '@/components/admin-status';
 import {SwitchRow} from '@/components/switch-row';
-import {SplitBar, StatCard} from '@/components/admin-stat-card';
+import {EMPTY_TEXT, SplitBar, StatCard} from '@/components/admin-stat-card';
 import {LineChart, type LineSeries} from '@/components/charts/line-chart';
 import {BarChart} from '@/components/charts/bar-chart';
 import {DonutChart, type DonutSlice} from '@/components/charts/donut-chart';
 import {colors, fonts, radii, spacing} from '@/constants/theme';
 import {
-  DEFAULT_RANGE, RANGES, REFRESH_MESSAGES, activeUsersLabel, aiLabel, areasLabel, buildStatsView, clockTime,
-  completionLabel, dayLabel, hasValues, nairobiToday, niceMax, refreshOutcomeOf, relativeDayLabel, shortDate,
-  signupsLabel, splitLabel, type AreaKey, type RangeDays,
+  COMPLETION_SUBTITLE, DEFAULT_RANGE, RANGES, REFRESH_MESSAGES, STATS_INFO as INFO, TODAY_CAPTION, activeUsersLabel,
+  aiLabel, areasLabel, buildStatsView, clockTime, completionLabel, dayLabel, hasValues, niceMax, refreshOutcomeOf,
+  shortDate, signupsLabel, splitLabel, type AreaKey, type RangeDays,
 } from '@/utils/adminStats';
 
 // module level, so useAdminData gets a stable fetcher. One read of the 90-day maximum; ranges filter in memory.
@@ -29,24 +29,6 @@ const AREA_COLORS: Record<AreaKey, string> = {
   Relations: colors.pink,
   Health: colors.green,
   none: colors.muted,
-};
-
-const INFO = {
-  active: 'Opened the app: accounts that used the app that day, from the sign-in refresh Firebase records while the '
-    + 'app is open. Only the latest refresh is kept, so this history starts on the day stats were first deployed, '
-    + 'and older days show as gaps. Logged a habit: accounts that added, edited or ticked a habit that day, counted '
-    + 'when the change reached the server.',
-  signups: 'New accounts per week, Monday to Sunday (Nairobi time), from Firebase sign-in records, so accounts made '
-    + 'before stats existed count too. Always the last 13 weeks: the range above does not change it.',
-  completion: 'Habits ticked divided by habits scheduled that day, across all accounts. The server only knows the '
-    + 'days someone ticked or unticked, so scheduled days are rebuilt from each habit\'s start date and its current '
-    + 'days: changing a habit\'s days also changes its past. Deleted habits are left out.',
-  areas: 'Current habits grouped by the area their icon belongs to. Areas picked by hand on the phone stay on the '
-    + 'phone, so these are by icon only. Icons with no area are Not counted.',
-  setup: 'How current habits are set up: every day or only some weekdays, with or without a reminder time, and '
-    + 'whether the user added the habit or took a suggestion.',
-  ai: 'AI insight requests sent to the model each day (Nairobi time), including ones that failed. With test '
-    + 'accounts off, their requests are taken out when the server still holds them for that day.',
 };
 
 type RefreshState = {kind: 'idle'} | {kind: 'running'} | {kind: 'failed'; message: string};
@@ -63,7 +45,6 @@ export default function AdminStatsScreen() {
   const [refresh, setRefresh] = useState<RefreshState>({kind: 'idle'});
 
   // "now" is the load time, so the range only moves on a load (never mid-render)
-  const nowMs = load.status === 'ready' ? load.data.loadedAt : 0;
   const view = useMemo(
     () => (load.status === 'ready' ? buildStatsView(load.data.docs, {days, includeTest, nowMs: load.data.loadedAt}) : null),
     [load, days, includeTest],
@@ -129,13 +110,13 @@ export default function AdminStatsScreen() {
 
         {load.status === 'loading' && <AdminStatus kind="loading" />}
         {load.status === 'error' && <AdminStatus kind={load.kind} message={load.message} onRetry={retry} />}
-        {view && <StatsCards view={view} days={days} today={nairobiToday(nowMs)} />}
+        {view && <StatsCards view={view} days={days} />}
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-function StatsCards({view, days, today}: {view: ReturnType<typeof buildStatsView>; days: RangeDays; today: string}) {
+function StatsCards({view, days}: {view: ReturnType<typeof buildStatsView>; days: RangeDays}) {
   const xLabels = useMemo(() => view.dates.map(shortDate), [view.dates]);
   const pointLabels = useMemo(() => view.dates.map(dayLabel), [view.dates]);
 
@@ -159,37 +140,37 @@ function StatsCards({view, days, today}: {view: ReturnType<typeof buildStatsView
     [view.areas],
   );
 
-  const latest = view.latestActive;
-  const activeEmpty = !hasValues(view.opened) && !hasValues(view.logged);
+  const trendEmpty = !hasValues(view.opened) && !hasValues(view.logged);
+  const todayEmpty = view.today.opened === null && view.today.logged === null;
   const setupEmpty = !view.setup || view.areaTotal === 0;
 
   return (
     <View style={styles.cards}>
-      <StatCard title="Active users" info={INFO.active} empty={activeEmpty}>
-        {latest && (
-          <View style={styles.tiles}>
-            <Tile label="Opened the app" value={latest.opened} day={relativeDayLabel(latest.day, today)} />
-            <Tile label="Logged a habit" value={latest.logged} day={relativeDayLabel(latest.day, today)} />
-          </View>
-        )}
-        <LineChart series={activeSeries} xLabels={xLabels} pointLabels={pointLabels} max={activeMax}
-          accessibilityLabel={activeUsersLabel(view, days)} />
+      <StatCard title="Active users" info={INFO.active} empty={trendEmpty && todayEmpty}>
+        <View style={styles.tiles}>
+          <Tile label="Opened the app" value={view.today.opened} />
+          <Tile label="Logged a habit" value={view.today.logged} />
+        </View>
+        {trendEmpty
+          ? <Text style={styles.chartEmpty}>{EMPTY_TEXT}</Text>
+          : <LineChart series={activeSeries} xLabels={xLabels} pointLabels={pointLabels} max={activeMax}
+              accessibilityLabel={activeUsersLabel(view, days)} />}
       </StatCard>
 
       <StatCard title="Sign-ups per week" subtitle="Last 13 weeks" info={INFO.signups} empty={view.signupWeeks.length === 0}>
         <BarChart values={signupValues} xLabels={signupX} barLabels={signupBars}
-          max={niceMax(Math.max(0, ...signupValues))} color={colors.green} valueName="sign-ups"
+          max={niceMax(Math.max(0, ...signupValues))} color={colors.green} valueOne="sign-up" valueOther="sign-ups"
           accessibilityLabel={signupsLabel(view)} />
       </StatCard>
 
-      <StatCard title="Completion rate" subtitle="Rebuilt from schedules" info={INFO.completion}
+      <StatCard title="Completion rate" subtitle={COMPLETION_SUBTITLE} info={INFO.completion}
         empty={!hasValues(view.completionPercent)}>
         <LineChart series={completionSeries} xLabels={xLabels} pointLabels={pointLabels} max={100}
           format={(v) => `${v}%`} accessibilityLabel={completionLabel(view, days)} />
       </StatCard>
 
       <StatCard title="Habits by area" subtitle="By habit icon" info={INFO.areas} empty={view.areaTotal === 0}>
-        <DonutChart slices={slices} totalLabel="habits" accessibilityLabel={areasLabel(view)} />
+        <DonutChart slices={slices} totalLabel={view.areaTotal === 1 ? 'habit' : 'habits'} accessibilityLabel={areasLabel(view)} />
       </StatCard>
 
       <StatCard title="Habit setup" info={INFO.setup} empty={setupEmpty}>
@@ -207,19 +188,20 @@ function StatsCards({view, days, today}: {view: ReturnType<typeof buildStatsView
 
       <StatCard title="AI insights per day" info={INFO.ai} empty={!hasValues(view.aiCalls)}>
         <BarChart values={view.aiCalls} xLabels={xLabels} barLabels={pointLabels}
-          max={niceMax(Math.max(0, ...view.aiCalls.map((v) => v ?? 0)))} color={colors.purple} valueName="requests"
+          max={niceMax(Math.max(0, ...view.aiCalls.map((v) => v ?? 0)))} color={colors.purple} valueOne="request" valueOther="requests"
           accessibilityLabel={aiLabel(view, days)} />
       </StatCard>
     </View>
   );
 }
 
-function Tile({label, value, day}: {label: string; value: number | null; day: string}) {
+// Today's number so far ("—" until today's document exists: the nightly run writes yesterday, Refresh writes today)
+function Tile({label, value}: {label: string; value: number | null}) {
   return (
-    <View style={styles.tile} accessible accessibilityLabel={`${label}, ${day}: ${value === null ? 'no data' : value}`}>
+    <View style={styles.tile} accessible accessibilityLabel={`${label}, ${TODAY_CAPTION}: ${value === null ? 'no data yet' : value}`}>
       <Text style={styles.tileValue}>{value === null ? '—' : value}</Text>
       <Text style={styles.tileLabel} numberOfLines={1}>{label}</Text>
-      <Text style={styles.tileDay}>{day}</Text>
+      <Text style={styles.tileDay}>{TODAY_CAPTION}</Text>
     </View>
   );
 }
@@ -273,4 +255,5 @@ const styles = StyleSheet.create({
   tileLabel: {fontFamily: fonts.semiBold, fontSize: 12, color: colors.text},
   tileDay: {fontFamily: fonts.regular, fontSize: 11, color: colors.muted},
   splits: {gap: spacing.lg},
+  chartEmpty: {fontFamily: fonts.regular, fontSize: 14, color: colors.muted, paddingVertical: spacing.md, textAlign: 'center'},
 });

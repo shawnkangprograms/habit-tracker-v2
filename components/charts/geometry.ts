@@ -16,8 +16,8 @@ export function valueY(v: number, max: number, height: number): number {
 
 const r1 = (n: number) => Math.round(n * 10) / 10;
 
-// One SVG path for a whole series: a new "M" after every gap. Single points between gaps are returned separately,
-// because a lone "M" draws nothing; the chart marks them with a dot.
+// One SVG path for a whole series: a new "M" after every gap (so a gap stays a gap), plus every point's position,
+// so the chart can mark each one with a dot (single and sparse points stay visible; a lone "M" draws nothing).
 export function linePath(values: readonly (number | null)[], max: number, box: Box): {d: string; dots: {x: number; y: number}[]} {
   const n = values.length;
   let d = '';
@@ -29,10 +29,15 @@ export function linePath(values: readonly (number | null)[], max: number, box: B
     const y = r1(valueY(v, max, box.height));
     const startsRun = i === 0 || values[i - 1] === null;
     d += `${startsRun ? 'M' : 'L'}${x},${y} `;
-    const endsRun = i === n - 1 || values[i + 1] === null;
-    if (startsRun && endsRun) dots.push({x, y});
+    dots.push({x, y});
   }
   return {d: d.trim(), dots};
+}
+
+// Every dot of a series as ONE path: a tiny segment per point, drawn with a round cap of the stroke width, so 90
+// dots are one native view instead of 90 circles (light on low-end phones)
+export function dotsPath(dots: readonly {x: number; y: number}[]): string {
+  return dots.map((p) => `M${p.x},${p.y} h0.01`).join(' ');
 }
 
 // Bar slot layout: n equal slots across width; the bar fills `fill` of its slot, centred

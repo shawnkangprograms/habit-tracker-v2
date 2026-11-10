@@ -2,7 +2,7 @@ import {memo, useMemo, useState} from 'react';
 import {Pressable, StyleSheet, Text, View, type LayoutChangeEvent} from 'react-native';
 import Svg, {Circle, Line, Path} from 'react-native-svg';
 import {colors, fonts, spacing} from '@/constants/theme';
-import {axisTicks, linePath, nearestPoint, pointX, valueY} from '@/components/charts/geometry';
+import {axisTicks, dotsPath, linePath, nearestPoint, pointX, valueY} from '@/components/charts/geometry';
 
 export type LineSeries = {label: string; values: (number | null)[]; color: string; dashed?: boolean};
 
@@ -16,8 +16,9 @@ type Props = {
 };
 
 const HEIGHT = 140;
-const AXIS_W = 34;
+const AXIS_W = 44;// wide enough for "100%" on one line at 11 px
 const PAD_TOP = 6;
+const DOT = 5;// dot diameter
 
 // A line chart in react-native-svg: one Path per series (gaps break the line), a dot for points that stand alone,
 // three grid lines, and a legend naming each series with its line style (solid / dashed), so colour is never the
@@ -52,7 +53,8 @@ export const LineChart = memo(function LineChart({series, xLabels, pointLabels, 
         <View pointerEvents="none">
         <View style={{height: HEIGHT + PAD_TOP}}>
           {[max, max / 2, 0].map((v) => (
-            <Text key={v} style={[styles.axis, {top: PAD_TOP + valueY(v, max, HEIGHT) - 7}]}>{format(Math.round(v))}</Text>
+            <Text key={v} style={[styles.axis, {top: PAD_TOP + valueY(v, max, HEIGHT) - 7}]} numberOfLines={1}
+              adjustsFontSizeToFit minimumFontScale={0.8}>{format(Math.round(v))}</Text>
           ))}
           {plotW > 0 && (
             <Svg width={plotW} height={HEIGHT + PAD_TOP} style={styles.svg}>
@@ -68,8 +70,9 @@ export const LineChart = memo(function LineChart({series, xLabels, pointLabels, 
                 <Path key={series[i].label} d={p.d} translateY={PAD_TOP} fill="none" stroke={series[i].color} strokeWidth={2}
                   strokeDasharray={series[i].dashed ? '5 4' : undefined} strokeLinejoin="round" strokeLinecap="round" />
               ))}
-              {paths.flatMap((p, i) => p.dots.map((d) => (
-                <Circle key={`${series[i].label}-${d.x}`} cx={d.x} cy={d.y + PAD_TOP} r={2.5} fill={series[i].color} />
+              {paths.map((p, i) => (p.dots.length === 0 ? null : (
+                <Path key={`${series[i].label}-dots`} d={dotsPath(p.dots)} translateY={PAD_TOP} fill="none"
+                  stroke={series[i].color} strokeWidth={DOT} strokeLinecap="round" />
               )))}
               {sel !== null && series.map((s) => (s.values[sel] === null ? null : (
                 <Circle key={s.label} cx={pointX(sel, n, plotW)} cy={PAD_TOP + valueY(s.values[sel]!, max, HEIGHT)} r={4}

@@ -3,6 +3,7 @@ import {Pressable, StyleSheet, Text, View} from 'react-native';
 import Svg, {Circle} from 'react-native-svg';
 import {colors, fonts, spacing} from '@/constants/theme';
 import {donutArcs, sliceAt} from '@/components/charts/geometry';
+import {plural} from '@/utils/adminStats';
 
 export type DonutSlice = {key: string; label: string; count: number; percent: number; color: string};
 
@@ -69,7 +70,7 @@ export const DonutChart = memo(function DonutChart({slices, totalLabel, accessib
           return (
             <Pressable key={s.key} onPress={() => toggle(s.key)} style={styles.row} hitSlop={4}
               accessibilityRole="button" accessibilityState={{selected: isSel}}
-              accessibilityLabel={`${s.label}: ${s.count} habits, ${s.percent} percent`}>
+              accessibilityLabel={`${s.label}: ${plural(s.count, 'habit', 'habits')}, ${s.percent} percent`}>
               <View style={[styles.swatch, {backgroundColor: s.color}]} />
               <Text style={[styles.rowLabel, isSel && styles.bold]} numberOfLines={1}>{s.label}</Text>
               <Text style={[styles.rowValue, isSel && styles.bold]}>{s.count}</Text>

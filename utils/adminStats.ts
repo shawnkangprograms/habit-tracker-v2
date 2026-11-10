@@ -4,8 +4,12 @@
 // Rules:
 // - A day with no document, or with a value it couldn't measure, is a GAP (null), never a zero. Lines break at
 //   gaps and bars are left out.
+// - Trends (the line charts and the AI bars) end YESTERDAY: today is still open, so it would always dip. Today's
+//   numbers appear only in the Active users tiles ("Today so far").
 // - The "Include test accounts" switch picks the document's `all` section; off picks `real`.
-// - Snapshot cards (sign-ups per week, habits by area, habit setup) use the NEWEST document in the range.
+// - Snapshot cards (sign-ups per week, habits by area, habit setup) use the NEWEST document, today's included.
+// - Completion uses `completionActive` (accounts that logged a habit in the 7 days ending that day); a document
+//   written before it existed (version 1) is a gap there until it is recomputed.
 // - Percentages are whole numbers. Shares of one whole use the largest-remainder method, so they add up to 100.
 
 export type RangeDays = 7 | 30 | 90;
@@ -25,7 +29,8 @@ export type StatsSection = {
   accounts?: unknown;
   activeUsers?: {openedDay?: unknown; openedWeek?: unknown; loggedDay?: unknown; loggedWeek?: unknown};
   signups?: {day?: unknown; perWeek?: unknown};
-  completion?: {scheduled?: unknown; done?: unknown};
+  completion?: {scheduled?: unknown; done?: unknown};// every account (kept for reference, not charted)
+  completionActive?: {scheduled?: unknown; done?: unknown; accounts?: unknown};
   habits?: {
     total?: unknown;
     byArea?: Record<string, unknown>;
@@ -43,19 +48,50 @@ export type Split = {left: {label: string; count: number; percent: number}; righ
 export type Slice = {key: AreaKey; label: string; count: number; percent: number};
 
 export type StatsView = {
-  dates: string[];// the range, oldest first, ending today
+  dates: string[];// the trend range, oldest first, ending YESTERDAY
   opened: (number | null)[];
   logged: (number | null)[];
-  latestActive: {day: string; opened: number | null; logged: number | null} | null;
+  today: {opened: number | null; logged: number | null};// today's document so far (null: none yet)
   signupWeeks: {weekStart: string; count: number}[];// from the newest doc (13 weeks), [] if none
   completionPercent: (number | null)[];// null: no doc, or nothing scheduled that day
   areas: Slice[];// all seven, Not counted last; [] if no doc
   areaTotal: number;
   setup: {frequency: Split; reminders: Split; source: Split} | null;
   aiCalls: (number | null)[];
-  updatedAtMs: number | null;// newest computedAt in the range
+  updatedAtMs: number | null;// newest computedAt among the documents used
   hasAnyDoc: boolean;
 };
+
+export const TODAY_CAPTION = 'Today so far';
+
+export const COMPLETION_SUBTITLE = 'Active accounts only · rebuilt from schedules';
+
+// The cards' info texts, kept with the pure transforms so tests/admin-stats.test.ts pins them. They name no
+// on-device feature: the isolation scans stay strict for this file's copy too (tests/admin-stats.test.ts).
+export const STATS_INFO = {
+  active: 'Opened the app: accounts that used the app that day, from the sign-in refresh Firebase records while the '
+    + 'app is open. Only the latest refresh is kept, so this history starts on the day stats were first deployed, '
+    + 'and older days show as gaps. Logged a habit: accounts that added, edited or ticked a habit that day, counted '
+    + 'when the change reached the server. The lines end yesterday; the tiles show today so far.',
+  signups: 'New accounts per week, Monday to Sunday (Nairobi time), from Firebase sign-in records, so accounts made '
+    + 'before stats existed count too. Always the last 13 weeks: the range above does not change it.',
+  completion: 'Habits ticked divided by habits scheduled that day, counting active accounts only: active = logged a '
+    + 'habit in the last 7 days (added, edited or ticked one in the 7 days ending that day). The server only knows '
+    + 'the days someone ticked or unticked, so scheduled days are rebuilt from each habit\'s start date and its '
+    + 'current days: changing a habit\'s days also changes its past. Deleted habits are left out. The line ends '
+    + 'yesterday.',
+  areas: 'Current habits grouped by the area their icon belongs to. Icons with no area are Not counted. Discipline '
+    + 'is 0 here because no habit icon maps to it. Areas chosen on the phone stay on the phone.',
+  setup: 'How current habits are set up: every day or only some weekdays, with or without a reminder time, and '
+    + 'whether the user added the habit or took a suggestion.',
+  ai: 'AI insight requests sent to the model each day (Nairobi time), including ones that failed. The bars end '
+    + 'yesterday. With test accounts off, their requests are taken out when the server still holds them for that day.',
+} as const;
+
+// "1 request", "2 requests", "0 requests"
+export function plural(n: number, one: string, other: string): string {
+  return `${n} ${n === 1 ? one : other}`;
+}
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const NAIROBI_OFFSET_MS = 3 * 60 * 60 * 1000;// stats days are Nairobi dates (Kenya is UTC+3 all year)
@@ -80,7 +116,11 @@ function fromDayNumber(n: number): string {
   return new Date(n * DAY_MS).toISOString().slice(0, 10);// a UTC day number, so the UTC date is the right one
 }
 
-// `days` dates ending with `today`, oldest first
+export function addDaysTo(date: string, n: number): string {
+  return fromDayNumber(dayNumber(date) + n);
+}
+
+// `days` dates ending with `today` (or any end date), oldest first
 export function rangeDates(today: string, days: number): string[] {
   const end = dayNumber(today);
   return Array.from({length: days}, (_, i) => fromDayNumber(end - days + 1 + i));
@@ -170,11 +210,13 @@ export function buildStatsView(
   docs: readonly StatsDoc[],
   options: {days: RangeDays; includeTest: boolean; nowMs: number},
 ): StatsView {
-  const dates = rangeDates(nairobiToday(options.nowMs), options.days);
+  const today = nairobiToday(options.nowMs);
+  const dates = rangeDates(addDaysTo(today, -1), options.days);// trends end yesterday
+  const used = new Set([...dates, today]);
   const byDay = new Map<string, StatsSection>();
   let updatedAtMs: number | null = null;
   for (const doc of docs) {
-    if (!dates.includes(doc.day)) continue;
+    if (!used.has(doc.day)) continue;
     const section = pickSection(doc, options.includeTest);
     if (!section) continue;
     byDay.set(doc.day, section);
@@ -191,13 +233,15 @@ export function buildStatsView(
   const opened = series((s) => count(s.activeUsers?.openedDay));
   const logged = series((s) => count(s.activeUsers?.loggedDay));
 
-  // newest day in the range with a document
-  const newestDay = [...dates].reverse().find((d) => byDay.has(d)) ?? null;
+  // the snapshot cards' document: today's if there is one, else the newest day of the range
+  const newestDay = [today, ...[...dates].reverse()].find((d) => byDay.has(d)) ?? null;
   const newest = newestDay ? byDay.get(newestDay)! : null;
 
-  const latestActive = newestDay && newest
-    ? {day: newestDay, opened: count(newest.activeUsers?.openedDay), logged: count(newest.activeUsers?.loggedDay)}
-    : null;
+  const todaySection = byDay.get(today);
+  const todayNumbers = {
+    opened: todaySection ? count(todaySection.activeUsers?.openedDay) : null,
+    logged: todaySection ? count(todaySection.activeUsers?.loggedDay) : null,
+  };
 
   const rawWeeks: unknown = newest?.signups?.perWeek;
   const signupWeeks: {weekStart: string; count: number}[] = [];
@@ -230,9 +274,9 @@ export function buildStatsView(
     dates,
     opened,
     logged,
-    latestActive,
+    today: todayNumbers,
     signupWeeks,
-    completionPercent: series((s) => completionPercent(s.completion?.scheduled, s.completion?.done)),
+    completionPercent: series((s) => completionPercent(s.completionActive?.scheduled, s.completionActive?.done)),
     areas,
     areaTotal,
     setup,
@@ -264,21 +308,27 @@ export function activeUsersLabel(view: StatsView, days: number): string {
 
 export function signupsLabel(view: StatsView): string {
   const total = view.signupWeeks.reduce((sum, w) => sum + w.count, 0);
-  return `Sign-ups per week, last ${view.signupWeeks.length} weeks: ${total} in total, ${rangeWords(view.signupWeeks.map((w) => w.count))} a week.`;
+  return `Sign-ups per week, last ${plural(view.signupWeeks.length, 'week', 'weeks')}: ${plural(total, 'sign-up', 'sign-ups')} `
+    + `in total, ${rangeWords(view.signupWeeks.map((w) => w.count))} a week.`;
 }
 
 export function completionLabel(view: StatsView, days: number): string {
-  return `Completion rate, last ${days} days, rebuilt from schedules: ${rangeWords(view.completionPercent, '%')}.`;
+  return `Completion rate, last ${days} days, active accounts only, rebuilt from schedules: ${rangeWords(view.completionPercent, '%')}.`;
 }
 
 export function areasLabel(view: StatsView): string {
   const parts = view.areas.filter((s) => s.count > 0).map((s) => `${s.label} ${s.count} (${s.percent}%)`);
-  return `Habits by area, by habit icon, ${view.areaTotal} habits: ${parts.length > 0 ? parts.join(', ') : 'none'}.`;
+  return `Habits by area, by habit icon, ${plural(view.areaTotal, 'habit', 'habits')}: ${parts.length > 0 ? parts.join(', ') : 'none'}.`;
 }
 
 export function aiLabel(view: StatsView, days: number): string {
   const total = view.aiCalls.reduce<number>((sum, v) => sum + (v ?? 0), 0);
-  return `AI insights per day, last ${days} days: ${total} in total, ${rangeWords(view.aiCalls)} a day.`;
+  return `AI insights per day, last ${days} days: ${plural(total, 'request', 'requests')} in total, ${rangeWords(view.aiCalls)} a day.`;
+}
+
+// Tooltip value for a bar: "1 request", "3 sign-ups", or "no data"
+export function barValueWords(v: number | null, one: string, other: string): string {
+  return v === null ? 'no data' : plural(v, one, other);
 }
 
 export function splitLabel(title: string, s: Split): string {

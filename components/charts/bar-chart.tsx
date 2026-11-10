@@ -3,6 +3,7 @@ import {Pressable, StyleSheet, Text, View, type LayoutChangeEvent} from 'react-n
 import Svg, {Line, Path, Rect} from 'react-native-svg';
 import {colors, fonts, spacing} from '@/constants/theme';
 import {axisTicks, barSlot, barsPath, slotAt, valueY} from '@/components/charts/geometry';
+import {barValueWords} from '@/utils/adminStats';
 
 type Props = {
   values: (number | null)[];// null: no data, no bar
@@ -10,17 +11,18 @@ type Props = {
   barLabels: string[];// tooltip heading per bar, e.g. "Mon 9 Nov" or "Week of 2 Nov"
   max: number;// the y axis top (use niceMax)
   color: string;
-  valueName: string;// tooltip noun, e.g. "sign-ups"
+  valueOne: string;// tooltip noun for 1, e.g. "sign-up"
+  valueOther: string;// and for any other count, e.g. "sign-ups"
   accessibilityLabel: string;
 };
 
 const HEIGHT = 120;
-const AXIS_W = 34;
+const AXIS_W = 44;// the same label column as the line chart
 const PAD_TOP = 6;
 
 // A bar chart in react-native-svg. Every bar is one shared Path (one native view, light on low-end phones); the
 // tapped bar is outlined and its value shown in words above the chart. Days without data have no bar.
-export const BarChart = memo(function BarChart({values, xLabels, barLabels, max, color, valueName, accessibilityLabel}: Props) {
+export const BarChart = memo(function BarChart({values, xLabels, barLabels, max, color, valueOne, valueOther, accessibilityLabel}: Props) {
   const [width, setWidth] = useState(0);
   const [selected, setSelected] = useState<number | null>(null);
   const n = values.length;
@@ -32,7 +34,7 @@ export const BarChart = memo(function BarChart({values, xLabels, barLabels, max,
   const selValue = sel === null ? null : values[sel];
   const tooltip = sel === null
     ? 'Tap a bar to see its value'
-    : `${barLabels[sel]} · ${selValue === null ? 'no data' : `${selValue} ${valueName}`}`;
+    : `${barLabels[sel]} · ${barValueWords(selValue, valueOne, valueOther)}`;
 
   const slot = sel === null ? null : barSlot(sel, n, plotW);
   const selTop = selValue === null || selValue === undefined ? null : PAD_TOP + valueY(selValue, max, HEIGHT);
@@ -49,7 +51,8 @@ export const BarChart = memo(function BarChart({values, xLabels, barLabels, max,
         <View pointerEvents="none">{/* locationX measured from the Pressable (see line-chart.tsx) */}
           <View style={{height: HEIGHT + PAD_TOP}}>
             {[max, max / 2, 0].map((v) => (
-              <Text key={v} style={[styles.axis, {top: PAD_TOP + valueY(v, max, HEIGHT) - 7}]}>{Math.round(v)}</Text>
+              <Text key={v} style={[styles.axis, {top: PAD_TOP + valueY(v, max, HEIGHT) - 7}]} numberOfLines={1}
+                adjustsFontSizeToFit minimumFontScale={0.8}>{Math.round(v)}</Text>
             ))}
             {plotW > 0 && (
               <Svg width={plotW} height={HEIGHT + PAD_TOP} style={styles.svg}>
