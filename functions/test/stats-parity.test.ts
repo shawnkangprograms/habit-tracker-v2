@@ -66,6 +66,53 @@ describe('stats parity with the app', () => {
     }
   });
 
+  test('completionActive equals the app\'s per-day counts summed over the accounts active that week', () => {
+    const HOUR = 3600 * 1000;
+    const DAY = server.addDays(TODAY, -1);// the closed day a nightly run reports
+    const now = server.nairobiDayStartMs(TODAY) + 10 * HOUR;
+    const weekStart = server.nairobiDayStartMs(server.addDays(DAY, -6));
+    const dayEnd = server.nairobiDayStartMs(TODAY);
+    let activeSeen = 0;
+    let idleSeen = 0;
+    let scheduledSeen = 0;
+    for (let batch = 0; batch < 40; batch++) {
+      const input = {authUsers: [] as object[], habits: [] as object[], completions: [] as object[]};
+      let expected = {scheduled: 0, done: 0, accounts: 0};
+      for (let u = 0; u < 5; u++) {
+        const seed = 5000 + batch * 10 + u;
+        const rng = createRng(seed);
+        const uid = `user${u}`;
+        const {habits, completions} = randomUser(seed);
+        // each write lands somewhere in the last 30 days, so some accounts are active that week and some aren't
+        const writeAt = () => server.nairobiDayStartMs(server.addDays(TODAY, -rng.int(1, 30))) + rng.int(0, 23) * HOUR;
+        let active = false;
+        const note = (ms: number) => { if (ms >= weekStart && ms < dayEnd) active = true; return ms; };
+        input.authUsers.push({uid, createdMs: now - 60 * 24 * HOUR, lastRefreshMs: null});
+        for (const h of habits) {
+          input.habits.push({uid, habitId: h.habitId, icon: 'run', frequencyType: h.frequencyType, days: h.days,
+            reminderTime: null, source: 'user', deleted: h.deleted, serverUpdatedMs: note(writeAt()),
+            createdAt: server.nairobiDayStartMs(h.createdDate) + 9 * HOUR});
+        }
+        for (const c of completions) {
+          input.completions.push({uid, habitId: c.habitId, date: c.date, completed: c.completed ? 1 : 0, serverUpdatedMs: note(writeAt())});
+        }
+        if (!active) {
+          idleSeen += 1;
+          continue;
+        }
+        activeSeen += 1;
+        const app = dailyCompletion(habits as never, completions, TODAY);
+        const day = app.closed.find((d) => d.date === DAY) ?? {scheduled: 0, done: 0};
+        expected = {scheduled: expected.scheduled + day.scheduled, done: expected.done + day.done, accounts: expected.accounts + 1};
+      }
+      const stats = server.computeDayStats(input, DAY, now);
+      assert.deepEqual(stats.all.completionActive, expected, `batch ${batch}`);
+      scheduledSeen += expected.scheduled;
+    }
+    // the random data really covers both kinds of account and real scheduled days
+    assert.ok(activeSeen > 20 && idleSeen > 20 && scheduledSeen > 20, `${activeSeen} active, ${idleSeen} idle, ${scheduledSeen} scheduled`);
+  });
+
   test('isScheduledOn and the S-2 clamp match utils/gamification.ts', () => {
     for (const seed of SEEDS) {
       const {habits} = randomUser(seed);

@@ -102,6 +102,32 @@ describe('computeDayStats', () => {
     assert.deepEqual(today.real.completion, {scheduled: 2, done: 0});
   });
 
+  test('completionActive: only accounts that logged a habit in the 7 days ending that day', () => {
+    // in the base fixture every account with habits logged something in 3..9 Nov, so active = all
+    assert.deepEqual(stats.real.completionActive, {scheduled: 3, done: 1, accounts: 2});
+    assert.deepEqual(stats.all.completionActive, {scheduled: 3, done: 1, accounts: 3});
+
+    // an idle real account: a daily habit, last written on 1 Oct, nothing ticked since
+    const input = fixture();
+    input.authUsers.push({uid: 'u-idle', createdMs: at('2026-10-01', 9), lastRefreshMs: null});
+    input.habits.push({uid: 'u-idle', habitId: 'f', icon: 'water', frequencyType: 'daily', days: [], reminderTime: null,
+      source: 'user', createdAt: at('2026-10-01', 9), deleted: false, serverUpdatedMs: at('2026-10-01', 9)});
+    const idle = agg.computeDayStats(input, DAY, NOW);
+    assert.deepEqual(idle.real.completion, {scheduled: 4, done: 1});// all accounts: the idle habit counts
+    assert.deepEqual(idle.real.completionActive, {scheduled: 3, done: 1, accounts: 2});// active only: it doesn't
+
+    // the window is the 7 days ending that day: a write on 2 Nov is outside it for 9 Nov, inside it for 8 Nov
+    input.habits.at(-1)!.serverUpdatedMs = at('2026-11-02', 12);
+    assert.equal(agg.computeDayStats(input, DAY, NOW).real.completionActive.accounts, 2);// u-real-1, u-real-2
+    // 8 Nov (window 2..8 Nov): u-idle (2 Nov) and u-real-1 (5 Nov); u-real-2's only write is on 9 Nov
+    const nov8 = agg.computeDayStats(input, '2026-11-08', NOW).real.completionActive;
+    assert.equal(nov8.accounts, 2);
+    assert.deepEqual(nov8, {scheduled: 2, done: 0, accounts: 2});// Sunday: a and f
+    // a tick on the day itself makes the account active
+    input.completions.push({uid: 'u-idle', habitId: 'f', date: DAY, completed: 1, serverUpdatedMs: at(DAY, 23)});
+    assert.deepEqual(agg.computeDayStats(input, DAY, NOW).real.completionActive, {scheduled: 4, done: 2, accounts: 3});
+  });
+
   test('a habit created after the reported day is not scheduled on it (backfill)', () => {
     const before = agg.computeDayStats(fixture(), '2026-11-08', NOW);
     assert.deepEqual(before.real.completion, {scheduled: 1, done: 0});// Sunday: only a (d is created 9 Nov)

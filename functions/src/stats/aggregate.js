@@ -24,9 +24,10 @@
 // - "opened the app" uses Auth's last token refresh, which keeps only the LATEST time; so it is measurable only
 //   while the day is recent (OPENED_MEASURABLE_MS after its start) and is left out of older, backfilled days.
 // - "logged a habit" uses serverUpdatedAt, the time of the LAST write of a habit or completion document.
+//   completionActive counts only accounts that logged a habit in the 7 days ending that day, by that measure.
 // - habit composition (area, source, frequency, reminders, habits per user) is the state at compute time.
 
-export const STATS_VERSION = 1;
+export const STATS_VERSION = 2;// 2: completionActive (accounts that logged a habit in the 7 days ending that day)
 export const SIGNUP_WEEKS = 13;// sign-ups per week: this many Monday-start weeks, ending with the day's week
 export const OPENED_MEASURABLE_MS = 2 * 24 * 60 * 60 * 1000;// "opened" only for days that started < 2 days ago
 
@@ -197,13 +198,21 @@ function computeSection({accounts, habits, completionsByUid, aiModelCalls}, day,
     if (!habitsByUid.has(h.uid)) habitsByUid.set(h.uid, []);
     habitsByUid.get(h.uid).push(h);
   }
+  // completion: every account (kept for reference); completionActive: only accounts that logged a habit in the
+  // 7 days ending that day (loggedWeek), so abandoned accounts don't drag the rate down. The chart uses the active one.
   let scheduled = 0;
   let done = 0;
+  const activeCompletion = {scheduled: 0, done: 0, accounts: 0};
   for (const [uid, userHabits] of habitsByUid) {
     const [counts] = dayCounts(userHabits, completionsByUid.get(uid) ?? [], [day], today);
     scheduled += counts.scheduled;
     done += counts.done;
+    if (loggedWeek.has(uid)) {
+      activeCompletion.scheduled += counts.scheduled;
+      activeCompletion.done += counts.done;
+    }
   }
+  activeCompletion.accounts = loggedWeek.size;
 
   // habit composition: active (not deleted) habits, now
   const active = habits.filter((h) => !h.deleted);
@@ -227,6 +236,7 @@ function computeSection({accounts, habits, completionsByUid, aiModelCalls}, day,
     activeUsers,
     signups: {day: signupsDay, perWeek},
     completion: {scheduled, done},
+    completionActive: activeCompletion,
     habits: {total: active.length, byArea, source, frequency, withReminder, perUser: habitsPerUser},
     aiInsights: {modelCalls: aiModelCalls},
   };
