@@ -93,8 +93,10 @@ service cloud.firestore {
         && userNameOk(request.resource.data, 'lastName');
 
       allow update: if signedIn() && request.auth.uid == userId
-        && request.resource.data.keys().hasOnly(['age', 'disabled', 'createdAt', 'firstName', 'lastName'])
+        && request.resource.data.keys().hasOnly(['age', 'disabled', 'createdAt', 'firstName', 'lastName', 'test'])
         && request.resource.data.get('disabled', false) == resource.data.get('disabled', false)
+        // test: set only by scripts/seed-test-accounts.mjs (Admin SDK), kept unchanged here so a test account can still edit its name
+        && request.resource.data.get('test', false) == resource.data.get('test', false)
         && request.resource.data.get('createdAt', null) == resource.data.get('createdAt', null)
         && request.resource.data.age is int
         && request.resource.data.age >= 18
@@ -149,6 +151,17 @@ service cloud.firestore {
         && request.resource.data.icon is string
         && request.resource.data.frequency is map;
       allow delete: if isAdmin();
+    }
+
+    // Admin stats: counts only, one doc per Nairobi day, written only by computeDailyStats and refreshStats
+    // (Admin SDK, which bypasses these rules).
+    match /stats/{day} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+    // refreshStats rate-limit state: functions only
+    match /statsMeta/{docId} {
+      allow read, write: if false;
     }
 
     // Admin audit log: append-only.
