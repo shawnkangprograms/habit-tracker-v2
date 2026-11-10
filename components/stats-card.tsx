@@ -109,7 +109,7 @@ export function StatsCardPlaceholder() {
       currentStreak={0}
       doneToday={0}
       scheduledToday={0}
-      vitality={{state: 'starting'}}
+      vitality={{state: 'starting', restarts: false}}
     />
   );
 }

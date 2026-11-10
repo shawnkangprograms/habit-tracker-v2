@@ -13,7 +13,7 @@ import type {HabitInput} from '../validation/validators.ts';
 import type {BuiltinPackId} from '../utils/packs/builtin.ts';
 
 const G = await import('../utils/gamification.ts');
-const {computeVitality} = await import('../utils/vitality.ts');
+const {computeVitality, hasCompletionHistory} = await import('../utils/vitality.ts');
 const {dailyCompletion} = await import('../utils/dailyCompletion.ts');
 const {computeRadar} = await import('../utils/radar/score.ts');
 const PR = await import('../utils/packs/record.ts');
@@ -57,7 +57,7 @@ async function runThrough(f: Fixture) {
   };
 
   const stats = G.computeGamification(f.habits, f.completions, f.today, toGamiReflections(reflections));
-  const vitality = computeVitality(dailyCompletion(f.habits, f.completions, f.today));
+  const vitality = computeVitality(dailyCompletion(f.habits, f.completions, f.today), hasCompletionHistory(f.completions, f.today));
   const radar = computeRadar({habits: f.habits, completions: f.completions, today: f.today, packs: record, areas});
 
   const active = f.habits.filter((h) => !h.deleted);
@@ -149,10 +149,10 @@ describe('what each fixture is there for', () => {
     for (const rest of r.rests.values()) assert.deepEqual([rest.added.length, rest.limited], [0, true]);
   });
 
-  test('recreated: the old history keeps its XP and streak; Vitality is starting again (V-2 changes only its copy)', async () => {
+  test('recreated: the old history keeps its XP and streak; Vitality is starting again, with the "Restarts" copy (V-2)', async () => {
     const r = await runThrough(fixture('recreated'));
     assert.ok(r.stats.completionXp > 0 && r.stats.longestStreak >= 100);
-    assert.equal(r.vitality.state, 'starting');
+    assert.deepEqual(r.vitality, {state: 'starting', restarts: true});
     assert.equal(r.radar.week.starting, true);
   });
 

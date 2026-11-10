@@ -15,7 +15,7 @@ const {computeRadar} = await import('../utils/radar/score.ts');
 const TODAY = '2026-10-21';
 const BASE: AppStats = {
   ...computeGamification([], [], TODAY),
-  vitality: {state: 'starting'},
+  vitality: {state: 'starting', restarts: false},
   radar: computeRadar({habits: [], completions: [], today: TODAY, packs: null, areas: {}}),
 };
 const withStreak = (currentStreak: number): AppStats => ({...BASE, currentStreak, longestStreak: currentStreak});

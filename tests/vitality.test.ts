@@ -6,6 +6,8 @@ import './helpers/alias.ts'; // must come before the dynamic imports below
 import type {GamiCompletion, GamiHabit} from '../utils/gamification.ts';
 import type {DayCount} from '../utils/dailyCompletion.ts';
 import type {WeekdayKey} from '../constants/habits.ts';
+import {readFileSync} from 'node:fs';
+import {FIXTURE_TODAY, dayOffset, fixture} from './helpers/fixtures.ts';
 
 const {dailyCompletion} = await import('../utils/dailyCompletion.ts');
 const v = await import('../utils/vitality.ts');
@@ -78,10 +80,10 @@ describe('the closed-day history', () => {
 
 describe('starting and today', () => {
   test('starting until a day with a scheduled habit has closed, even with a gain today', () => {
-    assert.deepEqual(vitality([], [], '2026-11-02'), {state: 'starting'});
-    assert.deepEqual(vitality(eight, tick(8, '2026-11-02'), '2026-11-02'), {state: 'starting'});
+    assert.deepEqual(vitality([], [], '2026-11-02'), {state: 'starting', restarts: false});
+    assert.deepEqual(vitality(eight, tick(8, '2026-11-02'), '2026-11-02'), {state: 'starting', restarts: false});
     // only rest days closed so far (a Friday habit created on Monday, today Thursday)
-    assert.deepEqual(vitality([onDays('a', ['fri'], '2026-11-02')], [], '2026-11-05'), {state: 'starting'});
+    assert.deepEqual(vitality([onDays('a', ['fri'], '2026-11-02')], [], '2026-11-05'), {state: 'starting', restarts: false});
   });
 
   test("today's provisional gain shows; a provisional loss does not", () => {
@@ -140,8 +142,11 @@ describe('history edge cases (the perfect-day rule)', () => {
     }
   });
 
-  test('all habits deleted: back to starting', () => {
-    assert.deepEqual(vitality([daily('gone', '2026-11-02', true)], [done('gone', '2026-11-02')], '2026-11-05'), {state: 'starting'});
+  test('all habits deleted: back to starting (the restart copy comes from the history flag, V-2 below)', () => {
+    assert.deepEqual(vitality([daily('gone', '2026-11-02', true)], [done('gone', '2026-11-02')], '2026-11-05'), {state: 'starting', restarts: false});
+    const completions = [done('gone', '2026-11-02')];
+    const counts = dailyCompletion([daily('gone', '2026-11-02', true)], completions, '2026-11-05');
+    assert.deepEqual(v.computeVitality(counts, v.hasCompletionHistory(completions, '2026-11-05')), {state: 'starting', restarts: true});
   });
 });
 
@@ -159,6 +164,59 @@ describe('bands and strings', () => {
       strong: "Strong. You're on a roll.",
     });
     assert.equal(v.VITALITY_STARTING, 'Starts after your first full day.');
+    assert.equal(v.VITALITY_RESTARTING, 'Restarts after your first full day.');
     assert.equal(v.vitalityA11yLabel(62), 'Vitality 62 out of 100');
+  });
+});
+
+// V-2 (PACKS_REPORTS_SPEC.md section 17; docs/TEST_STRATEGY.md, Phase 1b test cases): the starting copy says
+// "Restarts" when the account already has completion history, over the rows the stats load already has
+describe('V-2: "Restarts after your first full day." for an account with completion history', () => {
+  // what services/gamificationStats.ts computes, over the same two arrays
+  const load = (habits: GamiHabit[], completions: GamiCompletion[], today: string) =>
+    v.computeVitality(dailyCompletion(habits, completions, today), v.hasCompletionHistory(completions, today));
+  const copy = (x: ReturnType<typeof load>) => (x.state === 'starting' ? v.vitalityStartingText(x.restarts) : null);
+
+  test('V2-1: starting with a completed row before today, deleted habits included: "Restarts" (fixture recreated)', () => {
+    const f = fixture('recreated');// 8 habits deleted after 200 days of history, 8 with the same names created today
+    const r = load(f.habits, f.completions, f.today);
+    assert.deepEqual(r, {state: 'starting', restarts: true});
+    assert.equal(copy(r), 'Restarts after your first full day.');
+    // one completed row of a deleted habit is enough
+    const gone = [daily('gone', dayOffset(-5), true), daily('new', FIXTURE_TODAY)];
+    assert.equal(copy(load(gone, [done('gone', dayOffset(-5))], FIXTURE_TODAY)), 'Restarts after your first full day.');
+  });
+
+  test('V2-2: starting with no completion history: "Starts"', () => {
+    assert.equal(copy(load([], [], FIXTURE_TODAY)), 'Starts after your first full day.');
+    assert.equal(copy(load([daily('a', FIXTURE_TODAY)], [], FIXTURE_TODAY)), 'Starts after your first full day.');
+    // a tick today is not history yet: today is never closed
+    assert.equal(copy(load([daily('a', FIXTURE_TODAY)], [done('a', FIXTURE_TODAY)], FIXTURE_TODAY)), 'Starts after your first full day.');
+  });
+
+  test('V2-3: un-ticked rows and rows dated after today are not history', () => {
+    const habits = [daily('gone', dayOffset(-5), true), daily('a', FIXTURE_TODAY)];
+    const unticked = Array.from({length: 5}, (_, i) => done('gone', dayOffset(-5 + i), false));
+    assert.equal(copy(load(habits, unticked, FIXTURE_TODAY)), 'Starts after your first full day.');
+    assert.equal(copy(load(habits, [done('a', dayOffset(1)), done('a', dayOffset(30))], FIXTURE_TODAY)), 'Starts after your first full day.');
+    // non-boolean or malformed rows are not history either (strict typeof boolean, valid dates only)
+    const odd = [{habitId: 'gone', date: dayOffset(-2), completed: 1 as unknown as boolean}, {habitId: 'gone', date: 'yesterday', completed: true}];
+    assert.equal(v.hasCompletionHistory(odd, FIXTURE_TODAY), false);
+    // history never changes a ready value
+    assert.deepEqual(v.computeVitality(dailyCompletion(eight, tick(8, '2026-11-02'), '2026-11-03'), true),
+      v.computeVitality(dailyCompletion(eight, tick(8, '2026-11-02'), '2026-11-03'), false));
+  });
+
+  test('V2-4: the accessibility label uses the same text as the card', () => {
+    assert.equal(v.vitalityStartingA11yLabel(true), 'Vitality. Restarts after your first full day.');
+    assert.equal(v.vitalityStartingA11yLabel(false), 'Vitality. Starts after your first full day.');
+    for (const restarts of [true, false]) assert.ok(v.vitalityStartingA11yLabel(restarts).endsWith(v.vitalityStartingText(restarts)));
+    const bar = readFileSync(new URL('../components/vitality-bar.tsx', import.meta.url), 'utf8');
+    assert.match(bar, /accessibilityLabel=\{ready \? undefined : vitalityStartingA11yLabel\(vitality\.restarts\)\}/);
+    assert.match(bar, /: vitalityStartingText\(vitality\.restarts\)\}/);
+    assert.doesNotMatch(bar, /VITALITY_STARTING|VITALITY_RESTARTING/);// only through the two functions
+    // the stats load passes the history flag from the rows it already read (no extra query)
+    const stats = readFileSync(new URL('../services/gamificationStats.ts', import.meta.url), 'utf8');
+    assert.match(stats, /computeVitality\(dailyCompletion\(rows\.habits, rows\.completions, today\), hasCompletionHistory\(rows\.completions, today\)\)/);
   });
 });

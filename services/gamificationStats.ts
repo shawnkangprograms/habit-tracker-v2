@@ -16,7 +16,7 @@ import {getLocalDateString} from '@/utils/dates';
 import {computeGamification, type GamiCompletion} from '@/utils/gamification';
 import {computeRadar, type RadarHabit} from '@/utils/radar/score';
 import {toGamiReflections} from '@/utils/reflections/record';
-import {computeVitality} from '@/utils/vitality';
+import {computeVitality, hasCompletionHistory} from '@/utils/vitality';
 
 export async function getGamificationStats(userId: string, today = getLocalDateString()): Promise<AppStats> {
   const [rows, reflections, areas, packs] = await Promise.all([
@@ -27,7 +27,7 @@ export async function getGamificationStats(userId: string, today = getLocalDateS
   ]);
   return {
     ...computeGamification(rows.habits, rows.completions, today, toGamiReflections(reflections)),
-    vitality: computeVitality(dailyCompletion(rows.habits, rows.completions, today)),
+    vitality: computeVitality(dailyCompletion(rows.habits, rows.completions, today), hasCompletionHistory(rows.completions, today)),
     radar: computeRadar({
       habits: rows.habits, completions: rows.completions, today, areas,
       packs: packs.kind === 'ok' ? packs.record : null,

@@ -3,8 +3,8 @@ import {StyleSheet, Text, View} from 'react-native';
 import Animated, {ReduceMotion, useAnimatedStyle, useSharedValue, withTiming} from 'react-native-reanimated';
 import {colors, fonts, radii} from '@/constants/theme';
 import {
-  VITALITY_BAND_TEXT, VITALITY_LABEL, VITALITY_MAX, VITALITY_STARTING, vitalityA11yLabel, vitalityValueText,
-  type Vitality,
+  VITALITY_BAND_TEXT, VITALITY_LABEL, VITALITY_MAX, vitalityA11yLabel, vitalityStartingA11yLabel, vitalityStartingText,
+  vitalityValueText, type Vitality,
 } from '@/utils/vitality';
 
 // Vitality on Home's stats card (docs/PACKS_REPORTS_SPEC.md, section 13): one text line (label and value on the
@@ -25,7 +25,10 @@ export function VitalityBar({vitality}: {vitality: Vitality}) {
 
   return (
     <View style={styles.wrap}>
-      <View style={styles.line}>
+      <View
+        style={styles.line}
+        accessible={!ready}
+        accessibilityLabel={ready ? undefined : vitalityStartingA11yLabel(vitality.restarts)}>
         {ready ? (
           <View style={styles.value} accessible accessibilityLabel={vitalityA11yLabel(vitality.value)}>
             <Text style={styles.label}>{VITALITY_LABEL}</Text>
@@ -35,7 +38,7 @@ export function VitalityBar({vitality}: {vitality: Vitality}) {
           <Text style={styles.label}>{VITALITY_LABEL}</Text>
         )}
         <Text style={styles.message} numberOfLines={1} ellipsizeMode="tail">
-          {ready ? VITALITY_BAND_TEXT[vitality.band] : VITALITY_STARTING}
+          {ready ? VITALITY_BAND_TEXT[vitality.band] : vitalityStartingText(vitality.restarts)}
         </Text>
       </View>
       <View style={styles.track}>
