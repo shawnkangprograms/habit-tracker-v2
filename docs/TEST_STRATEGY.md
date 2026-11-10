@@ -41,7 +41,7 @@ keyboard).
 | # | Rule | Odd state | Test of the odd state | Rule now |
 |---|---|---|---|---|
 | S-1 | Last-write-wins on client `updatedAt` | Clock behind or moved back: the edit is refused or replaced by the next pull. Clock more than a day ahead: nothing pushes. | tests/clock-skew.test.ts, sync-status-line.test.ts, stamp.test.ts | Built (1b) |
-| S-2 | `createdAt` from the client clock | A habit created with the clock ahead is unscheduled until its future date | tests/decided-rules.test.ts (todo) | Decided |
+| S-2 | `createdAt` from the client clock | A habit created with the clock ahead is unscheduled until its future date | tests/decided-rules.test.ts | Fixed (1b) |
 | S-3 | Completions after today are ignored | A tick made with the clock ahead counts later | gamification, summary, fixture clockAhead | Keep |
 | S-4 | Sync at launch, foreground, every 5 min | New phone offline before its first pull: "Add the rest" or a retake re-creates templates that exist on the other phone | 1b | Decided |
 | S-5 | One completion doc per ticked day | Restoring a large account reads many docs (Firestore free tier: 50k reads a day for the whole project) | none | Measure (Phase 4) |
@@ -246,6 +246,11 @@ caller filters deleted habits first). With the new tests and the two killers: 33
 **Phase 1b, S-1 (2026-11-09).** Built: `db/stamp.js` (the monotonic stamp at updateHabit, softDeleteHabit and
 toggleCompletion), `restampFutureRows` (guarded), the engine's `clockSuspectCycles`, `utils/syncStatusLine.ts` and the
 Settings line. Its three todo tests are normal tests now. Suite: 992 tests, 989 pass, 3 todo (S-2, F-1, P-8).
+
+**Phase 1b, S-2 (2026-11-10).** Built: `clampCreatedDates` (utils/gamification.ts), applied on entry by
+`computeStreaks`, `countPerfectDays`, `dailyCompletion` and `computeSummary`; the radar and Vitality get it through
+`dailyCompletion`. The S-2 todo is a normal test now, plus a test that the clamp never moves a date earlier and a scan
+that fails if a new app file reads `createdDate`. Each clamp was removed in turn: 2 tests fail each time.
 
 ### Phase 1b test cases (written with the fixes)
 

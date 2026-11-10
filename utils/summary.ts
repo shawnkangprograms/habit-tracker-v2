@@ -15,7 +15,7 @@
 
 import type {WeekdayKey} from '@/constants/habits';
 import {
-  computeStreaks, fromDayNumber, isDateString, isScheduledOn, requireToday, toDayNumber, weekdayOf,
+  clampCreatedDates, computeStreaks, fromDayNumber, isDateString, isScheduledOn, requireToday, toDayNumber, weekdayOf,
   type GamiCompletion, type GamiHabit,
 } from '@/utils/gamification';
 
@@ -195,7 +195,7 @@ function summariseRange(
 // `habits` includes deleted ones (flagged), like computeGamification; `today` comes from getLocalDateString().
 export function computeSummary(habits: SummaryHabit[], completions: GamiCompletion[], today: string): Summary {
   requireToday(today);
-  const active = habits.filter((h) => !h.deleted);
+  const active = clampCreatedDates(habits, today).filter((h) => !h.deleted);// S-2: a future createdDate counts from today
   // valid completed rows up to today; future-dated rows are ignored, as everywhere else
   const doneKeys = new Set(
     completions

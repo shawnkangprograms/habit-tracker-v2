@@ -75,6 +75,15 @@ function scheduledOn(habit: GamiHabit, date: string, weekday: WeekdayKey): boole
   return habit.frequencyType === 'daily' || habit.days.includes(weekday);
 }
 
+// S-2 (docs/HABITQUEST_DESIGN.md): a habit created while the phone's clock was ahead has a createdDate after today.
+// Every function here that receives `today` first sets createdDate = min(createdDate, today), and only that: the
+// habit counts from today, and no past day is invented for it. Other habits are returned unchanged (same object).
+// Callers that schedule by createdDate with a `today` (dailyCompletion, so the radar and Vitality; computeSummary)
+// use it too. isScheduledOn receives no `today`, so it compares the date it is given.
+export function clampCreatedDates<H extends GamiHabit>(habits: H[], today: string): H[] {
+  return habits.map((h) => (isDateString(h.createdDate) && h.createdDate > today ? {...h, createdDate: today} : h));
+}
+
 // Not deleted, created on or before `date`, and daily or due on that weekday
 export function isScheduledOn(habit: GamiHabit, date: string): boolean {
   return scheduledOn(habit, date, weekdayOf(toDayNumber(date)));
@@ -86,6 +95,7 @@ function completedUpTo(completions: GamiCompletion[], today: string): GamiComple
 }
 
 // First day of history: the earliest habit createdDate or completion date. null if there is none up to today.
+// Called only with habits already clamped (S-2), by computeStreaks and countPerfectDays.
 function historyStart(habits: GamiHabit[], completions: GamiCompletion[], today: string): number | null {
   let start: string | null = null;
   for (const h of habits) {
@@ -109,6 +119,7 @@ export function computeStreaks(habits: GamiHabit[], completions: GamiCompletion[
   perHabit: Record<string, number>;
 } {
   requireToday(today);
+  habits = clampCreatedDates(habits, today);// S-2
   const done = completedUpTo(completions, today);
   const countedDates = new Set(done.map((c) => c.date));
   const doneKeys = new Set(done.map((c) => `${c.habitId}|${c.date}`));
@@ -160,6 +171,7 @@ export function earnedBadges(longestStreak: number): number[] {
 // Dates up to today where at least one active habit was scheduled and every scheduled one was completed
 export function countPerfectDays(habits: GamiHabit[], completions: GamiCompletion[], today: string): number {
   requireToday(today);
+  habits = clampCreatedDates(habits, today);// S-2
   const doneKeys = new Set(completedUpTo(completions, today).map((c) => `${c.habitId}|${c.date}`));
   const active = habits.filter((h) => !h.deleted);
   const start = historyStart(habits, completions, today);

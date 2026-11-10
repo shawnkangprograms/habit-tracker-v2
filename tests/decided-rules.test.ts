@@ -4,7 +4,7 @@
 /// <reference types="node" />
 import {describe, test} from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync} from 'node:fs';
+import {readdirSync, readFileSync} from 'node:fs';
 import './helpers/alias.ts'; // must come before the dynamic imports below
 import {FIXTURE_TODAY, dayOffset} from './helpers/fixtures.ts';
 import type {GamiCompletion, GamiHabit} from '../utils/gamification.ts';
@@ -13,6 +13,7 @@ const G = await import('../utils/gamification.ts');
 const {dailyCompletion} = await import('../utils/dailyCompletion.ts');
 const {computeVitality} = await import('../utils/vitality.ts');
 const {computeRadar} = await import('../utils/radar/score.ts');
+const {computeSummary} = await import('../utils/summary.ts');
 const {createReflectionsStore} = await import('../services/reflectionsStoreCore.ts');
 const PR = await import('../utils/packs/record.ts');
 const OR = await import('../utils/onboarding/record.ts');
@@ -24,12 +25,53 @@ describe('S-2: a habit created while the clock was ahead counts from today (crea
   const habits: GamiHabit[] = [{habitId: 'a', createdDate: dayOffset(3), frequencyType: 'daily', days: [], deleted: false}];
   const completions: GamiCompletion[] = [{habitId: 'a', date: FIXTURE_TODAY, completed: true}];
 
-  test('today: scheduled and done, so today is a perfect day and counts on the radar\'s and Vitality\'s inputs', {
-    todo: 'S-2: createdDate is after today, so the habit is never scheduled until that date: no perfect day, no today count',
-  }, () => {
+  test('today: scheduled and done, so today is a perfect day and counts on the radar\'s and Vitality\'s inputs', () => {
     assert.deepEqual(dailyCompletion(habits, completions, FIXTURE_TODAY).today, {date: FIXTURE_TODAY, scheduled: 1, done: 1});
-    assert.equal(G.computeGamification(habits, completions, FIXTURE_TODAY).perfectDays, 1);
+    const stats = G.computeGamification(habits, completions, FIXTURE_TODAY);
+    assert.equal(stats.perfectDays, 1);
+    assert.deepEqual([stats.currentStreak, stats.perHabitStreaks.a], [1, 1]);
     assert.equal(G.isScheduledOn({...habits[0], createdDate: FIXTURE_TODAY}, FIXTURE_TODAY), true);
+    // Summary: today's entry and the habit's rate count it in both ranges
+    const summary = computeSummary(habits.map((h) => ({...h, habitName: 'Read', icon: 'book'})), completions, FIXTURE_TODAY);
+    for (const range of [summary.week, summary.month]) {
+      const today = range.days[range.days.length - 1];
+      assert.deepEqual([today.date, today.scheduled, today.done, today.perfect], [FIXTURE_TODAY, 1, 1, true]);
+      assert.deepEqual([range.habits[0].done, range.habits[0].scheduled, range.empty], [1, 1, null]);
+    }
+  });
+
+  test('a habit created today or before is untouched, and the clamp never moves a date earlier than today', () => {
+    const past: GamiHabit = {habitId: 'p', createdDate: dayOffset(-4), frequencyType: 'daily', days: [], deleted: false};
+    const clamped = G.clampCreatedDates([past, habits[0], {...past, habitId: 't', createdDate: FIXTURE_TODAY}], FIXTURE_TODAY);
+    assert.equal(clamped[0], past);// same object
+    assert.deepEqual(clamped.map((h) => h.createdDate), [dayOffset(-4), FIXTURE_TODAY, FIXTURE_TODAY]);
+    assert.equal(habits[0].createdDate, dayOffset(3), 'the input is not mutated');
+    // a malformed createdDate is left for the callers' own checks
+    assert.equal(G.clampCreatedDates([{...past, createdDate: 'soon'}], FIXTURE_TODAY)[0].createdDate, 'soon');
+  });
+
+  test('every reader of createdDate in the app\'s pure code clamps it first (a new reader must be added here)', () => {
+    // the only modules that read createdDate; each function that receives today clamps on entry
+    const readers = (path: string) => source(path).split('\n').filter((l) => /\bcreatedDate\b/.test(l.replace(/\/\/.*$/, ''))).length;
+    const gami = source('utils/gamification.ts');
+    for (const fn of ['computeStreaks', 'countPerfectDays']) {
+      const body = gami.slice(gami.indexOf(`export function ${fn}(`));
+      assert.match(body.slice(0, 400), /requireToday\(today\);\s*habits = clampCreatedDates\(habits, today\);/, fn);
+    }
+    assert.match(source('utils/dailyCompletion.ts'), /const active = clampCreatedDates\(habits, today\)\.filter/);
+    assert.match(source('utils/summary.ts'), /const active = clampCreatedDates\(habits, today\)\.filter/);
+    // every app file mentioning createdDate outside comments: the producer (db/gamificationCore.js) and the two
+    // modules above. The radar and Summary reach it only through them; a new file here needs the clamp
+    const root = new URL('../', import.meta.url);
+    const found: string[] = [];
+    for (const dir of ['app', 'components', 'hooks', 'services', 'utils', 'db', 'sync', 'validation', 'constants']) {
+      for (const entry of readdirSync(new URL(`${dir}/`, root), {recursive: true}) as string[]) {
+        const path = `${dir}/${entry.replaceAll('\\', '/')}`;
+        if (/\.(ts|tsx|js)$/.test(path) && readers(path) > 0) found.push(path);
+      }
+    }
+    assert.deepEqual(found.sort(), ['db/gamificationCore.js', 'utils/dailyCompletion.ts', 'utils/gamification.ts']);
+    assert.match(source('utils/radar/score.ts'), /dailyCompletion\(habits, input\.completions, input\.today\)/);
   });
 
   test('only clamped to today: no past day is invented for it, so Vitality and the radar have no closed history yet', () => {

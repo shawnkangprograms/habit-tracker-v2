@@ -9,7 +9,9 @@
 // dated after today are ignored. Days are stepped by calendar day numbers, never by the clock, so daylight saving
 // and time zone changes can't add or skip a day.
 
-import {fromDayNumber, isDateString, isScheduledOn, requireToday, toDayNumber, type GamiCompletion, type GamiHabit} from '@/utils/gamification';
+import {
+  clampCreatedDates, fromDayNumber, isDateString, isScheduledOn, requireToday, toDayNumber, type GamiCompletion, type GamiHabit,
+} from '@/utils/gamification';
 
 export type DayCount = {date: string; scheduled: number; done: number};
 
@@ -21,7 +23,8 @@ export function dailyCompletion(
   today: string,
 ): {closed: DayCount[]; today: DayCount | null} {
   requireToday(today);
-  const active = habits.filter((h) => !h.deleted && isDateString(h.createdDate) && h.createdDate <= today);
+  // S-2: a createdDate after today (clock ahead) counts from today; no past day is invented for it
+  const active = clampCreatedDates(habits, today).filter((h) => !h.deleted && isDateString(h.createdDate));
   const doneKeys = new Set(completions
     .filter((c) => c.completed === true && isDateString(c.date) && c.date <= today)
     .map((c) => `${c.habitId}|${c.date}`));
