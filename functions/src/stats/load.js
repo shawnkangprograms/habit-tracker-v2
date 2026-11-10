@@ -88,5 +88,14 @@ export async function loadStatsInput({db, auth}, days) {
     if (snap.exists) aiDaily[snap.id] = snap.get('count');
   }
 
-  return {authUsers, testUids, habits, completions, aiUsage, aiDaily};
+  // documents read, per source (for the backfill script's report; aggregate.js ignores it)
+  const readCounts = {
+    users: usersSnap.docs.length,
+    habits: habitsSnap.docs.length,
+    completions: completionsSnap.docs.length,
+    aiUsage: aiUsageSnap.docs.length,
+    aiUsageDaily: aiDailySnaps.length,
+  };
+
+  return {authUsers, testUids, habits, completions, aiUsage, aiDaily, readCounts};
 }

@@ -298,6 +298,8 @@ describe('loadStatsInput', () => {
     assert.deepEqual(input.completions.map((c: {date: string}) => c.date), ['2026-11-09']);
     assert.deepEqual(input.aiDaily, {'2026-11-09': 4});
     assert.deepEqual(sdk.wheres, [['completions', 'date', '>=', '2026-11-02'], ['completions', 'date', '<=', '2026-11-09']]);
+    // documents read per source (habit h2 is read but ignored: it isn't under users/)
+    assert.deepEqual(input.readCounts, {users: 2, habits: 2, completions: 1, aiUsage: 1, aiUsageDaily: 1});
   });
 
   test('field masks never ask for names, ages, habit names or emails', async () => {
