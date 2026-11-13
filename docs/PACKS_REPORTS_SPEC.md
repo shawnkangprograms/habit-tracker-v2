@@ -69,7 +69,7 @@ Rules:
 - **Existing users and skippers (Stage 1b):** a Home card "Choose your habit packs" lets them pick up to {n} of the 6 built-in packs by hand, where {n} is the pack limit for their level (section 2b). The same picker opens from Settings > "Habit packs" for everyone. Packs the user already has show as picked and can't be unpicked there (they are edited or deleted from their Home card, section 4); a pick that would go past the limit is refused with the pack limit message. Saving adds the new packs after the existing ones and adopts same-named habits (next rule); a corrupt record is replaced, since saving is the user changing something. Stage 2 adds "Create your own pack" to the picker; there is no separate "Manage packs" screen.
 - **Custom packs (Stage 2):** created from Home or the picker (section 4), with a name, an area and any of the user's habits (none is fine). Their id comes from the habit id generator.
 - **Adopting existing habits:** when a built-in pack is created and the user already has an active, unpacked habit with a template's name, that habit joins the pack instead of a duplicate being offered. Names match after trimming, collapsing inner spaces and ignoring case. In onboarding, only habits that existed before the run are adopted.
-- **"Add the rest"** (built-in packs): creates the pack's missing templates (not adopted, not dropped) through the normal add-habit path, with the default 20:00 reminder, one at a time, stopping at the first failure and never creating a habit twice; the created ids are added to the pack after each success. Permission is requested through the shared reminder permission helper, only after habits exist. It waits for this uid's first pull on this phone (S-4), and a template whose only habit was renamed counts as dropped (P-2); section 17.
+- **"Add the rest"** (built-in packs): creates the pack's missing templates (not adopted, not dropped) through the normal add-habit path, with the default 20:00 reminder, one at a time, stopping at the first failure and never creating a habit twice; the created ids are added to the pack after each success. Permission is requested through the shared reminder permission helper, only after habits exist. It waits for this uid's first pull on this phone (S-4), and a template whose only habit was renamed or deleted is in `dropped` (P-2); section 17.
 
 ## 4. Home and pack screens
 
@@ -83,8 +83,8 @@ Rules:
   - **Habits:** every active habit as a checklist. A habit in another pack shows "In {pack}"; ticking it moves it here (a habit is in at most one pack). With no habits: "No habits to add yet. You can add some later." Empty packs are allowed; their Home card shows "No habits yet" (a pack whose habits aren't due today keeps "Nothing scheduled today").
   - **Built-in packs** are edited and deleted like any other and can be picked again later; their area stays fixed. Unticking a habit from a built-in pack, or moving it to another pack, puts its template in that pack's `dropped`; putting it back takes it out.
   - Save buttons "Create pack" / "Save changes". Creating checks the pack limit and shows the pack limit message above Save. Everything is one store write (record and mirror). Failures: "Couldn't save pack" with "Something went wrong. Please try again."; a pack deleted meanwhile: "Pack not found" / "This pack no longer exists.".
-- **Delete pack (edit mode only):** "Delete pack" opens "Delete this pack?" / "Its habits stay on your Home screen under Habits." with "Delete pack" and "Cancel". Habits are never deleted with a pack. Deleting the last pack also saves the choose card's "Not now" in the same write, so the card doesn't come straight back. Failure: "Couldn't delete pack". Deleting a habit takes it out of its pack (ids of deleted habits are ignored on read). Its reports and notifications go with it once those stages exist.
-- **Habit form:** a "HABIT PACK" row of chips, "None" plus the user's packs in order, shown once the user has packs. Changing it moves the habit between packs (same `dropped` rule), saved after the habit. The habit limit is checked only when adding, never when editing; at the limit the message shows above Save and nothing is created.
+- **Delete pack (edit mode only):** "Delete pack" opens "Delete this pack?" / "Its habits stay on your Home screen under Habits." with "Delete pack" and "Cancel". Habits are never deleted with a pack. Deleting the last pack also saves the choose card's "Not now" in the same write, so the card doesn't come straight back. Failure: "Couldn't delete pack". Deleting a habit takes it out of its pack (ids of deleted habits are ignored on read); if it was the only member of a built-in pack carrying a template's name, that template goes into the pack's `dropped` (P-2). Its reports and notifications go with it once those stages exist.
+- **Habit form:** a "HABIT PACK" row of chips, "None" plus the user's packs in order, shown once the user has packs. Changing it moves the habit between packs (same `dropped` rule), saved after the habit. Renaming a habit follows the same rule (P-2): the rename runs first, on the habit's current pack with its old name, then the move. The habit limit is checked only when adding, never when editing; at the limit the message shows above Save and nothing is created.
 - With fewer than 2 packs there is no combined report.
 - **At launch (cold-start flash fix):** nothing may say something untrue and the layout must not jump. Until Home's first habit load, pack cards (from the mirror) show their name, a blank status line and an empty bar, and an expanded card shows one plain placeholder block per habit id in its saved record (no cap; collapsed cards stay collapsed). "Create a habit pack", "Habits" and "Add a habit" appear once habits are known. The stats card's exact space is held by an empty card until the first stats load finishes (removed if that load fails, as before). utils/homeLoading.ts holds the rules. Known remaining moves: the "Choose your habit packs" card appears once data is known, and the insight card after home:usable. **Backlog:** a "shown last time" flag for the insight card in the existing startup read, so its space can be held too.
 
@@ -274,11 +274,26 @@ for an account that is not in a "normal" state, and the test that checks it. Fix
     pull. A corrupt `sync:<uid>` waits until the re-pull finishes; a parser-version bump and "Re-sync everything" keep
     the pull done. Tests: S4-1 to S4-5 and the others in tests/s4-first-pull.test.ts (two phones on the fake
     Firestore for S4-2 and S4-3).
-- **P-2, a renamed template habit leaves its built-in pack's templates.** Renaming the only habit in a built-in pack
-  that carries a template's name adds that template to the pack's `dropped`, so "Add the rest" doesn't create it
-  again; renaming it back to the template's name takes it out of `dropped` (the existing "putting it back" rule).
-  - Odd states: two members with the template's name (renaming one changes nothing); a rename that only changes case
-    or spacing (still the template); an unpacked habit or one in a custom pack (no pack changes). Tests: P2-1 to P2-5.
+- **P-2, a template habit renamed or deleted leaves its built-in pack's templates (built in Phase 1b, 2026-11-13).**
+  Renaming the only habit in a built-in pack that carries a template's name adds that template to the pack's
+  `dropped`, so "Add the rest" doesn't create it again; renaming it back to the template's name takes it out of
+  `dropped` (the existing "putting it back" rule). Deleting such a habit (decided 2026-11-13) also adds its template to
+  `dropped` when no other active member carries that name. utils/packs/manage.ts `renameInPack` and `deleteFromPack`;
+  the habit form (app/habit-form.tsx) is the only path that renames or deletes a habit on this phone. There is no
+  undo-delete path (sync never undeletes), so nothing takes a deleted habit's template back out.
+  - Order: a rename runs on the habit's current pack with its old name, then a pack move with the new name.
+  - If the active habits can't be read at the time, no pack changes (the habit is still renamed or deleted). If the
+    pack record can't be read, it is never written (R-1) and nothing is shown. The pack's unknown fields are kept (P-8).
+    A retake is unchanged: it may offer a dropped template again, as a habit outside the pack.
+  - Known gaps (accepted 2026-11-13): renames made before P-2 shipped aren't repaired (the old name was never stored;
+    fixture renamedPackHabit pins it); renames and deletes made on another phone and pulled here don't change this
+    phone's pack record (pack records aren't synced). The planned fix (redesign phase) stores each habit's template id
+    on the habit itself, synced, replacing name matching; not a field in the pack record.
+  - Odd states: two members with the template's name (renaming or deleting one changes nothing); a rename that only
+    changes case or spacing (still the template); an unpacked habit or one in a custom pack (no pack changes); a
+    rename from one template's name to another's (the first dropped, the second put back); a rename together with a
+    move. Tests: P2-1 to P2-5 and the rest in tests/p2-rename-delete.test.ts; tests/odd-state-fixtures.test.ts
+    (renamedPackHabit, pinned).
 - **P-8, older code never drops newer fields (built in Phase 1b, 2026-11-13).** Every record's parser accepts and
   ignores fields it doesn't know, and a save keeps them, so an OTA rollback or a launch from the embedded bundle can
   re-save a record without losing what a newer update added.

@@ -218,9 +218,12 @@ describe('what each fixture is there for', () => {
     assert.ok(r.plan.picks.length > 0 && !r.plan.picks.some((p) => p.id === 'walk20'));
   });
 
-  test('renamedPackHabit: runs through (the P-2 rule and its test arrive in 1b)', async () => {
+  test('renamedPackHabit, pinned (P-2): a rename made before P-2 shipped is not repaired, so walk20 still counts as missing', async () => {
+    // the old name was never stored, so nothing can tell which template "Evening walk" used to be (decided 2026-11-13);
+    // renames from now on go through renameInPack (tests/p2-rename-delete.test.ts)
     const r = await runThrough(fixture('renamedPackHabit'));
     assert.deepEqual(missingTemplates(r.record!, 'steady_energy', r.refs), ['walk20', 'water_meals', 'eat_produce']);
+    assert.deepEqual(r.record!.packs[0].dropped, []);
   });
 });
 

@@ -72,6 +72,57 @@ export function moveHabit(record: PacksRecord, habit: HabitRef, toPackId: string
   };
 }
 
+// ---------- P-2: a template habit renamed or deleted leaves its built-in pack's templates ----------
+// (docs/PACKS_REPORTS_SPEC.md, section 17). Templates count as present by name (membership.ts missingTemplates), so
+// once the only habit carrying a template's name is renamed away or deleted, "Add the rest" would create that template
+// again. These put it in the pack's `dropped`, the same rule as moving a habit out; renaming a habit back to a template's
+// name takes that template out (putting it back). Only for a built-in pack holding the habit; a name change of case or
+// spacing only changes nothing. `active`: every active habit (one read at the time of the change). Unchanged (the same
+// object) when nothing changes. Known gaps: renames and deletes made on another phone (pulled; pack records aren't
+// synced), and renames made before P-2 shipped.
+
+// Does another active member of this pack carry this template's name?
+function carriedByOther(pack: Pack, habitId: string, template: TemplateId, active: readonly HabitRef[]): boolean {
+  const members = new Set(pack.habitIds.filter((id) => id !== habitId));
+  const key = normaliseHabitName(TEMPLATE_NAMES[template]);
+  return active.some((h) => members.has(h.habitId) && normaliseHabitName(h.habitName) === key);
+}
+
+function withDropped(record: PacksRecord, pack: Pack, dropped: TemplateId[]): PacksRecord {
+  return {...record, packs: record.packs.map((p) => (p.id === pack.id ? {...p, dropped} : p))};
+}
+
+export function renameInPack(
+  record: PacksRecord,
+  rename: {habitId: string; oldName: string; newName: string},
+  active: readonly HabitRef[],
+): PacksRecord {
+  const pack = packOf(record, rename.habitId);
+  if (!pack || pack.kind !== 'builtin') return record;
+  if (normaliseHabitName(rename.oldName) === normaliseHabitName(rename.newName)) return record;
+  const before = templateOf(pack, rename.oldName);
+  const after = templateOf(pack, rename.newName);
+  let dropped = pack.dropped;
+  if (before && before !== after && !dropped.includes(before) && !carriedByOther(pack, rename.habitId, before, active)) {
+    dropped = [...dropped, before];
+  }
+  if (after && dropped.includes(after)) dropped = dropped.filter((t) => t !== after);
+  return dropped === pack.dropped ? record : withDropped(record, pack, dropped);
+}
+
+// A deleted habit (its name as it was): ids of deleted habits are ignored on read, so only `dropped` changes
+export function deleteFromPack(
+  record: PacksRecord,
+  habit: HabitRef,
+  active: readonly HabitRef[],
+): PacksRecord {
+  const pack = packOf(record, habit.habitId);
+  if (!pack || pack.kind !== 'builtin') return record;
+  const template = templateOf(pack, habit.habitName);
+  if (!template || pack.dropped.includes(template) || carriedByOther(pack, habit.habitId, template, active)) return record;
+  return withDropped(record, pack, [...pack.dropped, template]);
+}
+
 export type PackEdit = {
   name: string;// as typed; saved normalised
   area: Axis | null;// used when the pack has none yet (a new pack, or a custom pack that lost it)

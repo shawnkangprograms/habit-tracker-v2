@@ -6,7 +6,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {router, useLocalSearchParams} from 'expo-router';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
-import {addHabit, getDeletedHabitIds, getHabit, softDeleteHabit, updateHabit} from '@/db/habits';
+import {addHabit, getActiveHabitsWithDays, getDeletedHabitIds, getHabit, softDeleteHabit, updateHabit} from '@/db/habits';
 import {useSessionUid} from '@/services/session';
 import {
   ICON_IDS, REMIND_BEFORE_OPTIONS, type Frequency, type IconId, type RemindBeforeMin, type WeekdayKey,
@@ -31,7 +31,14 @@ import {HABIT_PACK_LABEL, NO_PACK} from '@/utils/packs/copy';
 import {areasStore} from '@/services/areasStore';
 import {iconArea, isAreaValue, type AreaValue} from '@/utils/radar/areas';
 import {AREA_NOT_COUNTED, AREA_ROW_HELPER, AREA_ROW_LABEL} from '@/utils/radar/copy';
-import {AREA_ORDER, moveHabit, packArea, packOf} from '@/utils/packs/manage';
+import {AREA_ORDER, deleteFromPack, moveHabit, packArea, packOf, renameInPack} from '@/utils/packs/manage';
+import type {HabitRef} from '@/utils/packs/membership';
+
+// P-2: every active habit, for "does another member still carry this template's name?"; null if it can't be read
+// (then no P-2 change is made)
+function activeRefs(userId: string): Promise<HabitRef[] | null> {
+  return (getActiveHabitsWithDays(userId) as Promise<HabitRef[]>).catch(() => null);
+}
 
 // For the timing line under the chips: a plain function so the React Compiler lint doesn't treat it as a render-time read
 function clockNow(): Date {
@@ -76,6 +83,7 @@ export default function HabitFormScreen() {
   const packs = usePacks(userId);
   const [packChoice, setPackChoice] = useState<string | null>(null);
   const [initialPack, setInitialPack] = useState<string | null>(null);
+  const [loadedName, setLoadedName] = useState<string | null>(null);// edit mode: the name as saved (P-2)
   const [limitMessage, setLimitMessage] = useState<string | null>(null);// adding only: the habit limit
   // The radar area (docs/PACKS_REPORTS_SPEC.md, section 11), for a habit whose pack has no area: null = not chosen,
   // so it follows the icon. Saved on this phone only, after the habit, and only once chosen (or already stored).
@@ -95,6 +103,7 @@ export default function HabitFormScreen() {
           return;
         }
         setHabitName(habit.habitName);
+        setLoadedName(habit.habitName);
         // an icon id outside the allowed list leaves the grid unselected; Save then shows the icon error
         setIcon((ICON_IDS as readonly string[]).includes(habit.icon) ? habit.icon : null);
         if (habit.frequency.type === 'weekdays') {
@@ -193,13 +202,21 @@ export default function HabitFormScreen() {
         }
         savedId = (await addHabit(userId, input.value)) as string;
       }
-      if (savedId && packChoice !== initialPack) {
+      const renamed = habitId !== undefined && loadedName !== null && loadedName !== input.value.habitName;
+      if (savedId && (packChoice !== initialPack || renamed)) {
         const habit = {habitId: savedId, habitName: input.value.habitName};
+        // P-2: a rename runs first, on the habit's current pack with its old name; then the move with the new name.
+        // If the active habits can't be read, the rename changes no pack (the habit is still renamed)
+        const active = renamed ? await activeRefs(userId) : null;
         // never throws; if the save fails, or the record can't be read (R-1: never written over), the habit
-        // simply stays unpacked, as before
+        // simply stays unpacked (and its template not dropped), silently, as before
         const moved = await packsStore.update(userId, (parsed) => {
           if (parsed.kind !== 'ok') return null;
-          const next = moveHabit(parsed.record, habit, packChoice);
+          let next = parsed.record;
+          if (renamed && active && habitId && loadedName !== null) {
+            next = renameInPack(next, {habitId, oldName: loadedName, newName: input.value.habitName}, active);
+          }
+          if (packChoice !== initialPack) next = moveHabit(next, habit, packChoice);
           return next === parsed.record ? null : next;
         });
         onPacksUpdate(moved, {saved: () => {}, unchanged: () => {}, unreadable: () => {}});
@@ -228,6 +245,18 @@ export default function HabitFormScreen() {
         onPress: async () => {
           try {
             await softDeleteHabit(userId, habitId);
+            // P-2: the only member carrying a template's name gone, its template is dropped from its built-in pack.
+            // Never blocks or fails the delete: an unreadable list or record changes nothing, silently
+            const active = userId && habitId && loadedName !== null ? await activeRefs(userId) : null;
+            if (active && userId && habitId && loadedName !== null) {
+              const deleted = {habitId, habitName: loadedName};
+              const dropped = await packsStore.update(userId, (parsed) => {
+                if (parsed.kind !== 'ok') return null;
+                const next = deleteFromPack(parsed.record, deleted, active);
+                return next === parsed.record ? null : next;
+              });
+              onPacksUpdate(dropped, {saved: () => {}, unchanged: () => {}, unreadable: () => {}});
+            }
             goBack();
           } catch (err) {
             Alert.alert("Couldn't delete habit", err instanceof Error ? err.message : 'Something went wrong. Please try again.');

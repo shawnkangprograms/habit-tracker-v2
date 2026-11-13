@@ -19,7 +19,7 @@ added for tests; new test files are picked up by the existing `tests/*.test.ts` 
 | S-2 | A habit's `createdDate` is clamped to `min(createdDate, today)`, and only that, wherever it is computed with `today`. | HABITQUEST_DESIGN.md |
 | S-4 | Template-creating actions ("Add the rest", a Settings retake, later a report's "Add" suggestion) wait for the first pull of this uid on this phone ('done' from the engine or the stored sync state; 'unknown' when unreadable also waits). | PACKS_REPORTS_SPEC.md §17, ONBOARDING_SPEC.md §5 |
 | S-6 | Notification and celebration settings are device settings, shared by every account on the phone. | HABITQUEST_DESIGN.md |
-| P-2 | Renaming the only habit in a built-in pack that carries a template's name adds that template to the pack's `dropped`. | PACKS_REPORTS_SPEC.md §17 |
+| P-2 | Renaming or deleting the only habit in a built-in pack that carries a template's name adds that template to the pack's `dropped`; renaming back takes it out. | PACKS_REPORTS_SPEC.md §17 |
 | P-4 | ONBOARDING_SPEC §11 reworded: only the first run never checks limits; a Settings retake is checked. | ONBOARDING_SPEC.md §11 |
 | P-8 | Parsers accept and ignore unknown fields; a save keeps fields it does not know (only fields from parsing; a known field always wins). Exceptions: the onboarding record keeps its privacy whitelist; the starting outline is replace-only. Newer builds never change a field's type or widen its values, and these records stay at version 1 (a breaking change uses a new key). | HABITQUEST_DESIGN.md, PACKS_REPORTS_SPEC.md §17 |
 | F-1 | Reflections are split per year (`reflections:v2:<uid>:<yyyy>`, marker `reflections:migrated:v2:<uid>`, v1 read but never written); a failed read never lowers XP or level (the last numbers stay; with none, Home's placeholder; limit checks never name an unknown level). | PACKS_REPORTS_SPEC.md §12, §17 |
@@ -48,7 +48,7 @@ keyboard).
 | S-6 | Per-user data | Notification and celebration prefs are device-wide | tests/decided-rules.test.ts (pin) | Decided: device settings |
 | S-7 | Local date everywhere | Travelling east skips a local date; west repeats one | partial | Keep, document |
 | P-1 | One pack per habit | A record listing an id twice | packs-record | Keep |
-| P-2 | Template present by name | A renamed pack habit makes "Add the rest" re-create the template | 1b | Decided |
+| P-2 | Template present by name | A renamed (or deleted) pack habit makes "Add the rest" re-create the template | tests/p2-rename-delete.test.ts, fixture renamedPackHabit (pinned) | Built (1b) |
 | P-3 | Adoption by name | Two same-named habits; one already packed | packs-membership, mutation-killers (M08) | Keep |
 | P-4 | Retake limits | ONBOARDING §11 contradicted PACKS §2b | packs-manage | Reworded |
 | P-5 | "Add the rest" level fallback 1 | Too little room (safe), possibly the wrong level named | none | Keep; test that the fallback never allows more |
@@ -293,6 +293,12 @@ and the cycle stop): each fails R-1 tests. Suite: 1119 tests, 1119 pass, 0 todo.
 were checked by hand (an unreadable state counted as 'done'; held celebrations ignored): each fails 2 tests. Suite:
 1133 tests, 1133 pass, 0 todo.
 
+**Phase 1b, P-2 (2026-11-13).** Built: `renameInPack` and `deleteFromPack` (utils/packs/manage.ts), run by the habit
+form on a rename (before any pack move) and after a delete, with one read of the active habits. New:
+`tests/p2-rename-delete.test.ts`. Changed: odd-state-fixtures (renamedPackHabit is a pin now). Two mutations were
+checked by hand (another carrier ignored; a delete never dropping): each fails 2 tests. Suite: 1148 tests, 1148 pass,
+0 todo.
+
 ### Phase 1b test cases (written with the fixes)
 
 S-1, monotonic stamp, stuck rows and the clock line (done; tests/clock-skew.test.ts unless noted):
@@ -341,6 +347,12 @@ P-2, a renamed template habit is dropped from its built-in pack:
 - P2-3: renaming it back to the template name takes walk20 out of `dropped` (the existing "putting it back" rule).
 - P2-4: renaming an unpacked habit or one in a custom pack changes no pack.
 - P2-5: a rename that only changes case or spacing is not a rename of the template.
+- Also (built 2026-11-13, tests/p2-rename-delete.test.ts): a rename from one template's name to another's; a rename
+  with a move (old pack first, then the move); deleting the only walk20 (dropped, "Add the rest" creates nothing for
+  it); deleting one of two carriers, an unpacked habit, a custom-pack habit or a non-template habit (no change); the
+  habit form is the only delete path and there is no undo; an unreadable active list or pack record (no change,
+  silent); a pack's unknown fields kept (P-8); a retake's starter for a dropped template joins no pack. Fixture
+  renamedPackHabit is pinned: a rename from before P-2 isn't repaired.
 
 R-1, area entries of deleted habits are pruned at the next write (built 2026-11-13, tests/r1-storage.test.ts):
 - R1-1: a write removes entries whose habit is deleted, readable and kept unreadable (P-8) alike; a prune alone is
