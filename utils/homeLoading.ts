@@ -17,10 +17,19 @@ export function packStatusText(input: {known: boolean; done: number; total: numb
 
 export type StatsSlot = 'placeholder' | 'card' | 'none';
 
-// statsSettled: the first stats load has finished (either way). After a failure the slot is empty, as before.
+// statsSettled: the first stats load has finished (either way). One rule for every stats failure (F-1, decided
+// 2026-11-13): with nothing shown yet, the card's space stays held by the placeholder (it used to collapse); once
+// numbers were shown, the card keeps them (statsAfterLoad). So a failure never shows a lower level, or none at all
+// after one was shown. 'none' is no longer produced.
 export function statsSlot(input: {statsSettled: boolean; hasStats: boolean}): StatsSlot {
-  if (input.hasStats) return 'card';
-  return input.statsSettled ? 'none' : 'placeholder';
+  return input.hasStats ? 'card' : 'placeholder';
+}
+
+// What the card shows after a load: the new stats, or after a failed load (null) the last ones shown for this
+// user. Another user's numbers are never kept.
+export function statsAfterLoad<T extends {userId: string}>(shown: T | null, loaded: T | null, userId: string): T | null {
+  if (loaded) return loaded;
+  return shown?.userId === userId ? shown : null;
 }
 
 export function showAddControls(input: {loaded: boolean}): boolean {

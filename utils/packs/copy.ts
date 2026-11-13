@@ -56,6 +56,9 @@ export function packLimitMessage(level: number): string {
   return `Pack limit reached. Reach level ${level} to add more habit packs.`;
 }
 
+// A limit check whose level couldn't be read (F-1, approved 2026-11-13): it never names a level
+export const LEVEL_UNKNOWN_MESSAGE = "Couldn't check your level just now. Try again in a moment.";
+
 // ---------- Stage 2: create, edit and delete packs, the habit form's pack row (approved strings) ----------
 
 export const NO_HABITS_YET = 'No habits yet';

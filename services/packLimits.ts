@@ -3,15 +3,18 @@
 // comes only from the gamification stats (services/statsStore.ts over services/gamificationStats.ts: local SQLite
 // and the reflections on this phone, never the network), so a change to the XP curve flows through here untouched. Never at cold start.
 //
-// Never throws. If the stats can't be read the level is 1 (the lowest limits). If the count can't be read it is
-// 0: the add itself then runs and fails or succeeds on its own.
+// Never throws. If the stats can't be loaded, the last ones loaded are used; with none, the level from ticks alone
+// (a lower bound, F-1), and a refusal then never names a level; if even that fails, level 1, also unknown. If the
+// count can't be read it is 0: the add itself then runs and fails or succeeds on its own.
 
 import {getActiveHabitsWithDays} from '@/db/habits';
-import {getGamificationStats} from '@/services/gamificationStats';
+import {getGamificationStats, getTicksOnlyLevel} from '@/services/gamificationStats';
 import {packsStore} from '@/services/packsStore';
 import {loadShared} from '@/services/statsStore';
 import {getLocalDateString} from '@/utils/dates';
-import {checkAdd, limitCheckTrace, type AddCheck, type LimitCheckTrace, type LimitKind} from '@/utils/packs/limits';
+import {
+  checkAddAtLevel, limitCheckTrace, type AddCheck, type KnownLevel, type LimitCheckTrace, type LimitKind,
+} from '@/utils/packs/limits';
 
 // Diagnostic (Job B): the last check made through checkAddFor in this app run, for the hidden trace panel. Memory
 // only (lost on restart), numbers only.
@@ -21,12 +24,18 @@ export function lastLimitCheck(): LimitCheckTrace | null {
   return lastCheck;
 }
 
-export async function currentLevel(uid: string): Promise<number> {
+export async function currentLevel(uid: string): Promise<KnownLevel> {
   try {
+    // after a failed load, loadShared still returns the last entry loaded: the last known level
     const result = await loadShared(uid, getLocalDateString(), () => getGamificationStats(uid));
-    return result.entry?.stats.level ?? 1;
+    if (result.entry) return {level: result.entry.stats.level, known: true};
   } catch {
-    return 1;
+    // fall through to the lower bound
+  }
+  try {
+    return {level: await getTicksOnlyLevel(uid), known: false};
+  } catch {
+    return {level: 1, known: false};
   }
 }
 
@@ -41,9 +50,9 @@ async function countOf(uid: string, kind: LimitKind): Promise<number> {
 }
 
 export async function checkAddFor(uid: string, kind: LimitKind, adding = 1): Promise<AddCheck> {
-  const [level, count] = await Promise.all([currentLevel(uid), countOf(uid, kind)]);
-  const input = {level, kind, count, adding};
-  const check = checkAdd(input);
+  const [at, count] = await Promise.all([currentLevel(uid), countOf(uid, kind)]);
+  const input = {...at, kind, count, adding};
+  const check = checkAddAtLevel(input);
   lastCheck = limitCheckTrace(input, check, Date.now());
   return check;
 }

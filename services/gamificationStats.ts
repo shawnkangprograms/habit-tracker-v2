@@ -5,6 +5,9 @@
 // reflections or areas. Vitality and the radar use the same rows: no extra query. Storage reads: the reflections
 // and the areas map, once per app run each (then from memory), and the packs record only when it isn't in memory
 // already (it normally is, from the startup mirror). Read-only: creates no rows, never touches sync.
+//
+// Rejects if the reflections can't be read (F-1): stats without them would show a lower level, so the caller keeps
+// the last numbers it showed instead (services/statsStore.ts, Home, Profile).
 
 import {getSummaryRows} from '@/db/gamification';
 import {areasStore} from '@/services/areasStore';
@@ -21,7 +24,7 @@ import {computeVitality, hasCompletionHistory} from '@/utils/vitality';
 export async function getGamificationStats(userId: string, today = getLocalDateString()): Promise<AppStats> {
   const [rows, reflections, areas, packs] = await Promise.all([
     getSummaryRows(userId) as Promise<{habits: RadarHabit[]; completions: GamiCompletion[]}>,
-    reflectionsStore.read(userId),// never throws; from memory after the first read
+    reflectionsStore.read(userId),// rejects if unreadable (never "no reflections"); from memory after the first read
     areasStore.read(userId),// never throws; failed or corrupt is an empty map (icon areas)
     packsStore.peek(userId)?.parsed ?? packsStore.read(userId),// never throws
   ]);
@@ -33,4 +36,11 @@ export async function getGamificationStats(userId: string, today = getLocalDateS
       packs: packs.kind === 'ok' ? packs.record : null,
     }),
   };
+}
+
+// For limit checks only, when no stats could be loaded (services/packLimits.ts): the level from ticks alone,
+// without reading the reflections. Never higher than the real level (reflections only add XP); never shown.
+export async function getTicksOnlyLevel(userId: string, today = getLocalDateString()): Promise<number> {
+  const rows = await (getSummaryRows(userId) as Promise<{habits: RadarHabit[]; completions: GamiCompletion[]}>);
+  return computeGamification(rows.habits, rows.completions, today, []).level;
 }

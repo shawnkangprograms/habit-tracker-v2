@@ -46,8 +46,15 @@ describe('stats card slot', () => {
     assert.equal(h.statsSlot({statsSettled: false, hasStats: true}), 'card');
   });
 
-  test('a failed load removes the placeholder: the card stays hidden, as before', () => {
-    assert.equal(h.statsSlot({statsSettled: true, hasStats: false}), 'none');
+  test('a failed load with nothing shown yet keeps the placeholder (F-1: one rule for every stats failure)', () => {
+    assert.equal(h.statsSlot({statsSettled: true, hasStats: false}), 'placeholder');
+  });
+
+  test('a failed load after numbers were shown keeps them (for this user only)', () => {
+    const shown = {userId: 'u1', level: 4};
+    assert.equal(h.statsAfterLoad(shown, null, 'u1'), shown);
+    assert.equal(h.statsAfterLoad(shown, null, 'u2'), null);
+    assert.equal(h.statsAfterLoad(null, null, 'u1'), null);
   });
 });
 

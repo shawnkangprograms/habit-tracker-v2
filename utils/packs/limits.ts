@@ -5,7 +5,7 @@
 // Nothing is ever removed: a user above a limit keeps everything and simply has no room. Onboarding's own habit
 // creation never asks for room.
 
-import {habitLimitMessage, packLimitMessage} from '@/utils/packs/copy';
+import {LEVEL_UNKNOWN_MESSAGE, habitLimitMessage, packLimitMessage} from '@/utils/packs/copy';
 
 export type LimitKind = 'habits' | 'packs';
 
@@ -57,6 +57,22 @@ export function checkAdd(input: {level: number; kind: LimitKind; count: number; 
   return {ok: false, room, message: limitMessageFor(input.kind, input.level, input.count)};
 }
 
+// The level a limit check uses. known: the stats (the last ones loaded, if a new load failed); otherwise the level
+// from ticks alone, a lower bound (F-1: reflections couldn't be read), so an add it allows is allowed.
+export type KnownLevel = {level: number; known: boolean};
+
+// checkAdd at a level that may be unknown: a refusal at an unknown level never names a level, since the real
+// one may be higher
+export function checkAddAtLevel(input: KnownLevel & {kind: LimitKind; count: number; adding?: number}): AddCheck {
+  const check = checkAdd(input);
+  return check.ok || input.known ? check : {...check, message: LEVEL_UNKNOWN_MESSAGE};
+}
+
+// The limit message for a refusal at this level (see checkAddAtLevel)
+export function limitMessageAt(kind: LimitKind, at: KnownLevel, count: number): string {
+  return at.known ? limitMessageFor(kind, at.level, count) : LEVEL_UNKNOWN_MESSAGE;
+}
+
 // ---------- Diagnostic (Job B): the last limit check, kept in memory only ----------
 // services/packLimits.ts keeps one of these for the hidden trace panel (Settings, long press on the version line).
 // Numbers only: no habit or pack names, and it is never stored, synced or sent. namedLevel: the level the refusal
@@ -73,12 +89,12 @@ export type LimitCheckTrace = {
 };
 
 export function limitCheckTrace(
-  input: {level: number; kind: LimitKind; count: number; adding?: number},
+  input: {level: number; kind: LimitKind; count: number; adding?: number; known?: boolean},
   check: AddCheck,
   at: number,
 ): LimitCheckTrace {
   return {
     at, kind: input.kind, level: input.level, count: input.count, adding: input.adding ?? 1, room: check.room,
-    namedLevel: check.ok ? null : nextLimitLevel(input.level, input.kind, input.count),
+    namedLevel: check.ok || input.known === false ? null : nextLimitLevel(input.level, input.kind, input.count),
   };
 }

@@ -22,13 +22,13 @@ added for tests; new test files are picked up by the existing `tests/*.test.ts` 
 | P-2 | Renaming the only habit in a built-in pack that carries a template's name adds that template to the pack's `dropped`. | PACKS_REPORTS_SPEC.md §17 |
 | P-4 | ONBOARDING_SPEC §11 reworded: only the first run never checks limits; a Settings retake is checked. | ONBOARDING_SPEC.md §11 |
 | P-8 | Parsers accept and ignore unknown fields; a save keeps fields it does not know (only fields from parsing; a known field always wins). Exceptions: the onboarding record keeps its privacy whitelist; the starting outline is replace-only. Newer builds never change a field's type or widen its values, and these records stay at version 1 (a breaking change uses a new key). | HABITQUEST_DESIGN.md, PACKS_REPORTS_SPEC.md §17 |
-| F-1 | Reflections are split per year; a failed read never lowers XP or level. | PACKS_REPORTS_SPEC.md §12, §17 |
+| F-1 | Reflections are split per year (`reflections:v2:<uid>:<yyyy>`, marker `reflections:migrated:v2:<uid>`, v1 read but never written); a failed read never lowers XP or level (the last numbers stay; with none, Home's placeholder; limit checks never name an unknown level). | PACKS_REPORTS_SPEC.md §12, §17 |
 | V-1 | The current schedule is applied to past days (accepted limitation), pinned by a test. | PACKS_REPORTS_SPEC.md §13, §17 |
 | V-2 | When Vitality is starting and the account has completion history, the copy is "Restarts after your first full day." | PACKS_REPORTS_SPEC.md §13, §17 |
 | R-1 | Area-map entries of deleted habits are pruned at the next write. | PACKS_REPORTS_SPEC.md §11, §17 |
 
-Open, not decided: S-5 (Firestore read cost of restoring a large account; measure in the emulator first), F-1's
-storage layout (key per year; proposed in the 1b plan), and the clock-status copy (proposal in the Phase 1a report).
+Open, not decided: S-5 (Firestore read cost of restoring a large account; measure in the emulator first) and the
+clock-status copy (proposal in the Phase 1a report).
 
 ## Part A: post-mortem of the five bugs
 
@@ -64,7 +64,7 @@ keyboard).
 | V-2 | Deleted habits drop out of past days | Deleted and recreated: "starts" after months of use | fixture recreated; copy test in 1b | Decided |
 | V-3 | Streak and Vitality disagree on deleted-only days | Documented | vitality | Keep |
 | R-1 | Area entries of deleted habits kept | Large accounts: the map grows | 1b | Decided |
-| F-1 | One reflections item "for years" | About 5 years reaches the 2 MB per-item read limit; a failed read reads as "none" | tests/decided-rules.test.ts (todo), fixture large | Decided |
+| F-1 | One reflections item "for years" | About 5 years reaches the 2 MB per-item read limit; a failed read reads as "none" | tests/decided-rules.test.ts (F-1), tests/reflections-years.test.ts, fixture large | Built (1b) |
 | C-1 | `level:v2:N` keys | Pre-Stage-3 accounts | celebrations, fixture preStage3 | Keep |
 | X-1 | XP recalculated from history | Level drop puts the account over its limit | packs-manage | Keep |
 
@@ -134,7 +134,9 @@ Every persisted format:
 | `packs:chooseDismissed:v1:<uid>` | key | — |
 | `onboarding:v1:<uid>` | `version: 1` | `answers` always null now (older records carry objects) |
 | `onboarding:pending:v1:<uid>` | key | — |
-| `reflections:v1:<uid>` | `version: 1` | per-year split decided (F-1) |
+| `reflections:v1:<uid>` | `version: 1` | read only since F-1 (copied into the year items, never written; delete after the next store build) |
+| `reflections:v2:<uid>:<yyyy>` | key; `version: 1` inside | F-1 (Phase 1b): one item per year |
+| `reflections:migrated:v2:<uid>` | key; `version: 1` inside | F-1 marker: `years`, `v1Length` |
 | `areas:v1:<uid>` | key | pruning decided (R-1) |
 | `profile:outline:v1:<uid>` | key | — |
 | `celebrated:v1:<uid>` | key | `level:N` to `level:v2:N` |
@@ -259,6 +261,20 @@ The P-8 todo is a normal test now, plus one rollback test per record (the real s
 for the celebrated keys and the celebrations switch, negative tests (a property added in memory, a forged known key,
 a stored `__proto__`) and a scan that fails if a file other than the parsers creates carried fields. Suite: 1066
 tests, 1065 pass, 1 todo (F-1).
+
+**Phase 1b, F-1 (2026-11-13).** Built: reflections in one item per year (`reflections:v2:<uid>:<yyyy>`) with the
+marker `reflections:migrated:v2:<uid>`, through the P-8 parser and serialiser unchanged (year helpers in
+`utils/reflections/record.ts`, store in `services/reflectionsStoreCore.ts`); v1 read, merged in, never written. A
+failed read rejects: the stats load publishes nothing, Home keeps the last numbers (or its placeholder with none),
+the bar offers nothing, limit checks use the last level or a ticks-only lower bound and never name an unknown level.
+The F-1 todo is a normal test now. New: `tests/reflections-years.test.ts` (migration in one multiSet, a later run's
+reads, new account, kill mid-migration on Android and iOS-like storage, a missing year refilled, a save carrying
+owed writes, the rollback window, v1 unreadable before and after the marker, failed reads, the year boundary, a
+wrong-clock year, sizes with the 20-a-day case pinned, P-8, fixtures large and everythingCorrupt, `u1`/`u10`),
+`tests/helpers/kv-storage.ts`, and F-1 tests in `tests/decided-rules.test.ts` (rejects, the shared entry keeps the
+last level, Home's rule, limit checks at an unknown level, the ticks-only lower bound). Changed: reflections-store,
+home-loading (a failed load keeps the placeholder), packs-manage (the check is `checkAddAtLevel`). Suite: 1092 tests,
+1092 pass, 0 todo.
 
 ### Phase 1b test cases (written with the fixes)
 

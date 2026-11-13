@@ -14,7 +14,7 @@ import {BUILTIN_PACKS, type BuiltinPackId} from '@/utils/packs/builtin';
 import {
   CHOOSE_ADOPT_NOTE, CREATE_OWN_PACK, PACK_NAMES, SAVE_PACKS, chooseTitle, habitCount,
 } from '@/utils/packs/copy';
-import {checkAdd, limitMessageFor, limitsForLevel} from '@/utils/packs/limits';
+import {checkAddAtLevel, limitMessageAt, limitsForLevel, type KnownLevel} from '@/utils/packs/limits';
 import type {HabitRef} from '@/utils/packs/membership';
 import {ownedBuiltins, packsAfterPick, togglePick} from '@/utils/packs/picker';
 import {TEMPLATE_NAMES} from '@/utils/onboarding/copy';
@@ -37,19 +37,21 @@ export default function ChoosePacksScreen() {
   const {from} = useLocalSearchParams<{from?: string}>();
   const uid = useSessionUid();
   const packs = usePacks(uid);
-  const [level, setLevel] = useState<number | null>(null);
+  const [at, setAt] = useState<KnownLevel | null>(null);
+  const level = at?.level ?? null;
   const [picked, setPicked] = useState<BuiltinPackId[]>([]);
   const [limitMessage, setLimitMessage] = useState<string | null>(null);// the pack limit message, while shown
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
 
   // The level from local SQLite (services/packLimits.ts: the stats Home already shares, or one local
-  // computation); never the network. If that fails, level 1, the lowest limit.
+  // computation); never the network. If the stats can't be loaded, the level from ticks alone (a lower bound),
+  // and a refusal then names no level.
   useEffect(() => {
     if (!uid) return;
     let active = true;
     currentLevel(uid).then((l) => {
-      if (active) setLevel(l);
+      if (active) setAt(l);
     });
     return () => {
       active = false;
@@ -63,16 +65,16 @@ export default function ChoosePacksScreen() {
   const canSave = ready && picked.length > 0 && !saving;
 
   const tap = (id: BuiltinPackId) => {
-    if (parsed === null || level === null) return;
-    const result = togglePick({picked, id, owned, packCount, level});
+    if (parsed === null || at === null) return;
+    const result = togglePick({picked, id, owned, packCount, level: at.level});
     setPicked(result.picked);
-    setLimitMessage(result.limited ? limitMessageFor('packs', level, packCount + picked.length) : null);
+    setLimitMessage(result.limited ? limitMessageAt('packs', at, packCount + picked.length) : null);
   };
 
   // Counts the picks not saved yet too, so the user can't go past the limit by mixing both
   const createOwn = () => {
-    if (level === null) return;
-    const check = checkAdd({level, kind: 'packs', count: packCount + picked.length});
+    if (at === null) return;
+    const check = checkAddAtLevel({...at, kind: 'packs', count: packCount + picked.length});
     if (check.ok) router.push({pathname: '/packs/edit', params: {from: 'packs'}});
     else setLimitMessage(check.message);
   };

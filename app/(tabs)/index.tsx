@@ -21,7 +21,7 @@ import {colors, fonts, radii, spacing, ICON_COLORS} from '@/constants/theme';
 import {HabitIcon} from '@/constants/habitIcons';
 import type {IconId} from '@/constants/habits';
 import {StatsCard, StatsCardPlaceholder} from '@/components/stats-card';
-import {BLANK_STATUS, showAddControls, statsSlot} from '@/utils/homeLoading';// nothing untrue and no jump at launch
+import {BLANK_STATUS, showAddControls, statsAfterLoad, statsSlot} from '@/utils/homeLoading';// nothing untrue and no jump at launch
 import {HabitCheck} from '@/components/habit-check';
 import {XpFloat} from '@/components/xp-float';
 import {useReduceMotion} from '@/hooks/use-reduce-motion';
@@ -57,7 +57,8 @@ import {PackCard, type AddRest} from '@/components/packs/pack-card';
 import {ChoosePacksCard} from '@/components/packs/choose-packs-card';
 import {homeGroups, showChooseCard} from '@/utils/packs/home';
 import {addTheRest} from '@/utils/packs/addRest';
-import {checkAdd, limitMessageFor, limitsForLevel} from '@/utils/packs/limits';
+import {checkAdd, limitMessageAt, limitsForLevel} from '@/utils/packs/limits';
+import {currentLevel} from '@/services/packLimits';// "Add the rest" when Home shows no stats
 import {ADD_REST_FAILED, CREATE_PACK_BUTTON, HOME_HABITS_TITLE, HOME_PACKS_TITLE} from '@/utils/packs/copy';
 import {ROUTINE_REMINDER_DEFAULT} from '@/utils/onboarding/plan';
 
@@ -83,7 +84,7 @@ const LAUNCH_FALLBACK_MS = 1500;
 const FOCUS_SYNC_MIN_INTERVAL_MS = 30 * 1000;
 let lastFocusSyncAt = Date.now();
 
-type StatsSnapshot = {date: string; stats: AppStats};// stats plus the local date they were computed for
+type StatsSnapshot = {userId: string; date: string; stats: AppStats};// stats plus whose and the local date they were computed for
 type Float = {key: number; amount: number};// one "+N XP" label
 type LoadReason = 'focus' | 'remote' | 'toggle' | 'refresh' | 'day' | 'reflection';// only for the dev timing log
 
@@ -260,7 +261,7 @@ export default function HomeScreen() {// default export, becomes the "index" tab
       return rows;
   }, [userId]);
 
-  const [stats, setStats] = useState<StatsSnapshot | null>(null);// null = not loaded or failed: the header card is hidden
+  const [stats, setStats] = useState<StatsSnapshot | null>(null);// null = nothing loaded yet: the card's placeholder shows
   const statsRef = useRef<StatsSnapshot | null>(null);// the same snapshot, readable at tap time
   const statsRequest = useRef(0);// id of the newest stats load; older responses are ignored
   const statsSettled = useRef(0);// id of the newest load that has finished
@@ -291,17 +292,19 @@ export default function HomeScreen() {// default export, becomes the "index" tab
         mark('stats:computeEnd');// queries and computation done, before the store publish
         return computed;
       }));
-    const loaded = await load.promise;// null if it failed: the card hides; the habit list keeps working
-    const snapshot: StatsSnapshot | null = loaded ? {date, stats: loaded.stats} : null;
+    const loaded = await load.promise;// null if it failed: the card keeps what it showed; the habit list keeps working
+    const snapshot: StatsSnapshot | null = loaded ? {userId, date, stats: loaded.stats} : null;
     if (request !== statsRequest.current) return null;// stale
     const published = publishStats(loaded, load);// for Profile and the tab icon; a no-op if nothing changed
     if (loaded) mark('stats:published');
     statsSettled.current = request;
     setFirstStatsSettled(true);// no re-render once it is already true
-    const unchanged = isDeepEqual(statsRef.current, snapshot);// every field, incl. streaks and badges
+    // a failed load never replaces numbers already shown with nothing, or with lower ones (F-1)
+    const shown = statsAfterLoad(statsRef.current, snapshot, userId);
+    const unchanged = isDeepEqual(statsRef.current, shown);// every field, incl. streaks and badges
     if (!unchanged) {
-      statsRef.current = snapshot;
-      setStats(snapshot);
+      statsRef.current = shown;
+      setStats(shown);
     }
     perfLog(`${reason} stats in ${Math.round(performance.now() - startedAt)} ms (${unchanged ? 'unchanged, no render' : 'changed'})`);
     return {snapshot, published};
@@ -468,8 +471,8 @@ export default function HomeScreen() {// default export, becomes the "index" tab
   const [packNotices, setPackNotices] = useState<Record<string, string>>({});// by packId: the last run's message
 
   // "Add the rest" (utils/packs/addRest.ts): adopts, then creates the pack's missing templates daily at 20:00,
-  // as many as the habit limit allows. The level comes from the stats Home already has (or one local
-  // computation if that load failed; level 1 if that fails too), never the network.
+  // as many as the habit limit allows. The level comes from the stats Home shows (or services/packLimits.ts if it
+  // shows none: the last loaded, else ticks alone, a lower bound whose refusal names no level), never the network.
   const addRestFor = async (packId: string) => {
     if (!userId || addingRef.current) return;
     addingRef.current = true;
@@ -479,14 +482,14 @@ export default function HomeScreen() {// default export, becomes the "index" tab
       const parsed = await packsStore.read(userId);
       if (parsed.kind !== 'ok') return;
       const habits = await (getActiveHabitsWithDays(userId) as Promise<ActiveHabit[]>);
-      const level = statsRef.current?.stats.level
-        ?? await getGamificationStats(userId).then((s) => s.level, () => 1);
+      const shown = statsRef.current;
+      const at = shown ? {level: shown.stats.level, known: true} : await currentLevel(userId);
       const result = await addTheRest({
         addHabit: (input) => addHabit(userId, input) as Promise<string>,
         savePacks: (record) => packsStore.write(userId, record),
-      }, {record: parsed.record, packId, habits, level, reminderTime: ROUTINE_REMINDER_DEFAULT});
+      }, {record: parsed.record, packId, habits, level: at.level, reminderTime: ROUTINE_REMINDER_DEFAULT});
       if (result.failed) notice = ADD_REST_FAILED;
-      else if (result.limited) notice = limitMessageFor('habits', level, habits.length + result.added);// active habits after the adds
+      else if (result.limited) notice = limitMessageAt('habits', at, habits.length + result.added);// active habits after the adds
       if (result.added > 0) askForReminderPermission();// in context, only once habits with a reminder exist
     } catch (err) {
       console.log('Add the rest failed', err);

@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import {readdirSync, readFileSync} from 'node:fs';
 import './helpers/alias.ts'; // must come before the dynamic imports below
 import {FIXTURE_TODAY, dayOffset} from './helpers/fixtures.ts';
+import {kvStorage} from './helpers/kv-storage.ts';
 import type {GamiCompletion, GamiHabit} from '../utils/gamification.ts';
 
 const G = await import('../utils/gamification.ts');
@@ -26,6 +27,9 @@ const {createAreasStore, parseAreasRecord} = await import('../services/areasStor
 const NP = await import('../utils/notificationPrefs.ts');
 const {createCelebratedStore} = await import('../services/celebratedStore.ts');
 const OR = await import('../utils/onboarding/record.ts');
+const SS = await import('../services/statsStore.ts');
+const HL = await import('../utils/homeLoading.ts');
+const LIM = await import('../utils/packs/limits.ts');
 
 const source = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
@@ -92,19 +96,69 @@ describe('S-2: a habit created while the clock was ahead counts from today (crea
 });
 
 describe('F-1: a failed reflections read never lowers XP or level', () => {
-  const unreadable = {
-    getItem: async () => {
-      throw new Error('CursorWindow: Row too big to fit into CursorWindow');
-    },
-    setItem: async () => {},
-  };
-
-  test('unreadable storage is reported as unknown, never handed to the stats load as "no reflections"', {
-    todo: 'F-1: read() returns an empty record on a failed read, so the stats load drops every reflection\'s XP and the level can fall',
-  }, async () => {
+  test('unreadable storage is reported as unknown, never handed to the stats load as "no reflections"', async () => {
+    const unreadable = kvStorage({'reflections:v1:uid-big': '{"version":1,"days":{}}'});
+    unreadable.failReads('all');
     const store = createReflectionsStore(unreadable);
     const result = await store.read('uid-big').then((record) => record, () => 'rejected' as const);
-    assert.ok(result === 'rejected' || result === null, `got ${JSON.stringify(result)}`);
+    assert.equal(result, 'rejected', `got ${JSON.stringify(result)}`);
+  });
+
+  test('the stats load rejects with it, and the shared entry keeps the last numbers (never published as lower)', async () => {
+    const habits: GamiHabit[] = [{habitId: 'h', createdDate: dayOffset(-10), frequencyType: 'daily', days: [], deleted: false}];
+    const completions = Array.from({length: 10}, (_, i) => ({habitId: 'h', date: dayOffset(-10 + i), completed: true}));
+    const reflections = completions.map((c, i) => ({habitId: 'h', date: c.date, savedAt: i + 1}));
+    const good = G.computeGamification(habits, completions, FIXTURE_TODAY, reflections);
+    const stats = {...good, vitality: null, radar: null} as never;// only the level matters here
+    SS.reset('uid-xp');
+    const first = SS.beginLoad('uid-xp', FIXTURE_TODAY, async () => stats);
+    SS.publish(await first.promise, first);
+    SS.markStale();
+    const failed = SS.beginLoad('uid-xp', FIXTURE_TODAY, () => Promise.reject(new Error('Row too big to fit into CursorWindow')));
+    assert.equal(await failed.promise, null);
+    assert.deepEqual(SS.publish(await failed.promise, failed), {accepted: false, previous: null, comparable: false});
+    assert.equal(SS.getEntry()?.stats.level, good.level);
+    SS.reset(null);
+  });
+
+  test('Home: a failed load keeps the numbers shown for this user, or keeps the placeholder when none were shown', () => {
+    const shown = {userId: 'u1', date: FIXTURE_TODAY, level: 4};
+    assert.equal(HL.statsAfterLoad(shown, null, 'u1'), shown);
+    assert.equal(HL.statsAfterLoad(shown, null, 'u2'), null, 'another user\'s numbers are never kept');
+    const next = {...shown, level: 5};
+    assert.equal(HL.statsAfterLoad(shown, next, 'u1'), next);
+    assert.equal(HL.statsSlot({statsSettled: true, hasStats: false}), 'placeholder');
+    assert.equal(HL.statsSlot({statsSettled: true, hasStats: true}), 'card');
+    // Home wires both
+    const home = source('app/(tabs)/index.tsx');
+    assert.match(home, /const shown = statsAfterLoad\(statsRef\.current, snapshot, userId\);/);
+    assert.doesNotMatch(home, /setStats\(snapshot\)/);
+  });
+
+  test('limit checks at an unknown level: a lower bound may allow; a refusal never names a level', () => {
+    const unknown = {level: 2, known: false, kind: 'habits' as const, count: 14};
+    const refused = LIM.checkAddAtLevel(unknown);
+    assert.deepEqual(refused, {ok: false, room: 0, message: "Couldn't check your level just now. Try again in a moment."});
+    assert.doesNotMatch(refused.ok ? '' : refused.message, /level \d/);
+    assert.deepEqual(LIM.checkAddAtLevel({...unknown, count: 10}), {ok: true, room: 4});
+    assert.match((LIM.checkAddAtLevel({...unknown, known: true}) as {message: string}).message, /Reach level 3/);
+    assert.equal(LIM.limitMessageAt('packs', {level: 2, known: false}, 9), "Couldn't check your level just now. Try again in a moment.");
+    assert.equal(LIM.limitCheckTrace(unknown, refused, 1).namedLevel, null);
+    // every path: the shared check, the pack picker and Home's "Add the rest"
+    const service = source('services/packLimits.ts');
+    assert.match(service, /if \(result\.entry\) return \{level: result\.entry\.stats\.level, known: true\};/);
+    assert.match(service, /return \{level: await getTicksOnlyLevel\(uid\), known: false\};/);
+    assert.match(source('app/packs/choose.tsx'), /limitMessageAt\('packs', at, /);
+    assert.match(source('app/(tabs)/index.tsx'), /limitMessageAt\('habits', at, /);
+    assert.doesNotMatch(source('app/(tabs)/index.tsx') + source('app/packs/choose.tsx'), /limitMessageFor\(/);
+  });
+
+  test('the ticks-only level is a lower bound: reflections only ever add XP', () => {
+    const habits: GamiHabit[] = [{habitId: 'h', createdDate: dayOffset(-30), frequencyType: 'daily', days: [], deleted: false}];
+    const completions = Array.from({length: 30}, (_, i) => ({habitId: 'h', date: dayOffset(-30 + i), completed: true}));
+    const reflections = completions.map((c, i) => ({habitId: 'h', date: c.date, savedAt: i + 1}));
+    assert.ok(G.computeGamification(habits, completions, FIXTURE_TODAY, []).level <= G.computeGamification(habits, completions, FIXTURE_TODAY, reflections).level);
+    assert.match(source('services/gamificationStats.ts'), /computeGamification\(rows\.habits, rows\.completions, today, \[\]\)\.level/);
   });
 
   test('what is at stake today: the same account loses its reflection XP when the read fails', async () => {
@@ -143,19 +197,7 @@ describe('P-8: a newer field survives an older build re-saving the record (excep
   // Each test: a record as a newer build might write it (fields this build doesn't know, at every level), parsed by
   // today's code, changed the way an older build would change it, and saved again through the real store core.
   const UID = 'uid-p8';
-  const memory = (initial: Record<string, string> = {}) => {
-    const data = new Map(Object.entries(initial));
-    return {
-      data,
-      getItem: async (key: string) => data.get(key) ?? null,
-      setItem: async (key: string, value: string) => {
-        data.set(key, value);
-      },
-      multiSet: async (pairs: [string, string][]) => {
-        for (const [key, value] of pairs) data.set(key, value);
-      },
-    };
-  };
+  const memory = kvStorage;
   const stored = (m: {data: Map<string, string>}, key: string) => JSON.parse(m.data.get(key)!);
 
   const NEWER_PACKS = JSON.stringify({
@@ -238,25 +280,31 @@ describe('P-8: a newer field survives an older build re-saving the record (excep
     },
   });
 
+  // Since F-1 a save writes the year item (reflections:v2:<uid>:2026); v1 is read and never written, so what belongs
+  // to no year (the record's own keys, non-date keys) stays in v1. More in tests/reflections-years.test.ts.
+  const YEAR_2026 = RR.reflectionsYearKey(UID, '2026');
+
   test('reflections: a save keeps unknown fields and unreadable days and entries, exactly as stored', async () => {
     const m = memory({[RR.reflectionsKey(UID)]: NEWER_REFLECTIONS});
     const store = createReflectionsStore(m);
     assert.equal(await store.save(UID, {habitId: 'd', date: DAY, answers: ANSWERS, text: '', savedAt: 4}), 'saved');
-    const saved = stored(m, RR.reflectionsKey(UID));
+    const saved = stored(m, YEAR_2026);
     const before = JSON.parse(NEWER_REFLECTIONS);
-    assert.equal(saved.futureTop, 't');
     assert.deepEqual(saved.days[DAY].a, before.days[DAY].a);
     assert.deepEqual(saved.days[DAY].b, before.days[DAY].b);
     assert.deepEqual(saved.days['2026-11-06'], before.days['2026-11-06']);
-    assert.deepEqual(saved.days.someday, [1, 2]);
     assert.deepEqual(saved.days[DAY].d, {...ANSWERS, savedAt: 4});
+    assert.equal(m.data.get(RR.reflectionsKey(UID)), NEWER_REFLECTIONS, 'futureTop and someday stay in v1, never written');
   });
 
   test('reflections: an unreadable entry counts as already reflected (no bar, never written over) and earns no XP', async () => {
     const m = memory({[RR.reflectionsKey(UID)]: NEWER_REFLECTIONS});
     const store = createReflectionsStore(m);
+    await store.read(UID);// migrates into the year item
+    const yearBefore = m.data.get(YEAR_2026);
     assert.equal(await store.save(UID, {habitId: 'b', date: DAY, answers: ANSWERS, text: '', savedAt: 9}), 'exists');
-    assert.equal(m.data.get(RR.reflectionsKey(UID)), NEWER_REFLECTIONS, 'nothing written');
+    assert.equal(m.data.get(YEAR_2026), yearBefore, 'nothing written');
+    assert.equal(m.data.get(RR.reflectionsKey(UID)), NEWER_REFLECTIONS);
     const record = await store.read(UID);
     assert.equal(RR.hasReflection(record, 'b', DAY), true);
     assert.equal(RR.findReflection(record, 'b', DAY), null);

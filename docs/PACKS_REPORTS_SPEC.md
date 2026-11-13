@@ -196,7 +196,7 @@ Rewritten in Stage 3 (replaces "Notes and note XP": the inline "Add a note" chip
 
   Free text "ANYTHING ELSE? (OPTIONAL)", placeholder "A few words for yourself", at most 200 characters after trimming (control characters removed, line breaks kept), counter "{n}/200", error "Use 200 characters or fewer.". "Save reflection" is enabled once all four questions are answered. One reflection per habit per day; not editable in Stage 3.
 - **XP:** 20 per reflection (`REFLECTION_XP`), earned by answering the four questions; the free text never affects XP. It counts only while that day's completion of the habit is ticked, and at most 3 a day (the earliest saved among those that count). Like all XP it is derived, never stored: un-ticking removes it, re-ticking restores it if it is still among that day's first 3.
-- **Storage:** AsyncStorage `reflections:v1:<uid>` = `{version: 1, days: {date: {habitId: {feel, amount, helped, blocker, text?, savedAt}}}}`, on this phone only; never synced, never in Firestore or the admin screens. Kept on sign-out like the packs record. Kept when the habit is un-ticked or deleted (its XP follows the completion rule: deleted habits keep their XP). A corrupt record reads as none and is replaced by the next save; unreadable storage is never written over. Fields this build doesn't know (on the record or an entry), and days or entries it can't read, are kept by the next save exactly as stored; an unreadable entry counts as "already reflected" (no bar, never written over) and never earns XP (P-8, section 17). Size: about 1 KB a day at most with the cap; a single item reaches Android's per-item read limit (about 2 MB) in roughly 5 years, so the record is split per year and a failed read never lowers XP or level (F-1, section 17; the key layout is proposed in the Phase 1b plan).
+- **Storage (F-1, section 17):** AsyncStorage, one item per year: `reflections:v2:<uid>:<yyyy>` = `{version: 1, days: {date: {habitId: {feel, amount, helped, blocker, text?, savedAt}}}}` holding that year's days, plus the marker `reflections:migrated:v2:<uid>` = `{version: 1, years: [2026, …], v1Length}`. The record from before F-1, `reflections:v1:<uid>` (every year in one item), is read but never written or deleted; its entries are copied into the year items. On this phone only; never synced, never in Firestore or the admin screens. Kept on sign-out like the packs record. Kept when the habit is un-ticked or deleted (its XP follows the completion rule: deleted habits keep their XP). A corrupt year reads as none for that year and is replaced by the next save into it; unreadable storage is never written over, and a failed read never lowers XP or level. Fields this build doesn't know (on a year item or an entry), and days or entries it can't read, are kept by the next save exactly as stored; an unreadable entry counts as "already reflected" (no bar, never written over) and never earns XP (P-8, section 17). Size (measured, UTF-8): saves are about 3 a day through the bar, which offers only while XP is still open, so about 0.85 KB a day with 200-character text and about 0.31 MB a year item; Android reads at most about 2 MB per item and allows 6 MB in all by default. Accepted limitation (2026-11-13): un-ticking and re-ticking to reflect about 20 times a day with text reaches about 2.4 MB a year item (past the per-item limit) and, with v1 kept, past 6 MB in two years; pinned by a test, no save guard.
 - **AI rule (applies from stage 9; nothing is sent in Stage 3):** tags are always usable by the AI analysis (counts only). Free text reaches Gemini only when the user turns on "Use my notes in AI summaries" in Settings (off by default; the switch arrives in stage 9), with consent wording that says the text is processed outside Kenya. Only recent short excerpts are sent: at most the last 7 reflections, at most 200 characters each. Reflections on replace habits (from Q10: phone and social, pornography, smoking or vaping, gaming, junk food, alcohol, procrastination, matched by name since Q10 is never stored) never leave the phone, whatever the switch says. Habit names are never sent. Stage 9 adds exactly one audited export path for this.
 - **Backlog:** reflections must be covered by in-app data deletion before the Play release.
 
@@ -242,7 +242,7 @@ Built in Stage 4.
 | XP (was) | 5 (25) | 10 (50) | 20 (100) | 40 (200) | 80 (400) | 160 (800) |
 
 - **Level drops and celebrations:** a drop never shows anything (no "level down", no overlay, no toast). Level celebrations use the keys `level:v2:N` from Stage 3; the old curve's `level:N` keys are ignored and never deleted (so a level reached again on the new curve gets its full celebration, and going back to an older update can't celebrate twice). Streak keys are unchanged. A level reached by a reflection is celebrated on Home's next focus after the save. "Near level" toasts start at 20 XP to go (one reflection).
-- XP and level are read only on the phone (Home stats card and limits, Profile, the celebrations, services/packLimits.ts) through services/gamificationStats.ts. They are not stored, synced, sent to the insight function or shown in the admin screens, so the recalculation touches nothing outside the phone.
+- XP and level are read only on the phone (Home stats card and limits, Profile, the celebrations, services/packLimits.ts) through services/gamificationStats.ts. They are not stored, synced, sent to the insight function or shown in the admin screens, so the recalculation touches nothing outside the phone. A stats load whose reflections can't be read fails as a whole (F-1, section 17): the screens keep the last numbers they showed, so a failed read never shows a lower level.
 - Over-limit rule (applies from Stage 2): habit and pack limits only ever block ADDING. Nothing is deleted, hidden or disabled when a level drop puts an account over its limit.
 - Ticks are self-reported; reflections add context but do not prove completion. The final report must state this as a limitation.
 
@@ -275,7 +275,7 @@ for an account that is not in a "normal" state, and the test that checks it. Fix
   - Records: the packs record (record and each pack) and the mirror's copy of it (the mirror's own top-level keys are
     not carried: it is a cache, rebuilt on every write); the area map (section 11); the reflections record (section
     12: unreadable entries count as "already reflected" and never earn XP; the parser and serialiser work on any set
-    of days, so F-1's one item per year reuses them unchanged); the notification settings (kept apart from the
+    of days, so F-1's one item per year reuses them unchanged; F-1's marker is a P-8 record too); the notification settings (kept apart from the
     settings in effect, written back by the next change). Already compliant, pinned by tests: the celebrated keys (every
     key is kept; only `perfect:`/`early:` keys older than 7 days go) and the celebrations switch (a scalar written
     only when the user flips it).
@@ -292,11 +292,41 @@ for an account that is not in a "normal" state, and the test that checks it. Fix
     scans each object's keys once (the reflections record is the largest, about 6,000 entries after a year at 16
     habits); a carried field can't be pruned by an older build. Tests: tests/decided-rules.test.ts (P-8: one rollback
     test per record, the negative tests and the source scan).
-- **F-1, reflections split per year; a failed read never lowers XP or level.** The reflections record is stored in
-  one item per year; the key layout is proposed in the Phase 1b plan. A read that fails is "unknown", never "no
-  reflections": the stats load keeps what it last showed rather than recomputing without them.
-  - Odd states: a record past Android's per-item read limit, unreadable storage, a corrupt year (reads as none for
-    that year only). Tests: tests/decided-rules.test.ts (F-1; todo until Phase 1b), fixture large.
+- **F-1, reflections split per year; a failed read never lowers XP or level (built in Phase 1b, 2026-11-13).** The
+  reflections record is stored in one item per year, `reflections:v2:<uid>:<yyyy>`, through the P-8 parser and
+  serialiser unchanged, with the marker `reflections:migrated:v2:<uid>` = `{version: 1, years, v1Length}`
+  (services/reflectionsStoreCore.ts; the year helpers in utils/reflections/record.ts).
+  - Migration: the first load of an app run reads the marker and `reflections:v1:<uid>` in parallel (separate calls,
+    since one row too big fails a whole multiGet on Android), then every year the marker lists in one multiGet
+    (lifetime XP needs every year). v1 is merged into the years when there is no marker yet, when v1's length differs
+    from the marker's (an older build saved to v1 during a rollback: an OTA rollback, or a launch from the embedded
+    bundle), or when a listed year is missing or corrupt; a habit and day a year already has keeps the year's entry.
+    The changed years and the marker go in one multiSet, so the marker never lands without them (Android: one SQLite
+    transaction; iOS: the marker sits in the manifest, written after the year files). A kill before or during it
+    leaves no marker, and the next run merges again by union (nothing duplicated, nothing lost). With no marker, the
+    years come from this uid's keys (`getAllKeys`); a new account gets a marker at once. A failed migration write
+    never fails the read: the merged record is served and the writes are retried by the next load or carried by the
+    next save. v1 is never written or deleted in this change; v1's own unknown keys and non-date keys stay there.
+  - Failed reads: a marker or year that can't be read makes the read reject (not remembered, so the next read tries
+    again). v1 that can't be read rejects only before migration; once a valid marker exists it is skipped and logged,
+    and the years are served (nothing is rewritten without v1 to repair from). The rejection fails the stats load
+    (services/gamificationStats.ts), which publishes nothing (services/statsStore.ts), so the shared entry keeps the
+    last numbers. Home keeps the last numbers it showed for this user; with none shown yet, the card's placeholder
+    stays (one rule for every stats failure; it used to collapse). Profile keeps its entry or its "couldn't be loaded"
+    line. No reflection bar is offered; a save returns "failed". Limit checks use the last known level, or with none
+    the level from ticks alone (a lower bound); a refusal at that level never names one: "Couldn't check your level
+    just now. Try again in a moment." (approved 2026-11-13).
+  - Rollback window (accepted): while an older build runs, it sees only v1, so reflections saved by F-1 are missing
+    there (lower XP on that build; a level drop shows nothing). A reflection it saves for a habit and day a year
+    already has is not merged (the year's entry wins; it stays in v1).
+  - Later step (not built): delete `reflections:v1:<uid>` after the next store build, once no rollback target or
+    embedded bundle predates F-1. Until then both copies are kept (section 12, size).
+  - Odd states: a record past Android's per-item read limit (v1 before migration rejects; see section 12 for the
+    accepted 20-a-day case), unreadable storage, a corrupt year (reads as none for that year; refilled from v1 for
+    entries from before migration, else replaced by the next save), a date from a wrong clock (its own year key),
+    a kill mid-migration, two uids sharing a key prefix (`u1`, `u10`: never read). Tests: tests/decided-rules.test.ts
+    (F-1), tests/reflections-years.test.ts (migration, kill mid-migration, rollback window, failed reads, year
+    boundary, sizes, P-8, fixtures large and everythingCorrupt), tests/reflections-store.test.ts.
 - **V-1, the current schedule applies to past days (pinned).** Unchanged accepted limitation (section 13).
   - Odd states: a daily habit changed to one weekday loses its past perfect days and streak days on the other
     weekdays; its tick XP stays. Test: tests/decided-rules.test.ts (V-1).

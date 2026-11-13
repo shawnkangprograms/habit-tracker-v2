@@ -21,10 +21,10 @@ export function useReflectionBar(userId: string | undefined) {
     const seq = ++latestOffer.current;
     offering.current = habit.habitId;
     const ticked = new Set(rows.filter((r) => r.completed === 1).map((r) => r.habitId));
-    const record = await reflectionsStore.read(userId);
+    const record = await reflectionsStore.read(userId).catch(() => null);// unreadable (F-1): no offer
     if (seq !== latestOffer.current) return;
     offering.current = null;
-    if (!wouldReward(record, {habitId: habit.habitId, date, ticked})) {
+    if (!record || !wouldReward(record, {habitId: habit.habitId, date, ticked})) {
       setBar(null);// the newest tick has no offer: an older tick's bar doesn't stay up for it
       return;
     }

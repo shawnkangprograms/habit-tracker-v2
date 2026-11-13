@@ -223,7 +223,7 @@ describe('limits: one check, adding only', () => {
     assert.match(source('../utils/packs/picker.ts'), /checkAdd\(\{level: input\.level, kind: 'packs'/);
     assert.match(source('../app/(tabs)/index.tsx'), /checkAdd\(\{level, kind: 'habits'[\s\S]*checkAdd\(\{level, kind: 'packs'/);
     assert.match(source('../app/packs/edit.tsx'), /checkAddFor\(uid, 'packs'\)/);
-    assert.match(source('../app/packs/choose.tsx'), /checkAdd\(\{level, kind: 'packs', count: packCount \+ picked\.length\}\)/);
+    assert.match(source('../app/packs/choose.tsx'), /checkAddAtLevel\(\{\.\.\.at, kind: 'packs', count: packCount \+ picked\.length\}\)/);
     assert.match(source('../app/onboarding.tsx'), /if \(entry === 'settings'\) \{[\s\S]*checkAddFor\(userId, 'habits', remaining\)/);
   });
 
@@ -359,7 +359,7 @@ describe('Job B diagnostic: the last limit check is kept in memory only, numbers
       {at: 5, kind: 'packs', level: 1, count: 0, adding: 1, room: 2, namedLevel: null});
     // set by the one check every screen calls, held in a module variable: no storage, no names
     const service = source('../services/packLimits.ts');
-    assert.match(service, /const check = checkAdd\(input\);\s*lastCheck = limitCheckTrace\(input, check, Date\.now\(\)\);/);
+    assert.match(service, /const check = checkAddAtLevel\(input\);\s*lastCheck = limitCheckTrace\(input, check, Date\.now\(\)\);/);
     assert.doesNotMatch(service, /AsyncStorage|setItem|SecureStore|habitName|\.name\b/);
     // shown only by the hidden trace panel (required lazily by Settings in a trace build)
     assert.match(source('../components/startup-trace-panel.tsx'), /lastLimitCheck\(\)[\s\S]*activeHabitCount\(uid\)/);
