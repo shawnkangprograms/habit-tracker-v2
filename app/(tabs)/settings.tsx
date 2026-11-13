@@ -21,7 +21,7 @@ import {TRACE_ON} from '@/utils/startupTrace';
 import {SETTINGS_ROW} from '@/utils/onboarding/copy';
 import {NAME_ROW} from '@/utils/profileName';
 import {SETTINGS_PACKS_ROW} from '@/utils/packs/copy';
-import {useClockLine} from '@/hooks/use-clock-line';// S-1: the one sync message, here only
+import {useSyncLines} from '@/hooks/use-clock-line';// S-1 and R-1: the only sync messages, here only
 
 // DEV ONLY: long-press the title to seed early-praise history (logs first, a second long press confirms)
 const devSeed = devSeedEarlyPraise;
@@ -50,7 +50,7 @@ export default function SettingsScreen (){
     const {isAdmin, recheckIfFailed} = useIsAdmin();
     const celebrationsOn = useCelebrationsEnabled();
     const notificationPrefs = useNotificationPrefs();
-    const clockMessage = useClockLine();
+    const syncMessages = useSyncLines();
     const [permission, setPermission] = useState<PermissionState | null>(null);
     const [asking, setAsking] = useState(false);
     const [available] = useState(notificationsAvailable);// fixed for the app run: the module loads once or never
@@ -111,7 +111,7 @@ export default function SettingsScreen (){
         <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
             <ScrollView contentContainerStyle={styles.content}>
               <Text style={styles.title} onLongPress={onTitleLongPress}>Settings</Text>
-              {clockMessage ? <Text style={styles.clockLine}>{clockMessage}</Text> : null}
+              {syncMessages.map((line) => <Text key={line} style={styles.clockLine}>{line}</Text>)}
 
               <View style={styles.list}>
                 <SwitchRow

@@ -9,6 +9,10 @@
 //
 // P-8 (docs/PACKS_REPORTS_SPEC.md, section 17): an entry whose value this build can't read (written by a newer
 // build) is not used, but is kept and written back unchanged; setting that habit's area replaces it.
+//
+// R-1 (section 17): a write also removes the entries, readable or not, of habits known to be deleted (ids from
+// SQLite with deleted = 1). A habit missing from this phone is never "deleted", and a failed read of the deleted
+// ids prunes nothing. Storage that couldn't be read is never written over: the write then resolves false.
 
 import {isAreaValue, type AreasMap, type AreaValue} from '@/utils/radar/areas';
 import {isPlainObject, withUnknown, type UnknownFields} from '@/utils/unknownFields';
@@ -46,6 +50,17 @@ export function parseAreas(raw: string | null): AreasMap {
   return parseAreasRecord(raw).areas;
 }
 
+// R-1: the record without the entries of these deleted habits, readable or kept unreadable (P-8). The same object
+// when nothing is removed.
+export function pruneAreas(record: AreasRecord, deleted: ReadonlySet<string>): AreasRecord {
+  const areas = Object.entries(record.areas).filter(([habitId]) => !deleted.has(habitId));
+  const kept = Object.entries(record.unknownFields ?? {}).filter(([habitId]) => !deleted.has(habitId));
+  const removed = Object.keys(record.areas).length - areas.length + Object.keys(record.unknownFields ?? {}).length - kept.length;
+  if (removed === 0) return record;
+  const pruned: AreasRecord = {areas: Object.fromEntries(areas)};
+  return kept.length > 0 ? {...pruned, unknownFields: Object.freeze(Object.fromEntries(kept))} : pruned;
+}
+
 // The stored value: the kept entries first, then the readable ones (which win for the same habit)
 export function serialiseAreas(record: AreasRecord): string {
   return JSON.stringify(withUnknown(record.unknownFields, {...record.areas}));
@@ -72,11 +87,15 @@ export function createAreasStore(storage: AreasStorage) {
     return (await load(uid))?.areas ?? {};
   }
 
-  // Saves one habit's area. Resolves false if it couldn't be saved (the habit then keeps its icon's area).
-  function write(uid: string, habitId: string, value: AreaValue): Promise<boolean> {
+  // Saves one habit's area, removing the entries of `deletedIds` (R-1; null or absent: nothing is pruned). Resolves
+  // false if it couldn't be saved, or if storage couldn't be read (never written over); the habit then keeps its
+  // icon's area.
+  function write(uid: string, habitId: string, value: AreaValue, deletedIds?: readonly string[] | null): Promise<boolean> {
     const run = updates.then(async () => {
-      const current = (await load(uid)) ?? {areas: {}};
-      if (current.areas[habitId] === value) return true;
+      const loaded = await load(uid);
+      if (!loaded) return false;
+      const current = deletedIds ? pruneAreas(loaded, new Set(deletedIds)) : loaded;
+      if (current === loaded && current.areas[habitId] === value) return true;
       const next: AreasRecord = {...current, areas: {...current.areas, [habitId]: value}};
       try {
         await storage.setItem(areasKey(uid), serialiseAreas(next));

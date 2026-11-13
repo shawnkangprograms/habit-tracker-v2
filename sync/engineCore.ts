@@ -60,7 +60,8 @@ export type SyncCursors = {
   save(uid: string, state: CursorState): Promise<void>;
 };
 
-export type ErrorKind = 'offline' | 'timeout' | 'auth' | 'rejected' | 'unknown';
+// 'storage': this phone's stored sync state (the pull cursors) couldn't be read (R-1)
+export type ErrorKind = 'offline' | 'timeout' | 'auth' | 'rejected' | 'storage' | 'unknown';
 
 export type SyncStatus = {
   state: 'off' | 'idle' | 'syncing' | 'offline';
@@ -76,7 +77,17 @@ export type SyncStatus = {
   // S-1 "clock suspect": cycles that ended while a refused push looked like the phone's clock is wrong (see
   // nextClockSuspectCycles). Read only by Settings (utils/syncStatusLine.ts); never by Home or startup.
   clockSuspectCycles: number;
+  // R-1: consecutive cycles whose pull-cursor read failed (each ends before any network call; nothing is written
+  // over). 0 after a cursor read that works, on sign-out (stop), sign-in (start) and app restart. Read only by
+  // Settings (utils/syncStatusLine.ts, from 3) and the sync log.
+  cursorReadFailures: number;
 };
+
+// R-1: the counter after a cycle. Unchanged by a cycle that didn't get as far as reading the cursors.
+export function nextCursorReadFailures(previous: number, cycle: {cursorRead: 'ok' | 'failed' | 'none'}): number {
+  if (cycle.cursorRead === 'failed') return previous + 1;
+  return cycle.cursorRead === 'ok' ? 0 : previous;
+}
 
 // What one cycle did, for the clock-suspect counter
 export type CycleOutcome = {
@@ -116,7 +127,7 @@ const PERMANENT_CODES = ['permission-denied', 'invalid-argument', 'failed-precon
 const INITIAL_STATUS: SyncStatus = {
   state: 'off', lastSuccessAt: null, lastAttemptAt: null, lastPullAt: null, initialPullDone: false,
   pendingCount: 0, lastErrorKind: null, pullError: null, rejectedCount: 0,
-  pullCounts: {received: 0, invalid: 0, changed: 0}, clockSuspectCycles: 0,
+  pullCounts: {received: 0, invalid: 0, changed: 0}, clockSuspectCycles: 0, cursorReadFailures: 0,
 };
 
 class Aborted extends Error {}
@@ -181,6 +192,7 @@ export function createSyncEngine(options: SyncEngineOptions) {
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
   const rejected = new Map<string, Map<string, Rejection>>(); // uid -> doc key -> backoff
   let clockSuspectUid: string | null = null; // whose cycles status.clockSuspectCycles counts
+  let cursorFailUid: string | null = null; // whose cycles status.cursorReadFailures counts
 
   function setStatus(patch: Partial<SyncStatus>) {
     status = {...status, ...patch};
@@ -425,10 +437,19 @@ export function createSyncEngine(options: SyncEngineOptions) {
     let reachedPush = false;
     const flags: CycleFlags = {pulledToEnd: false, pushedOk: false, suspect: false};
     let state: CursorState | null = null;
+    let cursorRead: 'ok' | 'failed' | 'none' = 'none';
     try {
       // local, so initialPullDone is known even when offline
       if (cursors) {
-        state = await cursors.load(uid);
+        try {
+          state = await cursors.load(uid);
+        } catch {
+          // R-1: unreadable, so this cycle stops here: no network call, no cursor write, initialPullDone unchanged
+          check();
+          cursorRead = 'failed';
+          throw new CycleStop('storage');
+        }
+        cursorRead = 'ok';
         check(); // every cursor save starts right after a check, so none can start after stop()
         if (resetRequested) {
           resetRequested = false;
@@ -496,12 +517,16 @@ export function createSyncEngine(options: SyncEngineOptions) {
     const clockSuspectCycles = nextClockSuspectCycles(previousSuspect, {
       reachedPush, failed: failure !== null, pushedOk: flags.pushedOk, suspect: flags.suspect,
     });
+    const previousCursorFailures = cursorFailUid === uid ? status.cursorReadFailures : 0;
+    cursorFailUid = uid;
+    const cursorReadFailures = nextCursorReadFailures(previousCursorFailures, {cursorRead});
     const pullPatch = {
       pullCounts: counts,
       pullError,
       initialPullDone: state?.initialPullDone ?? status.initialPullDone,
       ...(pulledToEnd ? {lastPullAt: now()} : {}),
       clockSuspectCycles,
+      cursorReadFailures,
     };
     if (failure === null) {
       setStatus({
@@ -560,6 +585,7 @@ export function createSyncEngine(options: SyncEngineOptions) {
     stopped = false;
     generation += 1;
     clockSuspectUid = null;
+    cursorFailUid = null;
     setStatus({...INITIAL_STATUS, state: 'idle'});
   }
 
@@ -573,6 +599,7 @@ export function createSyncEngine(options: SyncEngineOptions) {
     debounceTimer = null;
     rejected.clear();
     clockSuspectUid = null;
+    cursorFailUid = null;
     setStatus({...INITIAL_STATUS});
   }
 

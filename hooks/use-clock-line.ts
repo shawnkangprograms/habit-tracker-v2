@@ -1,14 +1,19 @@
 import {useEffect, useState} from 'react';
 import {getSyncStatus, subscribeSyncStatus} from '@/sync/syncEngine';
-import {clockLine} from '@/utils/syncStatusLine';
+import {syncLines} from '@/utils/syncStatusLine';
 
-// Settings only: the S-1 clock line for the current sync status (utils/syncStatusLine.ts), or null. Subscribes while
-// Settings is mounted; Home and the startup path never use this.
-export function useClockLine(): string | null {
-  const [line, setLine] = useState<string | null>(() => clockLine(getSyncStatus()));
+type LineStatus = {clockSuspectCycles?: number; cursorReadFailures?: number};
+
+// Settings only: the sync lines for the current sync status (utils/syncStatusLine.ts: the S-1 clock line and the
+// R-1 cursor line), possibly none. Subscribes while Settings is mounted; Home and the startup path never use this.
+export function useSyncLines(): string[] {
+  const [lines, setLines] = useState<string[]>(() => syncLines(getSyncStatus()));
   useEffect(() => {
-    setLine(clockLine(getSyncStatus()));// a status change between the first render and this effect
-    return subscribeSyncStatus((status: {clockSuspectCycles?: number}) => setLine(clockLine(status)));
+    setLines(syncLines(getSyncStatus()));// a status change between the first render and this effect
+    return subscribeSyncStatus((status: LineStatus) => {
+      const next = syncLines(status);
+      setLines((current) => (current.join('\n') === next.join('\n') ? current : next));
+    });
   }, []);
-  return line;
+  return lines;
 }

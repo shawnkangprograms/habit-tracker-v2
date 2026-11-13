@@ -1,5 +1,5 @@
 import {useEffect, useRef, useState} from 'react';
-import {ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
+import {ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {router, useLocalSearchParams} from 'expo-router';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
@@ -7,12 +7,12 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import {getActiveHabitsWithDays} from '@/db/habits';
 import {usePacks} from '@/hooks/use-packs';
 import {currentLevel} from '@/services/packLimits';
-import {packsStore} from '@/services/packsStore';
+import {onPacksUpdate, packsStore} from '@/services/packsStore';
 import {useSessionUid} from '@/services/session';
 import {colors, fonts, radii, spacing} from '@/constants/theme';
 import {BUILTIN_PACKS, type BuiltinPackId} from '@/utils/packs/builtin';
 import {
-  CHOOSE_ADOPT_NOTE, CREATE_OWN_PACK, PACK_NAMES, SAVE_PACKS, chooseTitle, habitCount,
+  CHOOSE_ADOPT_NOTE, CREATE_OWN_PACK, PACK_NAMES, SAVE_PACK_FAILED, SAVE_PACKS, TRY_AGAIN, chooseTitle, habitCount,
 } from '@/utils/packs/copy';
 import {checkAddAtLevel, limitMessageAt, limitsForLevel, type KnownLevel} from '@/utils/packs/limits';
 import type {HabitRef} from '@/utils/packs/membership';
@@ -86,8 +86,13 @@ export default function ChoosePacksScreen() {
     try {
       // the active habits, for adoption; if that read fails nothing is adopted and the packs are still saved
       const habits = await (getActiveHabitsWithDays(uid) as Promise<HabitRef[]>).catch(() => [] as HabitRef[]);
-      await packsStore.update(uid, (current) => packsAfterPick(current, picked, habits, clockNow()));// never throws
-      goBack(from);
+      const result = await packsStore.update(uid, (current) => packsAfterPick(current, picked, habits, clockNow()));// never throws
+      onPacksUpdate(result, {
+        saved: () => goBack(from),
+        unchanged: () => goBack(from),
+        // R-1: the record couldn't be read, so nothing was written; the picker stays open with the picks
+        unreadable: () => Alert.alert(SAVE_PACK_FAILED, TRY_AGAIN),
+      });
     } finally {
       savingRef.current = false;
       setSaving(false);

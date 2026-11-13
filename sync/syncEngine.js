@@ -6,6 +6,7 @@ import * as store from '@/db/sync';
 import {emitRemoteChange} from '@/db/remoteChanges';
 import {getFirebaseAuth} from '@/services/authInit';
 import {mark, TRACE_ON} from '@/utils/startupTrace';
+import {CURSOR_LINE_MIN_CYCLES} from '@/utils/syncStatusLine';
 
 // The app's sync engine: the engine core (sync/engineCore.ts) on the real SQLite store (db/sync.js),
 // Firestore (sync/firestoreRemote.js), pull cursors in AsyncStorage (per uid, kept across sign-outs)
@@ -30,12 +31,27 @@ if (__DEV__) {
             const pull = `pulled ${s.pullCounts.received} (invalid ${s.pullCounts.invalid}, changed ${s.pullCounts.changed})`;
             console.log(
                 `Sync: ${s.state}, ${pull}, pullError ${s.pullError ?? 'none'}, pending ${s.pendingCount}, ` +
-                `rejected ${s.rejectedCount}, error ${s.lastErrorKind ?? 'none'}, restored ${s.initialPullDone}`
+                `rejected ${s.rejectedCount}, error ${s.lastErrorKind ?? 'none'}, restored ${s.initialPullDone}, ` +
+                `cursor read failures ${s.cursorReadFailures}`
             );
         }
         previous = s.state;
     });
 }
+
+// R-1, every build: a failed pull-cursor read ends the cycle before any network call and is never written over.
+// Logged at the third cycle in a row (when Settings starts showing its line), once per run of failures; the
+// cursors are never reset automatically.
+let loggedCursorFailures = false;
+engine.subscribe((s) => {
+    if (s.cursorReadFailures >= CURSOR_LINE_MIN_CYCLES && !loggedCursorFailures) {
+        loggedCursorFailures = true;
+        console.log(`Sync: the pull cursors couldn't be read for ${s.cursorReadFailures} cycles in a row; backup is paused`);
+        if (TRACE_ON) mark('sync:cursorReadFailing');
+    } else if (s.cursorReadFailures === 0) {
+        loggedCursorFailures = false;
+    }
+});
 
 // Startup trace (preview build only): when the first cycle ends, whatever its result
 if (TRACE_ON) {

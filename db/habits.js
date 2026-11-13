@@ -95,6 +95,13 @@ export async function getActiveHabitsWithDays(userId) {
     return core.getActiveHabitsWithDays(await getDatabase(), userId);
 }
 
+// R-1: ids of this user's deleted habits (the area map's prune at its next write). Rejects if the read fails;
+// the caller then prunes nothing.
+export async function getDeletedHabitIds(userId) {
+    requireUserId(userId);
+    return core.getDeletedHabitIds(await getDatabase(), userId);
+}
+
 // User action: full edit. Completion rows are never changed, so past history keeps its old frequency.
 export async function updateHabit(userId, habitId, input) {
     requireUserId(userId);

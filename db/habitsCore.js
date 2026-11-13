@@ -24,3 +24,10 @@ export async function getActiveHabitsWithDays(db, userId) {
             : [],
     }));
 }
+
+// R-1: the ids of this user's habits known to be deleted (deleted = 1), for pruning the area map. Only positive
+// evidence: a habit missing from this phone is never in it. Creates no rows.
+export async function getDeletedHabitIds(db, userId) {
+    const rows = await db.getAllAsync('SELECT habitId FROM habits WHERE userId = ? AND deleted = 1', [userId]);
+    return rows.map((r) => r.habitId);
+}

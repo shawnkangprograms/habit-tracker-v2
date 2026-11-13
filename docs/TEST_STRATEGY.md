@@ -25,7 +25,7 @@ added for tests; new test files are picked up by the existing `tests/*.test.ts` 
 | F-1 | Reflections are split per year (`reflections:v2:<uid>:<yyyy>`, marker `reflections:migrated:v2:<uid>`, v1 read but never written); a failed read never lowers XP or level (the last numbers stay; with none, Home's placeholder; limit checks never name an unknown level). | PACKS_REPORTS_SPEC.md §12, §17 |
 | V-1 | The current schedule is applied to past days (accepted limitation), pinned by a test. | PACKS_REPORTS_SPEC.md §13, §17 |
 | V-2 | When Vitality is starting and the account has completion history, the copy is "Restarts after your first full day." | PACKS_REPORTS_SPEC.md §13, §17 |
-| R-1 | Area-map entries of deleted habits are pruned at the next write. | PACKS_REPORTS_SPEC.md §11, §17 |
+| R-1 | Area-map entries of habits known deleted are pruned at the next area write; storage that couldn't be read is never written over (every store; exempt list with reasons in the spec). | PACKS_REPORTS_SPEC.md §11, §17 |
 
 Open, not decided: S-5 (Firestore read cost of restoring a large account; measure in the emulator first) and the
 clock-status copy (proposal in the Phase 1a report).
@@ -63,7 +63,7 @@ keyboard).
 | V-1 | Current schedule applied to the past | Frequency change rewrites history | tests/decided-rules.test.ts (pin) | Decided: pinned |
 | V-2 | Deleted habits drop out of past days | Deleted and recreated: "starts" after months of use | fixture recreated; copy test in 1b | Decided |
 | V-3 | Streak and Vitality disagree on deleted-only days | Documented | vitality | Keep |
-| R-1 | Area entries of deleted habits kept | Large accounts: the map grows | 1b | Decided |
+| R-1 | Area entries of deleted habits kept | Large accounts: the map grows | tests/r1-storage.test.ts (R1-1 to R1-5), fixture large | Built (1b) |
 | F-1 | One reflections item "for years" | About 5 years reaches the 2 MB per-item read limit; a failed read reads as "none" | tests/decided-rules.test.ts (F-1), tests/reflections-years.test.ts, fixture large | Built (1b) |
 | C-1 | `level:v2:N` keys | Pre-Stage-3 accounts | celebrations, fixture preStage3 | Keep |
 | X-1 | XP recalculated from history | Level drop puts the account over its limit | packs-manage | Keep |
@@ -137,7 +137,7 @@ Every persisted format:
 | `reflections:v1:<uid>` | `version: 1` | read only since F-1 (copied into the year items, never written; delete after the next store build) |
 | `reflections:v2:<uid>:<yyyy>` | key; `version: 1` inside | F-1 (Phase 1b): one item per year |
 | `reflections:migrated:v2:<uid>` | key; `version: 1` inside | F-1 marker: `years`, `v1Length` |
-| `areas:v1:<uid>` | key | pruning decided (R-1) |
+| `areas:v1:<uid>` | key | R-1 (Phase 1b): deleted habits' entries pruned at the next write; never written over when unreadable |
 | `profile:outline:v1:<uid>` | key | — |
 | `celebrated:v1:<uid>` | key | `level:N` to `level:v2:N` |
 | `insight:v1:<uid>` | key | — |
@@ -276,6 +276,15 @@ last level, Home's rule, limit checks at an unknown level, the ticks-only lower 
 home-loading (a failed load keeps the placeholder), packs-manage (the check is `checkAddAtLevel`). Suite: 1092 tests,
 1092 pass, 0 todo.
 
+**Phase 1b, R-1 (2026-11-13).** Built: the area map's prune of habits known deleted (`getDeletedHabitIds`,
+`pruneAreas`), and "storage that couldn't be read is never written over" in the areas, packs (`PacksUpdateResult`,
+`onPacksUpdate`), onboarding, celebrated, insight-cache, sync-cursor and startup-trace stores. The sync engine ends a
+cycle whose cursor read fails before any network call, counts such cycles (`cursorReadFailures`), and Settings shows
+the approved cursor line from 3. New: `tests/r1-storage.test.ts`. Changed: packs-record (update resolves
+`'unreadable'` without calling the change), cursor-store (an unreadable load rejects), sync-status-line (the cursor
+line, and `sync/syncEngine.js` reads its threshold for the log). Two mutations were checked by hand (the areas guard
+and the cycle stop): each fails R-1 tests. Suite: 1119 tests, 1119 pass, 0 todo.
+
 ### Phase 1b test cases (written with the fixes)
 
 S-1, monotonic stamp, stuck rows and the clock line (done; tests/clock-skew.test.ts unless noted):
@@ -322,11 +331,26 @@ P-2, a renamed template habit is dropped from its built-in pack:
 - P2-4: renaming an unpacked habit or one in a custom pack changes no pack.
 - P2-5: a rename that only changes case or spacing is not a rename of the template.
 
-R-1, area entries of deleted habits are pruned at the next write:
-- R1-1: a write removes entries whose habit is deleted.
+R-1, area entries of deleted habits are pruned at the next write (built 2026-11-13, tests/r1-storage.test.ts):
+- R1-1: a write removes entries whose habit is deleted, readable and kept unreadable (P-8) alike; a prune alone is
+  written even when the area is unchanged.
 - R1-2: a read never writes.
 - R1-3: an entry for a habit moved into a pack is kept (used again if it leaves the pack).
-- R1-4: unreadable storage is never written over, so nothing is pruned.
+- R1-4: unreadable storage is never written over, so nothing is pruned (the save resolves false).
+- R1-5: a failed read of the deleted ids prunes nothing (the area is still saved); a habit not on this phone is never
+  "deleted" (only SQLite `deleted = 1`); another uid's map is untouched; two writes at once both land.
+- Fixtures: large (one write prunes 150 entries; size before and after), everythingCorrupt (a corrupt map is still
+  replaced).
+
+R-1, storage that couldn't be read is never written over (built 2026-11-13, tests/r1-storage.test.ts):
+- Packs: the picker's, the edit screen's and delete's changes each get `'unreadable'` and write nothing; each screen's
+  handler shows its existing alert; every `packsStore.update` goes through `onPacksUpdate`.
+- Onboarding: a retake on an unreadable record creates its habits, writes no record, and the next plan excludes them
+  by name.
+- Celebrated and the insight cache: nothing written while unreadable, no repeat in the run, merged and saved later.
+- Sync cursors: the cycle ends before any network call, no cursor write, `initialPullDone` unchanged; the count reaches
+  3 and Settings' line shows; the next good read clears it; sign-out and sign-in reset it; never an automatic reset.
+- Startup trace, and pins for reflections and the notification settings.
 
 V-2, "Restarts after your first full day.":
 - V2-1: Vitality starting and any completed row before today (deleted habits included): "Restarts after your first

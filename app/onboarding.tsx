@@ -24,7 +24,7 @@ import {HabitProfile} from '@/components/onboarding/habit-profile';
 import {RoutineCard} from '@/components/onboarding/routine-card';
 import {RoutineReminder} from '@/components/onboarding/routine-reminder';
 import {RoutineGroup} from '@/components/onboarding/routine-group';
-import {packsStore} from '@/services/packsStore';
+import {onPacksUpdate, packsStore} from '@/services/packsStore';
 import {profileOutlineStore} from '@/services/profileOutlineStore';// the radar's starting outline (six numbers)
 import {checkAddFor} from '@/services/packLimits';
 import {packsAfterRun, routineGroups, runPacks, type RunJoin} from '@/utils/packs/choose';
@@ -293,11 +293,12 @@ export default function OnboardingScreen() {
 
   // The pack record, written right after each onboarding record save (utils/packs/choose.ts): the packs are created
   // once this run has made a habit and the user has none, unless the plan is balanced (no scoring answer, so no
-  // packs to choose). Never throws.
+  // packs to choose). Never throws. A record that can't be read is never written over (R-1): the starters then just
+  // join no pack, silently, as with a corrupt record.
   const existing = context.existing;
-  const savePacks = useCallback((uid: string, current: Plan) => packsStore.update(uid, (parsed) => packsAfterRun(parsed, {
+  const savePacks = useCallback(async (uid: string, current: Plan) => onPacksUpdate(await packsStore.update(uid, (parsed) => packsAfterRun(parsed, {
     chosen: current.packs, create: madeHabit.current && createsPacks(current), joins: joins.current, existing, now: clockNow(),
-  })), [existing]);
+  })), {saved: () => {}, unchanged: () => {}, unreadable: () => {}}), [existing]);
 
   // "What you told us" is left out when it would be empty (a balanced plan); the plan is built by then
   const onBuilt = () => setPhase(plan && !showsToldUs(plan) ? 'profile' : 'toldUs');

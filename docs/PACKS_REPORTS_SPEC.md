@@ -36,7 +36,7 @@ Stored in AsyncStorage under `packs:v1:<uid>`, kept on sign-out like the onboard
 - A custom pack also stores `area` (one of the six, chosen at creation, Stage 2); a built-in pack's area comes from its `builtinId` and is never stored.
 - A pack's `createdAt` anchors its yearly report; the combined yearly report uses the earliest `createdAt`.
 - Ids for custom packs come from the same generator used for habit ids.
-- A corrupt record is treated as "no packs" and left untouched until the user changes something.
+- A corrupt record is treated as "no packs" and left untouched until the user changes something. A record that couldn't be read (the storage call failed) is never written over (R-1, section 17): the change is refused, and the picker, the pack edit screen and pack delete show their existing alerts ("Couldn't save pack" / "Couldn't delete pack", "Something went wrong. Please try again.") and stay open.
 - Fields this build doesn't know are kept when it re-saves the record, on the record and on each pack, and the mirror's copy of the record keeps them too (P-8, section 17).
 
 ## 2b. Limits by level
@@ -156,7 +156,7 @@ Built in Stage 5.
 - **Score per area:** done / scheduled over the window's closed days, summed over every active habit in that area, with the per-day counts from utils/dailyCompletion.ts (the perfect-day rule: deleted habits are ignored, a habit counts from its creation day, rest days add nothing, so they never count against an axis). Today never counts. Window Week = the last 7 closed days (default), Month = the last 28 closed days. Summary's own stats keep their 30-day month; only the radar uses 28. Derived on every load (Home's stats load, Summary's load), never stored. Maths in utils/radar/score.ts.
 - **Axis states:** a score; **no data** (the area has habits but none was scheduled in the window); **empty** (no habits in the area). An axis without a score sits at the centre of the shape with a dashed spoke and no dot. When no axis has a score the radar shows "Starts after your first full day." instead of a shape.
 - **Habit to area** (utils/radar/areas.ts), first match wins: the habit's pack's area; for a habit in no pack, or in a custom pack with no area, the value stored on this phone; otherwise the icon pre-fill below. The habit form shows an "AREA" row (Health, Mind, Discipline, Career, Learning, Relations, Not counted; helper "Used for your radar. Habits in a pack use the pack's area.") whenever the selected pack has no area (None, no packs, or an area-less custom pack), pre-filled from the icon until the user picks one; a pick is saved after the habit, and a failed save leaves the icon's area.
-- **Area map:** `areas:v1:<uid>` = `{habitId: area | 'none'}` in AsyncStorage, on this phone only: never Firestore, sync or Gemini, kept on sign-out like the packs and reflections records. A habit pulled onto a new phone has no entry and falls back to the icon pre-fill. Entries of habits later moved into a pack (where the pack wins) are left in place; entries of deleted habits are pruned at the next write (R-1, section 17; until Phase 1b ships they are left in place). It is read once per app run inside the stats load, in parallel with SQLite; a failed or corrupt read counts as an empty map, never as a stats failure. An entry whose value this build can't read (written by a newer build) is not used but is kept by the next write; setting that habit's area replaces it (P-8, section 17).
+- **Area map:** `areas:v1:<uid>` = `{habitId: area | 'none'}` in AsyncStorage, on this phone only: never Firestore, sync or Gemini, kept on sign-out like the packs and reflections records. A habit pulled onto a new phone has no entry and falls back to the icon pre-fill. Entries of habits later moved into a pack (where the pack wins) are left in place; entries of habits known to be deleted (SQLite `deleted = 1`) are pruned at the next area write, readable or kept unreadable ones alike (R-1, section 17); entries of habits not on this phone are kept. It is read once per app run inside the stats load, in parallel with SQLite; a failed or corrupt read counts as an empty map, never as a stats failure, and a map that couldn't be read is never written over (the area save then fails silently and the habit keeps its icon's area). An entry whose value this build can't read (written by a newer build) is not used but is kept by the next write; setting that habit's area replaces it (P-8, section 17).
 - **Icon to area pre-fill (approved):**
 
 | Icon | Area |
@@ -336,7 +336,44 @@ for an account that is not in a "normal" state, and the test that checks it. Fix
   through the usual copy approval.
   - Odd states: every habit deleted and recreated (fixture recreated); only un-ticked or future-dated rows (not
     history). Tests: V2-1 to V2-4.
-- **R-1, area entries of deleted habits are pruned.** The next write to `areas:v1:<uid>` removes entries whose habit
-  is deleted. Entries of habits moved into a pack are kept (used again if the habit leaves the pack).
-  - Odd states: a large account with many deleted habits; unreadable storage (never written over, so nothing is
-    pruned); a read (never writes). Tests: R1-1 to R1-4.
+- **R-1, area entries of deleted habits are pruned (built in Phase 1b, 2026-11-13).** The next write to
+  `areas:v1:<uid>` (the habit form's area save, the only writer) removes the entries of habits known to be deleted:
+  the ids SQLite has with `deleted = 1` for this uid (db/habitsCore.js `getDeletedHabitIds`), both readable entries
+  and the unreadable ones kept by P-8. Deletes are sticky, so a pruned entry is never needed again. Entries of habits
+  moved into a pack are kept (used again if the habit leaves the pack). There is no prune when a habit is deleted
+  (decided 2026-11-13); each entry is about 60 bytes.
+  - A habit that isn't on this phone at all is never treated as deleted, and a failed or partial read of the deleted
+    ids prunes nothing (the area is still saved).
+  - Odd states: a large account with many deleted habits (fixture large: one write prunes 150); unreadable storage
+    (never written over, so nothing is pruned; the save resolves false); a read (never writes); a corrupt map (still
+    replaced); a habit not on this phone; another uid's map. Tests: R1-1 to R1-5 (tests/r1-storage.test.ts).
+- **R-1, storage that couldn't be read is never written over (built in Phase 1b, 2026-11-13).** "Couldn't be read"
+  means the storage call itself failed; a corrupt value (readable, but not the record's shape) is still replaced
+  as each record's rules say. Store by store:
+  - Area map: the save resolves false, silently (above).
+  - Packs record: `update()` doesn't call the change and resolves `'unreadable'`; its result is a typed union that
+    every caller handles through `onPacksUpdate` (one handler per result, all required). The picker, the pack edit
+    screen and pack delete show their existing alerts and stay open (section 2); the habit form's pack move and
+    onboarding's pack join skip silently.
+  - Onboarding record: `write()` skips silently until a read of the record succeeds. A Settings retake still creates
+    its habits; name dedupe still applies on the next retake (decided 2026-11-13).
+  - Celebrated keys: marks stay in memory (nothing repeats in this app run); a later mark reads again, merges what is
+    stored, and only then saves.
+  - Insight cache: a failed read is not remembered; a write reads again first and, if it still can't, the entry is
+    kept in memory only.
+  - Sync cursors (`sync:<uid>`): a failed read ends that sync cycle before any network call (no probe, pull, push or
+    cursor write) and leaves `initialPullDone` as the status had it; the cursors are never reset automatically. The
+    engine counts such cycles in a row (`cursorReadFailures`, memory only, 0 after a read that works and on sign-out,
+    sign-in and restart). From 3, Settings shows, muted, under its title (with the S-1 clock line if both apply):
+    "Backup paused: this phone couldn't read its backup progress. It will keep trying." (approved 2026-11-13), and
+    the sync log records it once. It goes after the next cursor read that works.
+  - Startup trace (trace builds only): the save is skipped.
+  - Already compliant, pinned by tests: reflections (F-1) and the notification settings.
+  - Exempt (confirmed 2026-11-13), each written without reading it first, with nothing it could lose: the packs
+    mirror (a cache of the packs record, rebuilt from it on every write), the profile name copy (a copy of the users
+    document, refreshed from it), the sign-in marker (a copy of the uid Firebase Auth confirmed), the celebrations
+    switch (written only with the value the user just chose), the packs "Not now" flag (its only value is "1"), the
+    onboarding pending flag (set at sign-up and cleared exactly when the record is written) and the starting outline
+    (replace-only, section 11).
+  - Tests: tests/r1-storage.test.ts (each store's unreadable case, the packs alerts and the onPacksUpdate scan, the
+    retake, the sync stop and the 3-cycle line), tests/sync-status-line.test.ts, tests/cursor-store.test.ts.

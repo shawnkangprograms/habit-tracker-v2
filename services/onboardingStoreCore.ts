@@ -7,7 +7,8 @@
 //
 // Never throws. An unreadable storage reads as 'corrupt' and as "not pending" (so onboarding never opens on a
 // guess) and is not remembered, so the next read tries again. A failed save keeps the value in memory for this
-// app run only.
+// app run only. A record that couldn't be read is never written over (R-1): until a read of it succeeds, write()
+// skips silently (a Settings retake still creates its habits; name dedupe still applies on the next retake).
 
 import type {KeyValueStorage} from '@/services/celebratedStore';
 import {PENDING_CLEARED, PENDING_SET, parsePending, pendingKey} from '@/utils/onboarding/gate';
@@ -16,6 +17,7 @@ import {parseRecord, recordKey, serialiseRecord, type OnboardingRecord, type Par
 export function createOnboardingStore(storage: KeyValueStorage) {
   const memory = new Map<string, ParsedRecord>();
   const pendingMemory = new Map<string, boolean>();
+  const unreadable = new Set<string>();// uids whose record read failed, until one succeeds
   let writes: Promise<void> = Promise.resolve();// one save at a time, in order
 
   function save(key: string, value: string): Promise<void> {
@@ -31,15 +33,19 @@ export function createOnboardingStore(storage: KeyValueStorage) {
     try {
       raw = await storage.getItem(recordKey(uid));
     } catch {
+      unreadable.add(uid);
       return {kind: 'corrupt'};
     }
+    unreadable.delete(uid);
     if (!memory.has(uid)) memory.set(uid, parseRecord(raw));// a write that finished meanwhile wins
     return memory.get(uid)!;
   }
 
   // Memory holds exactly what was saved (parsed back), so it can never hold more than storage does. Writing a
-  // record (finish or skip) also clears the pending flag, unless it is already known to be clear.
+  // record (finish or skip) also clears the pending flag, unless it is already known to be clear. Skipped while
+  // the record couldn't be read (see above).
   function write(uid: string, record: OnboardingRecord): Promise<void> {
+    if (unreadable.has(uid)) return Promise.resolve();
     const json = serialiseRecord(record);
     memory.set(uid, parseRecord(json));
     const saved = save(recordKey(uid), json);

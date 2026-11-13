@@ -9,7 +9,7 @@ import * as Crypto from 'expo-crypto';
 
 import {getActiveHabitsWithDays} from '@/db/habits';
 import {useKeyboardPadding} from '@/hooks/use-keyboard-padding';
-import {packsStore} from '@/services/packsStore';
+import {onPacksUpdate, packsStore} from '@/services/packsStore';
 import {checkAddFor} from '@/services/packLimits';
 import {useSessionUid} from '@/services/session';
 import type {IconId} from '@/constants/habits';
@@ -113,15 +113,19 @@ export default function EditPackScreen() {
         }
       }
       let missing = false;
-      await packsStore.update(uid, (parsed) => {
+      const done = () => (missing ? notFound(from) : goBack(from));
+      onPacksUpdate(await packsStore.update(uid, (parsed) => {
         const next = savePack(baseRecord(parsed), {
           packId, newId: Crypto.randomUUID(), name, area, habitIds: ticked, habits: loaded.habits, now: clockNow(),
         });
         missing = next === null && packId !== null && !baseRecord(parsed).packs.some((p) => p.id === packId);
         return next;
+      }), {
+        saved: done,
+        unchanged: done,
+        // R-1: the record couldn't be read, so nothing was written; the screen stays open
+        unreadable: () => Alert.alert(SAVE_PACK_FAILED, TRY_AGAIN),
       });
-      if (missing) notFound(from);
-      else goBack(from);
     } catch {
       Alert.alert(SAVE_PACK_FAILED, TRY_AGAIN);
     } finally {
@@ -140,8 +144,13 @@ export default function EditPackScreen() {
         onPress: async () => {
           try {
             // the last pack gone also saves "Not now", so the choose card doesn't come straight back
-            await packsStore.update(uid, (parsed) => (parsed.kind === 'ok' ? deletePack(parsed.record, packId) : null), {dismissIfEmpty: true});
-            goBack(from);
+            const result = await packsStore.update(uid, (parsed) => (parsed.kind === 'ok' ? deletePack(parsed.record, packId) : null), {dismissIfEmpty: true});
+            onPacksUpdate(result, {
+              saved: () => goBack(from),
+              unchanged: () => goBack(from),
+              // R-1: the record couldn't be read, so nothing was deleted; the screen stays open
+              unreadable: () => Alert.alert(DELETE_PACK_FAILED, TRY_AGAIN),
+            });
           } catch {
             Alert.alert(DELETE_PACK_FAILED, TRY_AGAIN);
           }

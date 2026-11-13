@@ -248,17 +248,18 @@ describe('the store', () => {
     assert.equal((await store.read('u1')).kind, 'ok');
   });
 
-  test('an unreadable storage reads as corrupt, is not remembered, and update writes nothing over it', async () => {
+  test('an unreadable storage reads as corrupt, is not remembered, and update writes nothing over it (R-1)', async () => {
     const m = memoryStorage({[r.packsKey('u1')]: r.serialisePacks(TWO)});
     const store = createPacksStore(m.storage);
     m.fail.get = true;
     assert.deepEqual(await store.read('u1'), {kind: 'corrupt'});
     let changed = 0;
-    await store.update('u1', (parsed) => {
+    const result = await store.update('u1', () => {
       changed += 1;
-      return parsed.kind === 'none' ? TWO : null;
+      return TWO;
     });
-    assert.equal(changed, 1);
+    assert.equal(result, 'unreadable');
+    assert.equal(changed, 0, 'change is not even asked');
     assert.equal(m.calls.multiSet, 0);
     m.fail.get = false;
     assert.equal((await store.read('u1')).kind, 'ok');

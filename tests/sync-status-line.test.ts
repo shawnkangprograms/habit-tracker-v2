@@ -8,7 +8,7 @@ import {join, relative} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import './helpers/alias.ts'; // must come before the dynamic imports below
 
-const {clockLine, CLOCK_LINE} = await import('../utils/syncStatusLine.ts');
+const {clockLine, CLOCK_LINE, cursorLine, CURSOR_LINE, syncLines} = await import('../utils/syncStatusLine.ts');
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 
 describe('the clock line', () => {
@@ -30,7 +30,24 @@ describe('the clock line', () => {
       }
     };
     for (const dir of ['app', 'components', 'hooks', 'services', 'utils', 'sync', 'db']) walk(join(ROOT, dir));
-    const users = files.filter((f) => /clockLine|use-clock-line|useClockLine|clockSuspect|syncStatusLine/.test(readFileSync(join(ROOT, f), 'utf8'))).sort();
-    assert.deepEqual(users, ['app/(tabs)/settings.tsx', 'hooks/use-clock-line.ts', 'sync/engineCore.ts', 'utils/syncStatusLine.ts']);
+    const users = files.filter((f) => /clockLine|use-clock-line|useClockLine|useSyncLines|clockSuspect|cursorReadFailures|cursorLine|syncStatusLine/.test(readFileSync(join(ROOT, f), 'utf8'))).sort();
+    // sync/syncEngine.js: only the R-1 log (its threshold), never a screen
+    assert.deepEqual(users, ['app/(tabs)/settings.tsx', 'hooks/use-clock-line.ts', 'sync/engineCore.ts', 'sync/syncEngine.js', 'utils/syncStatusLine.ts']);
+  });
+});
+
+describe('the cursor line (R-1)', () => {
+  test('hidden below three failed cursor reads in a row, the exact approved copy from three on', () => {
+    assert.equal(CURSOR_LINE, 'Backup paused: this phone couldn\'t read its backup progress. It will keep trying.');
+    for (const cycles of [0, 1, 2]) assert.equal(cursorLine({cursorReadFailures: cycles}), null);
+    for (const cycles of [3, 9]) assert.equal(cursorLine({cursorReadFailures: cycles}), CURSOR_LINE);
+    assert.equal(cursorLine({}), null);// a status from before R-1
+  });
+
+  test('both lines can show, the clock line first; Settings renders every line', () => {
+    assert.deepEqual(syncLines({clockSuspectCycles: 2, cursorReadFailures: 3}), [CLOCK_LINE, CURSOR_LINE]);
+    assert.deepEqual(syncLines({cursorReadFailures: 3}), [CURSOR_LINE]);
+    assert.deepEqual(syncLines(null), []);
+    assert.match(readFileSync(join(ROOT, 'app/(tabs)/settings.tsx'), 'utf8'), /syncMessages\.map\(\(line\) => <Text key=\{line\} style=\{styles\.clockLine\}>\{line\}<\/Text>\)/);
   });
 });

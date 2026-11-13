@@ -60,14 +60,19 @@ async function rowCounts(): Promise<TraceRecord['counts']> {
   return row ? {habits: row.habits, completions: row.completions} : null;
 }
 
-export async function loadTraces(): Promise<TraceRecord[]> {
+// Rejects if storage can't be read (so save() never writes over it, R-1); corrupt data reads as none
+async function readTraces(): Promise<TraceRecord[]> {
+  const raw = await AsyncStorage.getItem(KEY);
   try {
-    const raw = await AsyncStorage.getItem(KEY);
     const parsed: unknown = raw ? JSON.parse(raw) : [];
     return Array.isArray(parsed) ? (parsed as TraceRecord[]) : [];
   } catch {
     return [];
   }
+}
+
+export async function loadTraces(): Promise<TraceRecord[]> {
+  return readTraces().catch(() => []);
 }
 
 export async function clearTraces(): Promise<void> {
@@ -88,7 +93,7 @@ async function save(): Promise<void> {
       counts: await rowCounts().catch(() => null),
       ota: getOtaInfo(),
     });
-    const kept = [record, ...(await loadTraces())].slice(0, KEEP);
+    const kept = [record, ...(await readTraces())].slice(0, KEEP);// unreadable: no save (never written over)
     await AsyncStorage.multiSet([[KEY, JSON.stringify(kept)], [LAUNCHES_KEY, String(launch)]]);
   } catch (err) {
     console.log('Saving the startup trace failed', err);

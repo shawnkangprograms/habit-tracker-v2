@@ -30,26 +30,38 @@ export function parseEntry(raw: string | null): CacheEntry {
   }
 }
 
+// R-1: storage that couldn't be read is never written over. Such a read is not remembered (the next read tries
+// again); a write first reads again, and if storage still can't be read the entry is kept in memory only.
 export function createInsightCache(storage: KeyValueStorage) {
   const memory = new Map<string, CacheEntry>();
+  const readOk = new Set<string>();// uids whose stored entry was read (or written) in this app run
   let writes: Promise<void> = Promise.resolve();// one save at a time, in order
+
+  // true if storage could be read (or is known to be readable)
+  async function check(uid: string): Promise<boolean> {
+    if (readOk.has(uid)) return true;
+    try {
+      const entry = parseEntry(await storage.getItem(cacheKey(uid)));
+      readOk.add(uid);
+      if (!memory.has(uid)) memory.set(uid, entry);// a write that finished meanwhile wins
+      return true;
+    } catch {
+      return false;
+    }
+  }
 
   async function read(uid: string): Promise<CacheEntry> {
     const known = memory.get(uid);
     if (known) return known;
-    let entry = EMPTY_ENTRY;
-    try {
-      entry = parseEntry(await storage.getItem(cacheKey(uid)));
-    } catch {
-      // unreadable storage: nothing cached
-    }
-    if (!memory.has(uid)) memory.set(uid, entry);// a write that finished meanwhile wins
+    if (!(await check(uid))) return EMPTY_ENTRY;// unreadable: nothing cached, not remembered
     return memory.get(uid)!;
   }
 
   function write(uid: string, entry: CacheEntry): Promise<void> {
     memory.set(uid, entry);
-    const save = writes.then(() => storage.setItem(cacheKey(uid), JSON.stringify(entry)));
+    const save = writes.then(async () => {
+      if (await check(uid)) await storage.setItem(cacheKey(uid), JSON.stringify(memory.get(uid)));
+    });
     writes = save.catch(() => {});
     return writes;
   }

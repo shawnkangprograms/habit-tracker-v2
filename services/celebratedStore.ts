@@ -21,15 +21,23 @@ export function datedKeyCutoff(today: string): string {
   return `${dt.getUTCFullYear()}-${pad(dt.getUTCMonth() + 1)}-${pad(dt.getUTCDate())}`;
 }
 
+// R-1: storage that couldn't be read is never written over. The keys marked meanwhile stay in memory (no repeat in
+// this app run); a later mark reads again, merges what is stored, and only then saves.
 export function createCelebratedStore(storage: KeyValueStorage) {
   const keyFor = (uid: string) => `celebrated:v1:${uid}`;
-  const sets = new Map<string, Promise<Set<string>>>();// one shared Set per uid, read from storage once
+  type Entry = {keys: Set<string>; readOk: boolean};
+  const sets = new Map<string, Promise<Entry>>();// one shared Set per uid, read from storage once
   let writes: Promise<void> = Promise.resolve();// writes run one at a time, in order
 
-  // Never throws: missing, unreadable or corrupt data counts as "nothing celebrated yet"
-  async function read(uid: string): Promise<Set<string>> {
+  // Missing or corrupt data counts as "nothing celebrated yet"; null: storage couldn't be read
+  async function read(uid: string): Promise<Set<string> | null> {
+    let raw: string | null;
     try {
-      const raw = await storage.getItem(keyFor(uid));
+      raw = await storage.getItem(keyFor(uid));
+    } catch {
+      return null;
+    }
+    try {
       const parsed: unknown = raw ? JSON.parse(raw) : [];
       return new Set(Array.isArray(parsed) ? parsed.filter((k): k is string => typeof k === 'string') : []);
     } catch {
@@ -37,25 +45,33 @@ export function createCelebratedStore(storage: KeyValueStorage) {
     }
   }
 
-  function setFor(uid: string): Promise<Set<string>> {
-    let set = sets.get(uid);
-    if (!set) {
-      set = read(uid);
-      sets.set(uid, set);
+  function setFor(uid: string): Promise<Entry> {
+    let entry = sets.get(uid);
+    if (!entry) {
+      entry = read(uid).then((keys) => ({keys: keys ?? new Set<string>(), readOk: keys !== null}));
+      sets.set(uid, entry);
     }
-    return set;
+    return entry;
   }
 
+  // Never throws: what is known for this user (nothing celebrated yet, if storage couldn't be read)
   async function load(uid: string): Promise<ReadonlySet<string>> {
-    return setFor(uid);
+    return (await setFor(uid)).keys;
   }
 
   // Adds the keys in memory first (so the next load already sees them), prunes old dated keys, then saves.
   // Never throws; a failed save only means a possible repeat after a restart.
   async function mark(uid: string, keys: string[], today: string): Promise<void> {
     if (keys.length === 0) return;
-    const set = await setFor(uid);
+    const entry = await setFor(uid);
+    const set = entry.keys;
     for (const key of keys) set.add(key);
+    if (!entry.readOk) {
+      const stored = await read(uid);
+      if (stored === null) return;// still unreadable: kept in memory only, never written over
+      for (const key of stored) set.add(key);
+      entry.readOk = true;
+    }
     const cutoff = datedKeyCutoff(today);
     for (const key of set) {
       const dated = DATED_KEY.exec(key);

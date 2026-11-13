@@ -6,7 +6,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {router, useLocalSearchParams} from 'expo-router';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
-import {addHabit, getHabit, softDeleteHabit, updateHabit} from '@/db/habits';
+import {addHabit, getDeletedHabitIds, getHabit, softDeleteHabit, updateHabit} from '@/db/habits';
 import {useSessionUid} from '@/services/session';
 import {
   ICON_IDS, REMIND_BEFORE_OPTIONS, type Frequency, type IconId, type RemindBeforeMin, type WeekdayKey,
@@ -25,7 +25,7 @@ import {askForReminderPermission} from '@/services/reminderPermission';
 import {DEFAULT_REMINDER_TIME, LEAD_LABELS, reminderTimingNote, timingNoteText} from '@/utils/reminderForm';
 import {usePacks} from '@/hooks/use-packs';
 import {useKeyboardScroll} from '@/hooks/use-keyboard-scroll';
-import {packsStore} from '@/services/packsStore';
+import {onPacksUpdate, packsStore} from '@/services/packsStore';
 import {checkAddFor} from '@/services/packLimits';
 import {HABIT_PACK_LABEL, NO_PACK} from '@/utils/packs/copy';
 import {areasStore} from '@/services/areasStore';
@@ -195,15 +195,21 @@ export default function HabitFormScreen() {
       }
       if (savedId && packChoice !== initialPack) {
         const habit = {habitId: savedId, habitName: input.value.habitName};
-        // never throws; if the save fails the habit simply stays unpacked
-        await packsStore.update(userId, (parsed) => {
+        // never throws; if the save fails, or the record can't be read (R-1: never written over), the habit
+        // simply stays unpacked, as before
+        const moved = await packsStore.update(userId, (parsed) => {
           if (parsed.kind !== 'ok') return null;
           const next = moveHabit(parsed.record, habit, packChoice);
           return next === parsed.record ? null : next;
         });
+        onPacksUpdate(moved, {saved: () => {}, unchanged: () => {}, unreadable: () => {}});
       }
-      // never throws; a failed write leaves the habit on its icon's area
-      if (savedId && showAreaRow && areaPick !== null) await areasStore.write(userId, savedId, areaPick);
+      // never throws; a failed write leaves the habit on its icon's area. R-1: also prunes the entries of deleted
+      // habits; if their ids can't be read, nothing is pruned
+      if (savedId && showAreaRow && areaPick !== null) {
+        const deletedIds = await getDeletedHabitIds(userId).catch(() => null);
+        await areasStore.write(userId, savedId, areaPick, deletedIds);
+      }
       if (reminderTime !== null) await askForReminderPermission();// services/reminderPermission.ts; never throws
       goBack();
     } catch (err) {

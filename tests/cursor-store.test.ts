@@ -37,8 +37,14 @@ test('missing, corrupt or malformed state means "pull from the start"', async ()
   assert.deepEqual(await store.load('bad-cursor'),
     {parserVersion: 1, habitsCursor: null, completionsCursor: CURSOR, initialPullDone: true});
 
-  const broken = createCursorStore({getItem: async () => { throw new Error('storage down'); }, setItem: async () => {}}, 1);
-  assert.deepEqual(await broken.load('a'), emptyCursorState(1));
+});
+
+test('R-1: storage that can\'t be read rejects (never "pull from the start"), and reset writes nothing', async () => {
+  let writes = 0;
+  const broken = createCursorStore({getItem: async () => { throw new Error('storage down'); }, setItem: async () => { writes += 1; }}, 1);
+  await assert.rejects(broken.load('a'), /storage down/);
+  await assert.rejects(broken.reset('a'), /storage down/);
+  assert.equal(writes, 0);
 });
 
 test('a different parser version resets the cursors but keeps initialPullDone', async () => {

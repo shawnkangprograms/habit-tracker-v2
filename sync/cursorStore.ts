@@ -41,12 +41,14 @@ function isCursor(value: unknown): value is PullCursor {
 export function createCursorStore(storage: KeyValueStorage, parserVersion: number = PARSER_VERSION) {
   const keyFor = (uid: string) => `sync:${uid}`;
 
-  // Never throws. Missing, unreadable or corrupt state means "pull from the start".
+  // Missing or corrupt state means "pull from the start". Rejects if storage can't be read (R-1): the engine then
+  // ends that cycle before any network call, so the stored cursors are never written over and the status keeps the
+  // initialPullDone it had (never a false one read from an empty state).
   // A different parserVersion resets the cursors but keeps initialPullDone (no restore screen again).
   async function load(uid: string): Promise<CursorState> {
+    const raw = await storage.getItem(keyFor(uid));
     let parsed: unknown = null;
     try {
-      const raw = await storage.getItem(keyFor(uid));
       parsed = raw ? JSON.parse(raw) : null;
     } catch {
       return emptyCursorState(parserVersion);
@@ -67,7 +69,8 @@ export function createCursorStore(storage: KeyValueStorage, parserVersion: numbe
     await storage.setItem(keyFor(uid), JSON.stringify({...state, parserVersion}));
   }
 
-  // Force a full re-pull for this uid ("Re-sync everything"); keeps initialPullDone
+  // Force a full re-pull for this uid ("Re-sync everything"); keeps initialPullDone. Rejects, writing nothing, if the
+  // stored state can't be read.
   async function reset(uid: string): Promise<void> {
     const current = await load(uid);
     await save(uid, {...emptyCursorState(parserVersion), initialPullDone: current.initialPullDone});
