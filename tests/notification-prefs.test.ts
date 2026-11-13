@@ -2,10 +2,12 @@
 /// <reference types="node" />
 import {describe, test} from 'node:test';
 import assert from 'node:assert/strict';
-import {
+import './helpers/alias.ts'; // must come before the dynamic import below (the module imports '@/utils/unknownFields')
+
+const {
   DEFAULT_NOTIFICATION_PREFS, parseNotificationPrefs, parseStoredNotificationPrefs, reminderSwitchValue,
   shouldAskOnReminderSave, shouldShowSoftPrompt, withDefaults,
-} from '../utils/notificationPrefs.ts';
+} = await import('../utils/notificationPrefs.ts');
 
 describe('notification prefs', () => {
   test('defaults: habit reminders on, nudge off at 20:30, prompt not answered', () => {

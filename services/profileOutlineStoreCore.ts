@@ -5,6 +5,8 @@
 // Kept or cleared like the onboarding record (kept on sign-out). Never synced, never sent anywhere.
 //
 // Never throws. Missing, unreadable or corrupt reads as no outline (nothing is drawn). A failed write is ignored.
+// Replace-only (P-8, decided 2026-11-13): a write replaces the stored outline from fresh scores and carries none of
+// its keys, since anything a newer build stored beside the scores would describe the outline being replaced.
 
 import {AXES, type Axis} from '@/utils/onboarding/types';
 

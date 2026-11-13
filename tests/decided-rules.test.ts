@@ -16,6 +16,15 @@ const {computeRadar} = await import('../utils/radar/score.ts');
 const {computeSummary} = await import('../utils/summary.ts');
 const {createReflectionsStore} = await import('../services/reflectionsStoreCore.ts');
 const PR = await import('../utils/packs/record.ts');
+const PM = await import('../utils/packs/manage.ts');
+const PMem = await import('../utils/packs/membership.ts');
+const PCh = await import('../utils/packs/choose.ts');
+const {createPacksStore} = await import('../services/packsStoreCore.ts');
+const RR = await import('../utils/reflections/record.ts');
+const RW = await import('../utils/reflections/rewards.ts');
+const {createAreasStore, parseAreasRecord} = await import('../services/areasStoreCore.ts');
+const NP = await import('../utils/notificationPrefs.ts');
+const {createCelebratedStore} = await import('../services/celebratedStore.ts');
 const OR = await import('../utils/onboarding/record.ts');
 
 const source = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
@@ -131,27 +140,232 @@ describe('S-6: notification and celebration settings are device settings, shared
 });
 
 describe('P-8: a newer field survives an older build re-saving the record (except where a privacy whitelist applies)', () => {
-  const withFuture = JSON.stringify({
-    version: 1, futureTop: 'kept',
-    packs: [{id: 'calm_mind', kind: 'builtin', builtinId: 'calm_mind', name: 'Calm Mind', habitIds: ['h1'], dropped: [], createdAt: 1, order: 0, futureField: 7}],
+  // Each test: a record as a newer build might write it (fields this build doesn't know, at every level), parsed by
+  // today's code, changed the way an older build would change it, and saved again through the real store core.
+  const UID = 'uid-p8';
+  const memory = (initial: Record<string, string> = {}) => {
+    const data = new Map(Object.entries(initial));
+    return {
+      data,
+      getItem: async (key: string) => data.get(key) ?? null,
+      setItem: async (key: string, value: string) => {
+        data.set(key, value);
+      },
+      multiSet: async (pairs: [string, string][]) => {
+        for (const [key, value] of pairs) data.set(key, value);
+      },
+    };
+  };
+  const stored = (m: {data: Map<string, string>}, key: string) => JSON.parse(m.data.get(key)!);
+
+  const NEWER_PACKS = JSON.stringify({
+    version: 1, futureTop: {kept: true},
+    packs: [
+      {id: 'calm_mind', kind: 'builtin', builtinId: 'calm_mind', name: 'Calm Mind', habitIds: ['h1'], dropped: [], createdAt: 1, order: 0, futureField: 7},
+      {id: 'c1', kind: 'custom', name: 'Evenings', habitIds: ['h2'], dropped: [], createdAt: 2, order: 1, area: 'Mind', colour: 'teal'},
+    ],
   });
+  const okPacks = (raw: string) => {
+    const parsed = PR.parsePacks(raw);
+    assert.ok(parsed.kind === 'ok');
+    return parsed.record;
+  };
 
   test('a packs record still parses when it has fields this build does not know', () => {
-    assert.equal(PR.parsePacks(withFuture).kind, 'ok');
+    assert.equal(PR.parsePacks(NEWER_PACKS).kind, 'ok');
   });
 
-  test('re-saving it keeps the fields this build does not know', {
-    todo: 'P-8: serialisePacks writes only the known fields, so an older build re-saving the record drops newer ones',
-  }, () => {
-    const parsed = PR.parsePacks(withFuture);
-    assert.ok(parsed.kind === 'ok');
-    const saved = JSON.parse(PR.serialisePacks(parsed.record));
-    assert.equal(saved.futureTop, 'kept');
-    assert.equal(saved.packs[0].futureField, 7);
+  test('packs: rename, move a member, add a member and delete a pack keep the fields this build does not know', () => {
+    const habits = [{habitId: 'h1', habitName: 'Breathe'}, {habitId: 'h2', habitName: 'Read'}, {habitId: 'h3', habitName: 'Walk'}];
+    let record = okPacks(NEWER_PACKS);
+    record = PM.savePack(record, {packId: 'c1', newId: 'unused', name: 'Nights', area: null, habitIds: ['h2'], habits, now: 3})!;
+    record = PM.moveHabit(record, habits[0], 'c1');
+    record = PMem.addToPack(record, 'calm_mind', 'h3');
+    const saved = JSON.parse(PR.serialisePacks(record));
+    assert.deepEqual(saved.futureTop, {kept: true});
+    const byId = Object.fromEntries(saved.packs.map((p: {id: string}) => [p.id, p]));
+    assert.equal(byId.calm_mind.futureField, 7);
+    assert.deepEqual(byId.calm_mind.habitIds, ['h3']);
+    assert.deepEqual([byId.c1.colour, byId.c1.name, byId.c1.area, byId.c1.habitIds], ['teal', 'Nights', 'Mind', ['h2', 'h1']]);
+    // deleting a pack takes its own fields with it; the record's stay
+    const deleted = JSON.parse(PR.serialisePacks(PM.deletePack(record, 'c1')));
+    assert.deepEqual([deleted.futureTop, deleted.packs.length, deleted.packs[0].futureField], [{kept: true}, 1, 7]);
+    assert.doesNotMatch(JSON.stringify(deleted), /teal/);
+  });
+
+  test('packs store: the record and the mirror keep them, from a storage read and from the startup mirror', async () => {
+    const m = memory({[PR.packsKey(UID)]: NEWER_PACKS});
+    const store = createPacksStore(m);
+    await store.update(UID, (parsed) => PM.moveHabit(PM.baseRecord(parsed), {habitId: 'h2', habitName: 'Read'}, null));
+    const canonical = stored(m, PR.packsKey(UID));
+    const mirror = stored(m, PR.PACKS_MIRROR_KEY);
+    for (const record of [canonical, mirror.record]) {
+      assert.deepEqual(record.futureTop, {kept: true});
+      assert.deepEqual(record.packs.map((p: {futureField?: number; colour?: string}) => [p.futureField, p.colour]), [[7, undefined], [undefined, 'teal']]);
+      assert.deepEqual(record.packs[1].habitIds, []);
+    }
+    // an app start: memory comes from the mirror alone, then a write
+    const next = createPacksStore(memory());
+    next.loadMirror(m.data.get(PR.PACKS_MIRROR_KEY)!);
+    const fromMirror = await next.read(UID);
+    assert.ok(fromMirror.kind === 'ok');
+    const m2 = memory();
+    const later = createPacksStore(m2);
+    later.loadMirror(m.data.get(PR.PACKS_MIRROR_KEY)!);
+    await later.write(UID, PM.deletePack(fromMirror.record, 'c1'));
+    assert.deepEqual([stored(m2, PR.packsKey(UID)).futureTop, stored(m2, PR.packsKey(UID)).packs[0].futureField], [{kept: true}, 7]);
+    assert.equal(stored(m2, PR.PACKS_MIRROR_KEY).record.packs[0].futureField, 7);
+  });
+
+  test('packs: a stored record with no packs keeps its fields when a run creates the packs', () => {
+    const empty = PR.parsePacks(JSON.stringify({version: 1, packs: [], futureTop: 'x'}));
+    const next = PCh.packsAfterRun(empty, {chosen: ['calm_mind', 'steady_energy'], create: true, joins: [], existing: [], now: 5});
+    assert.ok(next);
+    const saved = JSON.parse(PR.serialisePacks(next));
+    assert.deepEqual([saved.futureTop, saved.packs.length], ['x', 2]);
+    // a new pack starts with nothing carried
+    assert.equal(next.packs.some((p) => p.unknownFields !== undefined), false);
+  });
+
+  const DAY = '2026-11-05';
+  const ANSWERS = {feel: 'ok', amount: 'all', helped: 'routine', blocker: 'none'} as const;
+  const NEWER_REFLECTIONS = JSON.stringify({
+    version: 1, futureTop: 't',
+    days: {
+      [DAY]: {a: {...ANSWERS, savedAt: 1, mood: 'bright'}, b: {...ANSWERS, feel: 'meh', savedAt: 2}},
+      '2026-11-06': {c: {...ANSWERS, text: 'words', savedAt: 3}},
+      someday: [1, 2],
+    },
+  });
+
+  test('reflections: a save keeps unknown fields and unreadable days and entries, exactly as stored', async () => {
+    const m = memory({[RR.reflectionsKey(UID)]: NEWER_REFLECTIONS});
+    const store = createReflectionsStore(m);
+    assert.equal(await store.save(UID, {habitId: 'd', date: DAY, answers: ANSWERS, text: '', savedAt: 4}), 'saved');
+    const saved = stored(m, RR.reflectionsKey(UID));
+    const before = JSON.parse(NEWER_REFLECTIONS);
+    assert.equal(saved.futureTop, 't');
+    assert.deepEqual(saved.days[DAY].a, before.days[DAY].a);
+    assert.deepEqual(saved.days[DAY].b, before.days[DAY].b);
+    assert.deepEqual(saved.days['2026-11-06'], before.days['2026-11-06']);
+    assert.deepEqual(saved.days.someday, [1, 2]);
+    assert.deepEqual(saved.days[DAY].d, {...ANSWERS, savedAt: 4});
+  });
+
+  test('reflections: an unreadable entry counts as already reflected (no bar, never written over) and earns no XP', async () => {
+    const m = memory({[RR.reflectionsKey(UID)]: NEWER_REFLECTIONS});
+    const store = createReflectionsStore(m);
+    assert.equal(await store.save(UID, {habitId: 'b', date: DAY, answers: ANSWERS, text: '', savedAt: 9}), 'exists');
+    assert.equal(m.data.get(RR.reflectionsKey(UID)), NEWER_REFLECTIONS, 'nothing written');
+    const record = await store.read(UID);
+    assert.equal(RR.hasReflection(record, 'b', DAY), true);
+    assert.equal(RR.findReflection(record, 'b', DAY), null);
+    assert.equal(RW.wouldReward(record, {habitId: 'b', date: DAY, ticked: new Set(['a', 'b'])}), false);
+    assert.equal(RW.wouldReward(record, {habitId: 'e', date: DAY, ticked: new Set(['a', 'b', 'e'])}), true);
+    assert.deepEqual(RR.toGamiReflections(record).map((r) => r.habitId).sort(), ['a', 'c']);
+    assert.equal(RW.rewardsLeft(record, DAY, new Set(['a', 'b'])), 2, 'only the readable one counts toward the cap');
+  });
+
+  test('reflections: parse and serialise are idempotent on a record holding only some days (reused by F-1 per year)', () => {
+    const once = RR.serialiseReflections(RR.recordOf(RR.parseReflections(NEWER_REFLECTIONS)));
+    assert.equal(RR.serialiseReflections(RR.recordOf(RR.parseReflections(once))), once);
+    assert.deepEqual(JSON.parse(once), JSON.parse(NEWER_REFLECTIONS));
+  });
+
+  test('areas: setting one habit keeps the entries this build cannot read; setting that habit replaces its entry', async () => {
+    const m = memory({'areas:v1:uid-p8': JSON.stringify({h1: 'Mind', h2: {area: 'Mind', at: 5}, h3: 'Spirit'})});
+    const store = createAreasStore(m);
+    assert.deepEqual(await store.read(UID), {h1: 'Mind'});
+    assert.equal(await store.write(UID, 'h4', 'Health'), true);
+    assert.deepEqual(stored(m, 'areas:v1:uid-p8'), {h1: 'Mind', h2: {area: 'Mind', at: 5}, h3: 'Spirit', h4: 'Health'});
+    assert.equal(await store.write(UID, 'h3', 'Career'), true);
+    assert.deepEqual(stored(m, 'areas:v1:uid-p8').h3, 'Career');
+    assert.deepEqual(await store.read(UID), {h1: 'Mind', h4: 'Health', h3: 'Career'});
+  });
+
+  test('notification settings: a change keeps keys this build does not know; they never reach the settings in effect', () => {
+    const raw = JSON.stringify({nudgeOn: false, quietHours: {from: '22:00'}, nudgeTime: '21:30'});
+    const read = NP.parseStoredNotificationRecord(raw);
+    assert.deepEqual(read.stored, {nudgeOn: false});// a value this build can't read (a new nudge time) is dropped
+    assert.equal('quietHours' in NP.withDefaults(read.stored), false);
+    const saved = JSON.parse(NP.serialiseStoredNotificationPrefs({...read.stored, nudgeOn: true}, read.unknownFields));
+    assert.deepEqual(saved, {quietHours: {from: '22:00'}, nudgeOn: true});
+    // the service saves through the serialiser with what it read
+    assert.match(source('services/notificationPrefs.ts'), /kept = record\.unknownFields;/);
+    assert.match(source('services/notificationPrefs.ts'), /AsyncStorage\.setItem\(KEY, serialiseStoredNotificationPrefs\(stored, kept\)\)/);
+  });
+
+  test('pinned: celebrated keeps every key it does not know (only perfect:/early: keys older than 7 days go)', async () => {
+    const m = memory({'celebrated:v1:uid-p8': JSON.stringify(['level:v2:3', 'medal:gold:x', 'perfect:2026-10-01', 'perfect:2026-11-12'])});
+    await createCelebratedStore(m).mark(UID, ['streak:7'], '2026-11-13');
+    assert.deepEqual(stored(m, 'celebrated:v1:uid-p8').sort(), ['level:v2:3', 'medal:gold:x', 'perfect:2026-11-12', 'streak:7']);
+  });
+
+  test('pinned: the celebrations switch is written only when the user flips it', () => {
+    const src = source('services/celebrationPrefs.ts');
+    assert.equal(src.match(/setItem\(/g)?.length, 1);
+    assert.match(src, /export function setCelebrationsEnabled\(value: boolean\): void \{[^}]*AsyncStorage\.setItem\(KEY, value \? '1' : '0'\)/);
+  });
+
+  test('negative: a property added in memory is never written, only what came from parsing', () => {
+    const record = okPacks(NEWER_PACKS);
+    const tampered = {...record, secret: 'x', packs: [{...record.packs[0], scores: [1, 2]}, record.packs[1]]};
+    assert.doesNotMatch(PR.serialisePacks(tampered as typeof record), /secret|scores/);
+    const reflections = RR.recordOf(RR.parseReflections(NEWER_REFLECTIONS));
+    const a = reflections.days[DAY].a;
+    const withSecret = {...reflections, secret: 1, days: {...reflections.days, [DAY]: {...reflections.days[DAY], a: {...a, answers: 'q10'}}}};
+    assert.doesNotMatch(RR.serialiseReflections(withSecret as typeof reflections), /secret|q10/);
+    assert.doesNotMatch(NP.serialiseStoredNotificationPrefs({nudgeOn: true, extra: 1} as never), /extra/);
+  });
+
+  test('negative: a known field always wins over a carried key of the same name', () => {
+    const record = okPacks(NEWER_PACKS);
+    const forged = {...record, unknownFields: {version: 9, packs: []}, packs: [{...record.packs[0], unknownFields: {name: 'Evil', id: 'x'}}]};
+    const saved = JSON.parse(PR.serialisePacks(forged));
+    assert.deepEqual([saved.version, saved.packs.length, saved.packs[0].name, saved.packs[0].id], [1, 1, 'Calm Mind', 'calm_mind']);
+    // and the parser never collects a known key, even one whose value it drops
+    const dropped = okPacks(JSON.stringify({version: 1, packs: [{...JSON.parse(NEWER_PACKS).packs[1], area: 'Spirit'}]}));
+    assert.equal(dropped.packs[0].area, undefined);
+    assert.deepEqual(dropped.packs[0].unknownFields, {colour: 'teal'});
+  });
+
+  test('negative: a stored "__proto__" key stays a plain key and never sets a prototype', () => {
+    const raw = '{"version":1,"packs":[],"__proto__":{"polluted":true}}';
+    const record = okPacks(raw);
+    assert.ok(record.unknownFields && Object.prototype.hasOwnProperty.call(record.unknownFields, '__proto__'));
+    assert.equal(Object.getPrototypeOf(record.unknownFields), Object.prototype);
+    assert.equal(({} as {polluted?: boolean}).polluted, undefined);
+    assert.match(PR.serialisePacks(record), /"__proto__":\{"polluted":true\}/);
+    const areas = parseAreasRecord('{"__proto__":"Mind","h1":"Mind"}');
+    assert.deepEqual(Object.keys(areas.areas), ['h1']);
+  });
+
+  test('carried fields are created only by the parsers (a new file here must be a parser, or only read them)', () => {
+    const mentions = (path: string) => source(path).split('\n')
+      .map((l) => l.replace(/\/\/.*$/, ''))
+      .filter((l) => !/^\s*import\b/.test(l))// the helper module's path is not a use
+      .filter((l) => /\b(unknownFields|unreadDays)\b/.test(l));
+    const root = new URL('../', import.meta.url);
+    const found: string[] = [];
+    for (const dir of ['app', 'components', 'hooks', 'services', 'utils', 'db', 'sync', 'validation', 'constants']) {
+      for (const entry of readdirSync(new URL(`${dir}/`, root), {recursive: true}) as string[]) {
+        const path = `${dir}/${entry.replaceAll('\\', '/')}`;
+        if (/\.(ts|tsx|js)$/.test(path) && mentions(path).length > 0) found.push(path);
+      }
+    }
+    assert.deepEqual(found.sort(), [
+      'services/areasStoreCore.ts', 'services/notificationPrefs.ts', 'utils/notificationPrefs.ts', 'utils/packs/record.ts',
+      'utils/reflections/record.ts',
+    ]);
+    // the one non-parser file only reads them from a parse result
+    assert.deepEqual(mentions('services/notificationPrefs.ts').map((l) => l.trim()), ['kept = record.unknownFields;']);
   });
 
   test('exception: the onboarding record keeps its privacy whitelist and never saves fields it does not know', () => {
     const record = {...OR.completedRecord(null, 1), q10: 'alcohol'} as unknown as Parameters<typeof OR.serialiseRecord>[0];
     assert.doesNotMatch(OR.serialiseRecord(record), /q10|alcohol/);
+    const parsed = OR.parseRecord(JSON.stringify({...JSON.parse(OR.serialiseRecord(OR.completedRecord(null, 1))), q10: 'alcohol'}));
+    assert.ok(parsed.kind === 'ok');
+    assert.doesNotMatch(OR.serialiseRecord(parsed.record), /q10|alcohol/);
   });
 });

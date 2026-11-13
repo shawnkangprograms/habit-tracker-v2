@@ -43,6 +43,7 @@ export function runPacks(parsed: ParsedPacks, chosen: readonly BuiltinPackId[], 
   if (!hasNoPacks(parsed)) return parsed.kind === 'ok' ? parsed.record : null;
   if (!create) return null;
   return {
+    ...(parsed.kind === 'ok' ? parsed.record : {}),// a stored record with no packs keeps what it carries (P-8)
     version: PACKS_VERSION,
     packs: chosen.map((id, order) => ({
       id, kind: 'builtin', builtinId: id, name: PACK_NAMES[id], habitIds: [], dropped: [], createdAt: now, order,

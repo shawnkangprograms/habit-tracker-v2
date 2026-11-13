@@ -4,6 +4,7 @@
 // remindersOn, true or false, is always kept.
 
 import type {PermissionState} from '@/services/notificationsCore';
+import {collectUnknown, isPlainObject, withUnknown, type UnknownFields} from '@/utils/unknownFields';
 
 export const NUDGE_TIMES = ['19:00', '20:00', '20:30', '21:00'] as const;
 export type NudgeTime = (typeof NUDGE_TIMES)[number];
@@ -25,23 +26,44 @@ export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
   softPromptDone: false,
 };
 
-// Never throws: the valid fields that are present. Missing, corrupt or invalid data is "nothing stored" for
-// that field, so the default applies to it.
-export function parseStoredNotificationPrefs(raw: string | null): StoredNotificationPrefs {
+// The stored settings as read: the valid fields that are present, and (P-8, docs/PACKS_REPORTS_SPEC.md section 17)
+// the keys this build doesn't know, kept apart so they never reach the settings in effect, only the next save
+export type StoredNotificationRecord = {stored: StoredNotificationPrefs; unknownFields?: UnknownFields};
+
+const PREF_KEYS: ReadonlySet<string> = new Set(Object.keys(DEFAULT_NOTIFICATION_PREFS));
+
+// Never throws. Missing, corrupt or invalid data is "nothing stored" for that field, so the default applies to it;
+// an invalid value of a known field is dropped, never carried.
+export function parseStoredNotificationRecord(raw: string | null): StoredNotificationRecord {
   let parsed: unknown = null;
   try {
     parsed = raw ? JSON.parse(raw) : null;
   } catch {
-    return {};
+    return {stored: {}};
   }
-  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return {};
-  const p = parsed as Record<string, unknown>;
+  if (!isPlainObject(parsed)) return {stored: {}};
+  const p = parsed;
   const stored: StoredNotificationPrefs = {};
   if (typeof p.remindersOn === 'boolean') stored.remindersOn = p.remindersOn;
   if (typeof p.nudgeOn === 'boolean') stored.nudgeOn = p.nudgeOn;
   if (NUDGE_TIMES.includes(p.nudgeTime as NudgeTime)) stored.nudgeTime = p.nudgeTime as NudgeTime;
   if (typeof p.softPromptDone === 'boolean') stored.softPromptDone = p.softPromptDone;
-  return stored;
+  const unknownFields = collectUnknown(p, PREF_KEYS);
+  return unknownFields ? {stored, unknownFields} : {stored};
+}
+
+export function parseStoredNotificationPrefs(raw: string | null): StoredNotificationPrefs {
+  return parseStoredNotificationRecord(raw).stored;
+}
+
+// The value to save: the kept keys first, then the known fields one by one (a known field always wins)
+export function serialiseStoredNotificationPrefs(stored: StoredNotificationPrefs, unknownFields?: UnknownFields): string {
+  const known: StoredNotificationPrefs = {};
+  if (stored.remindersOn !== undefined) known.remindersOn = stored.remindersOn;
+  if (stored.nudgeOn !== undefined) known.nudgeOn = stored.nudgeOn;
+  if (stored.nudgeTime !== undefined) known.nudgeTime = stored.nudgeTime;
+  if (stored.softPromptDone !== undefined) known.softPromptDone = stored.softPromptDone;
+  return JSON.stringify(withUnknown(unknownFields, known));
 }
 
 // The settings in effect: the stored choices on top of the defaults

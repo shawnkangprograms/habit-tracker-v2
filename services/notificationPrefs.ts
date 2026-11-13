@@ -1,9 +1,10 @@
 import {useEffect, useSyncExternalStore} from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
-  DEFAULT_NOTIFICATION_PREFS, parseStoredNotificationPrefs, withDefaults, type NotificationPrefs,
-  type StoredNotificationPrefs,
+  DEFAULT_NOTIFICATION_PREFS, parseStoredNotificationRecord, serialiseStoredNotificationPrefs, withDefaults,
+  type NotificationPrefs, type StoredNotificationPrefs,
 } from '@/utils/notificationPrefs';
+import type {UnknownFields} from '@/utils/unknownFields';
 
 // Notification settings, per device, in AsyncStorage (like services/celebrationPrefs.ts). Defaults in
 // utils/notificationPrefs.ts (habit reminders on, nudge off). Only fields the user set are saved, so a default
@@ -16,6 +17,7 @@ const KEY = 'prefs:notifications:v1';
 const UNREAD_PREFS: NotificationPrefs = {...DEFAULT_NOTIFICATION_PREFS, remindersOn: false};
 
 let stored: StoredNotificationPrefs = {};
+let kept: UnknownFields | undefined;// P-8: stored keys this build doesn't know, written back by each save
 let prefs: NotificationPrefs = UNREAD_PREFS;
 let readOk = false;
 let loaded = false;
@@ -28,7 +30,9 @@ function notify() {
 
 async function readStored(): Promise<boolean> {
   try {
-    stored = parseStoredNotificationPrefs(await AsyncStorage.getItem(KEY));
+    const record = parseStoredNotificationRecord(await AsyncStorage.getItem(KEY));
+    stored = record.stored;
+    kept = record.unknownFields;
     prefs = withDefaults(stored);
     readOk = true;
   } catch {
@@ -71,7 +75,7 @@ export async function setNotificationPrefs(patch: Partial<NotificationPrefs>): P
   prefs = withDefaults(stored);
   notify();
   try {
-    await AsyncStorage.setItem(KEY, JSON.stringify(stored));
+    await AsyncStorage.setItem(KEY, serialiseStoredNotificationPrefs(stored, kept));
   } catch (err) {
     console.log('Saving notification settings failed', err);
   }

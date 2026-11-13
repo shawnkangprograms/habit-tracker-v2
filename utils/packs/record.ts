@@ -10,6 +10,7 @@
 
 import {BUILTIN_PACKS, isBuiltinPackId, type BuiltinPackId} from '@/utils/packs/builtin';
 import {AXES, TEMPLATE_IDS, isOneOf, type Axis, type TemplateId} from '@/utils/onboarding/types';
+import {collectUnknown, withUnknown, type UnknownFields} from '@/utils/unknownFields';
 
 export const PACKS_VERSION = 1;
 export const packsKey = (uid: string) => `packs:v1:${uid}`;
@@ -27,9 +28,14 @@ export type Pack = {
   createdAt: number;// ms; anchors the pack's yearly report
   order: number;
   area?: Axis;// custom only, chosen at creation (stage 2); a built-in pack's area comes from its builtinId
+  unknownFields?: UnknownFields;// P-8: stored keys this build doesn't know, set only by the parser
 };
 
-export type PacksRecord = {version: typeof PACKS_VERSION; packs: Pack[]};
+export type PacksRecord = {version: typeof PACKS_VERSION; packs: Pack[]; unknownFields?: UnknownFields};
+
+// P-8: every key this build reads (a key here with a value it can't use is dropped, never carried)
+const PACK_KEYS: ReadonlySet<string> = new Set(['id', 'kind', 'builtinId', 'name', 'habitIds', 'dropped', 'createdAt', 'order', 'area']);
+const RECORD_KEYS: ReadonlySet<string> = new Set(['version', 'packs']);
 
 export type ParsedPacks = {kind: 'none'} | {kind: 'corrupt'} | {kind: 'ok'; record: PacksRecord};
 
@@ -77,7 +83,8 @@ function parsePack(v: unknown): Pack | null {
     // update would save custom packs without it, and the edit screen lets the user pick one again
     if (isOneOf(AXES, o.area)) pack.area = o.area;
   }
-  return pack;
+  const unknownFields = collectUnknown(o, PACK_KEYS);
+  return unknownFields ? {...pack, unknownFields} : pack;
 }
 
 // The record from a parsed JSON value, or null if anything is wrong. Shared by the record and the mirror.
@@ -103,7 +110,8 @@ export function packsFromValue(v: unknown): PacksRecord | null {
       return true;
     });
   }
-  return {version: PACKS_VERSION, packs};
+  const unknownFields = collectUnknown(o, RECORD_KEYS);
+  return unknownFields ? {version: PACKS_VERSION, packs, unknownFields} : {version: PACKS_VERSION, packs};
 }
 
 export function parsePacks(raw: string | null): ParsedPacks {
@@ -118,17 +126,23 @@ export function parsePacks(raw: string | null): ParsedPacks {
   return record ? {kind: 'ok', record} : {kind: 'corrupt'};
 }
 
-// Writes the known fields one by one, so nothing else can reach storage
+// Writes the known fields one by one, so nothing else from memory can reach storage; the keys the parser kept
+// (P-8) go first, and a known field always wins
 function packValue(p: Pack) {
-  return {
+  return withUnknown(p.unknownFields, {
     id: p.id, kind: p.kind, ...(p.kind === 'builtin' ? {builtinId: p.builtinId} : {}), name: p.name,
     habitIds: [...p.habitIds], dropped: p.kind === 'builtin' ? [...p.dropped] : [], createdAt: p.createdAt, order: p.order,
     ...(p.kind === 'custom' && p.area ? {area: p.area} : {}),
-  };
+  });
+}
+
+// The record as stored: shared by the record and the mirror's copy of it
+function recordValue(record: PacksRecord) {
+  return withUnknown(record.unknownFields, {version: PACKS_VERSION, packs: record.packs.map(packValue)});
 }
 
 export function serialisePacks(record: PacksRecord): string {
-  return JSON.stringify({version: PACKS_VERSION, packs: record.packs.map(packValue)});
+  return JSON.stringify(recordValue(record));
 }
 
 // ---------- "Not now" on Home's "Choose your habit packs" card (Stage 1b) ----------
@@ -140,7 +154,9 @@ export const DISMISSED_VALUE = '1';
 
 // ---------- The mirror: {uid, record, dismissed} under PACKS_MIRROR_KEY ----------
 // record is the parsed record, null for "no record", or 'corrupt', so the mirror never hides a corrupt record.
-// dismissed is the "Not now" flag; a 1a mirror without it reads as false.
+// dismissed is the "Not now" flag; a 1a mirror without it reads as false. The record inside carries the keys this
+// build doesn't know like the canonical record (P-8); the mirror's own top-level keys are not carried: it is a
+// cache, rebuilt from the record and the flag on every write.
 
 export type PacksMirror = {uid: string; parsed: ParsedPacks; dismissed: boolean};
 
@@ -163,8 +179,6 @@ export function parseMirror(raw: string | null): PacksMirror | null {
 }
 
 export function serialiseMirror(uid: string, parsed: ParsedPacks, dismissed = false): string {
-  const record = parsed.kind === 'ok'
-    ? {version: PACKS_VERSION, packs: parsed.record.packs.map(packValue)}
-    : parsed.kind === 'corrupt' ? 'corrupt' : null;
+  const record = parsed.kind === 'ok' ? recordValue(parsed.record) : parsed.kind === 'corrupt' ? 'corrupt' : null;
   return JSON.stringify({uid, record, dismissed});
 }

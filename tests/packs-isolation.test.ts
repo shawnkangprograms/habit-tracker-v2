@@ -59,7 +59,7 @@ describe('pack modules', () => {
   });
 
   test('the pure logic in utils/packs imports only pure modules', () => {
-    const allowed = /^(@\/utils\/(packs|onboarding)\/\w+|@\/validation\/validators|@\/constants\/habits)$/;
+    const allowed = /^(@\/utils\/(packs|onboarding)\/\w+|@\/utils\/unknownFields|@\/validation\/validators|@\/constants\/habits)$/;
     for (const file of files('utils/packs')) {
       for (const spec of specifiers(readFileSync(file, 'utf8'))) assert.match(spec, allowed, `${rel(file)} imports ${spec}`);
     }
@@ -99,7 +99,7 @@ describe('reflection modules (not sent anywhere in Stage 3)', () => {
   });
 
   test('the pure logic in utils/reflections imports only pure modules', () => {
-    const allowed = /^@\/utils\/(reflections\/\w+|gamification)$/;
+    const allowed = /^@\/utils\/(reflections\/\w+|gamification|unknownFields)$/;
     for (const file of files('utils/reflections')) {
       for (const spec of specifiers(readFileSync(file, 'utf8'))) assert.match(spec, allowed, `${rel(file)} imports ${spec}`);
     }

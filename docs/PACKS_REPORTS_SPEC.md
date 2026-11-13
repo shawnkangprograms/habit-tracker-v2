@@ -37,7 +37,7 @@ Stored in AsyncStorage under `packs:v1:<uid>`, kept on sign-out like the onboard
 - A pack's `createdAt` anchors its yearly report; the combined yearly report uses the earliest `createdAt`.
 - Ids for custom packs come from the same generator used for habit ids.
 - A corrupt record is treated as "no packs" and left untouched until the user changes something.
-- Fields this build doesn't know are kept when it re-saves the record (P-8, section 17).
+- Fields this build doesn't know are kept when it re-saves the record, on the record and on each pack, and the mirror's copy of the record keeps them too (P-8, section 17).
 
 ## 2b. Limits by level
 
@@ -156,7 +156,7 @@ Built in Stage 5.
 - **Score per area:** done / scheduled over the window's closed days, summed over every active habit in that area, with the per-day counts from utils/dailyCompletion.ts (the perfect-day rule: deleted habits are ignored, a habit counts from its creation day, rest days add nothing, so they never count against an axis). Today never counts. Window Week = the last 7 closed days (default), Month = the last 28 closed days. Summary's own stats keep their 30-day month; only the radar uses 28. Derived on every load (Home's stats load, Summary's load), never stored. Maths in utils/radar/score.ts.
 - **Axis states:** a score; **no data** (the area has habits but none was scheduled in the window); **empty** (no habits in the area). An axis without a score sits at the centre of the shape with a dashed spoke and no dot. When no axis has a score the radar shows "Starts after your first full day." instead of a shape.
 - **Habit to area** (utils/radar/areas.ts), first match wins: the habit's pack's area; for a habit in no pack, or in a custom pack with no area, the value stored on this phone; otherwise the icon pre-fill below. The habit form shows an "AREA" row (Health, Mind, Discipline, Career, Learning, Relations, Not counted; helper "Used for your radar. Habits in a pack use the pack's area.") whenever the selected pack has no area (None, no packs, or an area-less custom pack), pre-filled from the icon until the user picks one; a pick is saved after the habit, and a failed save leaves the icon's area.
-- **Area map:** `areas:v1:<uid>` = `{habitId: area | 'none'}` in AsyncStorage, on this phone only: never Firestore, sync or Gemini, kept on sign-out like the packs and reflections records. A habit pulled onto a new phone has no entry and falls back to the icon pre-fill. Entries of habits later moved into a pack (where the pack wins) are left in place; entries of deleted habits are pruned at the next write (R-1, section 17; until Phase 1b ships they are left in place). It is read once per app run inside the stats load, in parallel with SQLite; a failed or corrupt read counts as an empty map, never as a stats failure.
+- **Area map:** `areas:v1:<uid>` = `{habitId: area | 'none'}` in AsyncStorage, on this phone only: never Firestore, sync or Gemini, kept on sign-out like the packs and reflections records. A habit pulled onto a new phone has no entry and falls back to the icon pre-fill. Entries of habits later moved into a pack (where the pack wins) are left in place; entries of deleted habits are pruned at the next write (R-1, section 17; until Phase 1b ships they are left in place). It is read once per app run inside the stats load, in parallel with SQLite; a failed or corrupt read counts as an empty map, never as a stats failure. An entry whose value this build can't read (written by a newer build) is not used but is kept by the next write; setting that habit's area replaces it (P-8, section 17).
 - **Icon to area pre-fill (approved):**
 
 | Icon | Area |
@@ -169,7 +169,7 @@ Built in Stage 5.
 | star | Not counted |
 
   Discipline has no icon of its own (none of the 12 fits it), so it is only ever chosen by hand or through a pack.
-- **Starting outline:** the onboarding Habit Profile as six whole numbers 1 to 5 under `profile:outline:v1:<uid>`, written by onboarding's results step (when the plan is built, before the Habit Profile shows) on every run that reaches it: the first run (opened from Home after sign-up or by the onboarding gate) and a Settings retake, which replaces it. Written from the in-memory scores, clamped 1 to 5; a failed write is ignored and never blocks onboarding. The answers are still never stored. Kept or cleared like the onboarding record (currently kept on sign-out). Drawn faintly (dashed, muted) behind the live shape on the Summary radar only, whenever one is stored; nothing is drawn when none is. Accounts that onboarded before Stage 5 have none until a retake.
+- **Starting outline:** the onboarding Habit Profile as six whole numbers 1 to 5 under `profile:outline:v1:<uid>`, written by onboarding's results step (when the plan is built, before the Habit Profile shows) on every run that reaches it: the first run (opened from Home after sign-up or by the onboarding gate) and a Settings retake, which replaces it. Written from the in-memory scores, clamped 1 to 5; a failed write is ignored and never blocks onboarding. The answers are still never stored. Kept or cleared like the onboarding record (currently kept on sign-out). Drawn faintly (dashed, muted) behind the live shape on the Summary radar only, whenever one is stored; nothing is drawn when none is. Accounts that onboarded before Stage 5 have none until a retake. Replace-only (P-8, section 17): a write replaces the stored outline and carries none of its keys, since anything a newer build stored beside the scores would describe the outline being replaced.
 - **The dashed shape on the onboarding radar** is a fixed reference at 2 of 5 on every axis (`RADAR_BASELINE` in utils/onboarding/scoring.ts). It is not user data.
 - **Where:**
   - Home: a compact card below the habit lists (after "Other days"), at a fixed height whose space is held by an empty placeholder until the first stats load has finished. Left: a small radar without labels or outline, with "Last 7 days" or "Last 28 days" directly under it. Right: "Habit radar", "Strongest: {area} {n}%", and "Needs care: {area} {n}%" only when the lowest scored axis is below 75% and is not the strongest (ties: the first in axis order), then a Week/Month switch. The radar and the text open Summary.
@@ -196,7 +196,7 @@ Rewritten in Stage 3 (replaces "Notes and note XP": the inline "Add a note" chip
 
   Free text "ANYTHING ELSE? (OPTIONAL)", placeholder "A few words for yourself", at most 200 characters after trimming (control characters removed, line breaks kept), counter "{n}/200", error "Use 200 characters or fewer.". "Save reflection" is enabled once all four questions are answered. One reflection per habit per day; not editable in Stage 3.
 - **XP:** 20 per reflection (`REFLECTION_XP`), earned by answering the four questions; the free text never affects XP. It counts only while that day's completion of the habit is ticked, and at most 3 a day (the earliest saved among those that count). Like all XP it is derived, never stored: un-ticking removes it, re-ticking restores it if it is still among that day's first 3.
-- **Storage:** AsyncStorage `reflections:v1:<uid>` = `{version: 1, days: {date: {habitId: {feel, amount, helped, blocker, text?, savedAt}}}}`, on this phone only; never synced, never in Firestore or the admin screens. Kept on sign-out like the packs record. Kept when the habit is un-ticked or deleted (its XP follows the completion rule: deleted habits keep their XP). A corrupt record reads as none and is replaced by the next save; unreadable storage is never written over. Size: about 1 KB a day at most with the cap; a single item reaches Android's per-item read limit (about 2 MB) in roughly 5 years, so the record is split per year and a failed read never lowers XP or level (F-1, section 17; the key layout is proposed in the Phase 1b plan).
+- **Storage:** AsyncStorage `reflections:v1:<uid>` = `{version: 1, days: {date: {habitId: {feel, amount, helped, blocker, text?, savedAt}}}}`, on this phone only; never synced, never in Firestore or the admin screens. Kept on sign-out like the packs record. Kept when the habit is un-ticked or deleted (its XP follows the completion rule: deleted habits keep their XP). A corrupt record reads as none and is replaced by the next save; unreadable storage is never written over. Fields this build doesn't know (on the record or an entry), and days or entries it can't read, are kept by the next save exactly as stored; an unreadable entry counts as "already reflected" (no bar, never written over) and never earns XP (P-8, section 17). Size: about 1 KB a day at most with the cap; a single item reaches Android's per-item read limit (about 2 MB) in roughly 5 years, so the record is split per year and a failed read never lowers XP or level (F-1, section 17; the key layout is proposed in the Phase 1b plan).
 - **AI rule (applies from stage 9; nothing is sent in Stage 3):** tags are always usable by the AI analysis (counts only). Free text reaches Gemini only when the user turns on "Use my notes in AI summaries" in Settings (off by default; the switch arrives in stage 9), with consent wording that says the text is processed outside Kenya. Only recent short excerpts are sent: at most the last 7 reflections, at most 200 characters each. Reflections on replace habits (from Q10: phone and social, pornography, smoking or vaping, gaming, junk food, alcohol, procrastination, matched by name since Q10 is never stored) never leave the phone, whatever the switch says. Habit names are never sent. Stage 9 adds exactly one audited export path for this.
 - **Backlog:** reflections must be covered by in-app data deletion before the Play release.
 
@@ -264,12 +264,34 @@ for an account that is not in a "normal" state, and the test that checks it. Fix
   again; renaming it back to the template's name takes it out of `dropped` (the existing "putting it back" rule).
   - Odd states: two members with the template's name (renaming one changes nothing); a rename that only changes case
     or spacing (still the template); an unpacked habit or one in a custom pack (no pack changes). Tests: P2-1 to P2-5.
-- **P-8, older code never drops newer fields.** Every record's parser accepts and ignores fields it doesn't know, and
-  a save keeps them, so an OTA rollback or a launch from the embedded bundle can re-save a record without losing what
-  a newer update added. The packs record and its mirror follow this rule.
-  - Odd states: a record written by a newer update and re-saved by an older one. Exception: the onboarding record
-    keeps its privacy whitelist (only the known fields are ever written, so answers and Q10 can never reach storage).
-    Tests: tests/decided-rules.test.ts (P-8; todo until Phase 1b).
+- **P-8, older code never drops newer fields (built in Phase 1b, 2026-11-13).** Every record's parser accepts and
+  ignores fields it doesn't know, and a save keeps them, so an OTA rollback or a launch from the embedded bundle can
+  re-save a record without losing what a newer update added.
+  - How (utils/unknownFields.ts): an object record's parser keeps the keys it doesn't know, as stored, in
+    `unknownFields`; a map record (the area map, a reflection day) keeps the entries it can't read. Only the parser
+    creates them (a test scans the app for any other file that does); the serialiser writes them first and then the
+    known fields one by one, so a known field always wins and nothing else held in memory is written. A known key
+    whose value this build can't read is dropped as before, never carried.
+  - Records: the packs record (record and each pack) and the mirror's copy of it (the mirror's own top-level keys are
+    not carried: it is a cache, rebuilt on every write); the area map (section 11); the reflections record (section
+    12: unreadable entries count as "already reflected" and never earn XP; the parser and serialiser work on any set
+    of days, so F-1's one item per year reuses them unchanged); the notification settings (kept apart from the
+    settings in effect, written back by the next change). Already compliant, pinned by tests: the celebrated keys (every
+    key is kept; only `perfect:`/`early:` keys older than 7 days go) and the celebrations switch (a scalar written
+    only when the user flips it).
+  - Exceptions: the onboarding record keeps its privacy whitelist (only the known fields are ever written, so answers
+    and Q10 can never reach storage). The starting outline is replace-only (section 11): a retake replaces it from
+    fresh scores and carries none of its keys, since they would describe the outline being replaced.
+  - Rules for newer builds (decided 2026-11-13): a newer build never changes an existing field's type or widens its
+    allowed values; it adds a new field instead, which older builds carry untouched. These records stay at
+    `version: 1`; a breaking change uses a new key (as F-1 does), because an older build reads another version as
+    corrupt, and some paths replace a corrupt record (picking packs, saving a reflection).
+  - Odd states: a record written by a newer update and re-saved by an older one; a newer field next to a value the
+    older build changed (the newer build must re-check its own fields on read, never assume they match); a stored
+    `__proto__` key (kept as a plain key, never a prototype). Size: nothing is added for today's records; parsing
+    scans each object's keys once (the reflections record is the largest, about 6,000 entries after a year at 16
+    habits); a carried field can't be pruned by an older build. Tests: tests/decided-rules.test.ts (P-8: one rollback
+    test per record, the negative tests and the source scan).
 - **F-1, reflections split per year; a failed read never lowers XP or level.** The reflections record is stored in
   one item per year; the key layout is proposed in the Phase 1b plan. A read that fails is "unknown", never "no
   reflections": the stats load keeps what it last showed rather than recomputing without them.

@@ -21,7 +21,7 @@ added for tests; new test files are picked up by the existing `tests/*.test.ts` 
 | S-6 | Notification and celebration settings are device settings, shared by every account on the phone. | HABITQUEST_DESIGN.md |
 | P-2 | Renaming the only habit in a built-in pack that carries a template's name adds that template to the pack's `dropped`. | PACKS_REPORTS_SPEC.md §17 |
 | P-4 | ONBOARDING_SPEC §11 reworded: only the first run never checks limits; a Settings retake is checked. | ONBOARDING_SPEC.md §11 |
-| P-8 | Parsers accept and ignore unknown fields; a save keeps fields it does not know. Exception: the onboarding record keeps its privacy whitelist. | HABITQUEST_DESIGN.md |
+| P-8 | Parsers accept and ignore unknown fields; a save keeps fields it does not know (only fields from parsing; a known field always wins). Exceptions: the onboarding record keeps its privacy whitelist; the starting outline is replace-only. Newer builds never change a field's type or widen its values, and these records stay at version 1 (a breaking change uses a new key). | HABITQUEST_DESIGN.md, PACKS_REPORTS_SPEC.md §17 |
 | F-1 | Reflections are split per year; a failed read never lowers XP or level. | PACKS_REPORTS_SPEC.md §12, §17 |
 | V-1 | The current schedule is applied to past days (accepted limitation), pinned by a test. | PACKS_REPORTS_SPEC.md §13, §17 |
 | V-2 | When Vitality is starting and the account has completion history, the copy is "Restarts after your first full day." | PACKS_REPORTS_SPEC.md §13, §17 |
@@ -54,7 +54,7 @@ keyboard).
 | P-5 | "Add the rest" level fallback 1 | Too little room (safe), possibly the wrong level named | none | Keep; test that the fallback never allows more |
 | P-6 | Over-limit only blocks adding | Level drop, pulled habits | packs-manage, fixture overLimitL3 | Keep |
 | P-7 | Custom pack area | Dropped by a rollback | packs-manage, radar, fixture customPackNoArea | Keep |
-| P-8 | Older code re-saving newer records | Newer fields dropped | tests/decided-rules.test.ts (todo) | Decided |
+| P-8 | Older code re-saving newer records | Newer fields dropped | tests/decided-rules.test.ts (P-8) | Built (1b) |
 | P-9 | Reports anchored on `createdAt` | Clock-ahead pack creation | not built | Clamp as S-2 at Stage 7 |
 | O-1 | Retake dedupe by id and name | New phone before first pull; renamed template habit | onboarding-plan (014da79); device case 1b | S-4 covers it |
 | O-2 | Relaunch reopens if killed before the first habit | Killed after it: the rest is not created | fixture halfOnboarded | Keep: a retake offers the rest |
@@ -96,7 +96,7 @@ keyboard).
 | Y3 | System rows never leave the phone | `isPushable` | yes | yes |
 | Y4 | A user's latest write is never lost (except the documented cross-phone skew limit) | `db/stamp.js`, `restampFutureRows` (S-1) | clock-skew | partial (clock-skew sequences); Phase 3 |
 | Y5 | A uid switch never applies data to the other uid | engineCore | yes | yes |
-| ST | Every store: per uid, round-trips, never throws, tolerates unknown fields | each `*Core` | yes; unknown fields todo (P-8) | Phase 3 |
+| ST | Every store: per uid, round-trips, never throws, tolerates unknown fields | each `*Core` | yes; unknown fields kept (P-8: packs and mirror, areas, reflections, notification settings; celebrated and the celebrations switch pinned) | Phase 3 |
 
 ## Part D: model-based sequence tests (Phase 2)
 
@@ -251,6 +251,14 @@ Settings line. Its three todo tests are normal tests now. Suite: 992 tests, 989 
 `computeStreaks`, `countPerfectDays`, `dailyCompletion` and `computeSummary`; the radar and Vitality get it through
 `dailyCompletion`. The S-2 todo is a normal test now, plus a test that the clamp never moves a date earlier and a scan
 that fails if a new app file reads `createdDate`. Each clamp was removed in turn: 2 tests fail each time.
+
+**Phase 1b, P-8 (2026-11-13).** Built: `utils/unknownFields.ts` (keys kept from parsing, written before the known
+fields), applied to the packs record and the mirror's copy of it, the area map, the reflections record (unreadable
+entries count as "already reflected", no XP) and the notification settings; `runPacks` keeps an empty record's fields.
+The P-8 todo is a normal test now, plus one rollback test per record (the real store cores over Maps), pinning tests
+for the celebrated keys and the celebrations switch, negative tests (a property added in memory, a forged known key,
+a stored `__proto__`) and a scan that fails if a file other than the parsers creates carried fields. Suite: 1066
+tests, 1065 pass, 1 todo (F-1).
 
 ### Phase 1b test cases (written with the fixes)
 
