@@ -17,7 +17,7 @@ added for tests; new test files are picked up by the existing `tests/*.test.ts` 
 |---|---|---|
 | S-1 | Every user write stamps `updatedAt = max(now, row.updatedAt + 1)` (monotonic per row). Unsynced rows more than a day ahead are re-stamped to now before a push (guarded). A "clock suspect" counter drives one muted Settings line. Cross-device clock skew is a documented last-write-wins limit. **Built in Phase 1b.** | HABITQUEST_DESIGN.md |
 | S-2 | A habit's `createdDate` is clamped to `min(createdDate, today)`, and only that, wherever it is computed with `today`. | HABITQUEST_DESIGN.md |
-| S-4 | Template-creating actions ("Add the rest", a Settings retake, later a report's "Add" suggestion) wait for the first pull of this uid on this phone. | PACKS_REPORTS_SPEC.md §17, ONBOARDING_SPEC.md §5 |
+| S-4 | Template-creating actions ("Add the rest", a Settings retake, later a report's "Add" suggestion) wait for the first pull of this uid on this phone ('done' from the engine or the stored sync state; 'unknown' when unreadable also waits). | PACKS_REPORTS_SPEC.md §17, ONBOARDING_SPEC.md §5 |
 | S-6 | Notification and celebration settings are device settings, shared by every account on the phone. | HABITQUEST_DESIGN.md |
 | P-2 | Renaming the only habit in a built-in pack that carries a template's name adds that template to the pack's `dropped`. | PACKS_REPORTS_SPEC.md §17 |
 | P-4 | ONBOARDING_SPEC §11 reworded: only the first run never checks limits; a Settings retake is checked. | ONBOARDING_SPEC.md §11 |
@@ -43,7 +43,7 @@ keyboard).
 | S-1 | Last-write-wins on client `updatedAt` | Clock behind or moved back: the edit is refused or replaced by the next pull. Clock more than a day ahead: nothing pushes. | tests/clock-skew.test.ts, sync-status-line.test.ts, stamp.test.ts | Built (1b) |
 | S-2 | `createdAt` from the client clock | A habit created with the clock ahead is unscheduled until its future date | tests/decided-rules.test.ts | Fixed (1b) |
 | S-3 | Completions after today are ignored | A tick made with the clock ahead counts later | gamification, summary, fixture clockAhead | Keep |
-| S-4 | Sync at launch, foreground, every 5 min | New phone offline before its first pull: "Add the rest" or a retake re-creates templates that exist on the other phone | 1b | Decided |
+| S-4 | Sync at launch, foreground, every 5 min | New phone offline before its first pull: "Add the rest" or a retake re-creates templates that exist on the other phone | tests/s4-first-pull.test.ts (S4-1 to S4-5) | Built (1b) |
 | S-5 | One completion doc per ticked day | Restoring a large account reads many docs (Firestore free tier: 50k reads a day for the whole project) | none | Measure (Phase 4) |
 | S-6 | Per-user data | Notification and celebration prefs are device-wide | tests/decided-rules.test.ts (pin) | Decided: device settings |
 | S-7 | Local date everywhere | Travelling east skips a local date; west repeats one | partial | Keep, document |
@@ -285,6 +285,14 @@ the approved cursor line from 3. New: `tests/r1-storage.test.ts`. Changed: packs
 line, and `sync/syncEngine.js` reads its threshold for the log). Two mutations were checked by hand (the areas guard
 and the cycle stop): each fails R-1 tests. Suite: 1119 tests, 1119 pass, 0 todo.
 
+**Phase 1b, S-4 (2026-11-13).** Built: `firstPullFor(uid)` (sync/syncEngine.js, sharing the engine's cursor store) over
+`firstPullResult` and `whenRestored` (utils/firstPull.ts); Home's "Add the rest" and the Settings plan row run only on
+'done', otherwise they show the approved line. Step 0 of the same change: `celebratedStore.known()` and
+`celebrationsOrHeld` hold celebrations while the celebrated keys can't be read. New: `tests/s4-first-pull.test.ts`
+(two phones on `tests/helpers/fake-firestore.ts`, which now also returns each device's cursor store). Two mutations
+were checked by hand (an unreadable state counted as 'done'; held celebrations ignored): each fails 2 tests. Suite:
+1133 tests, 1133 pass, 0 todo.
+
 ### Phase 1b test cases (written with the fixes)
 
 S-1, monotonic stamp, stuck rows and the clock line (done; tests/clock-skew.test.ts unless noted):
@@ -314,7 +322,10 @@ S-1, monotonic stamp, stuck rows and the clock line (done; tests/clock-skew.test
 - S1-25: the app's store (db/sync.js) provides `restampFutureRows` (optional in the engine's type) through the write
   queue.
 
-S-4, template-creating actions wait for this uid's first pull:
+S-4, template-creating actions wait for this uid's first pull (built 2026-11-13, tests/s4-first-pull.test.ts; also: the
+check's four outcomes, the approved line and its wiring in Home, Settings and sync/syncEngine.js, the R-1 interplay
+(unreadable cursors: 'unknown', nothing runs, no network call), a corrupt stored state, a parser-version bump, "Re-sync
+everything", fixtures pulledFromB and skippedThenRetake, and step 0's held celebrations):
 - S4-1: "Add the rest" with the first pull not done creates nothing and says it is waiting; after it, it creates.
 - S4-2: a Settings retake before the first pull creates nothing; once the pull is done, the plan is rebuilt with the
   pulled names and offers none of them.

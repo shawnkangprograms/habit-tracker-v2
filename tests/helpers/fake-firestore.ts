@@ -103,6 +103,6 @@ export async function createDevice(server: FakeServer, uid: string, clock: {now:
     now: () => clock.now, timeoutMs: 1000, debounceMs: 5,
   });
   engine.start();
-  return {db, engine, clock, uid, store, calls};
+  return {db, engine, clock, uid, store, calls, cursors, storage};
 }
 export type Device = Awaited<ReturnType<typeof createDevice>>;

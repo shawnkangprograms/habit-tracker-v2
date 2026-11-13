@@ -59,6 +59,18 @@ export function createCelebratedStore(storage: KeyValueStorage) {
     return (await setFor(uid)).keys;
   }
 
+  // The keys, or null while storage can't be read (unknown: the caller holds its celebrations rather than show a
+  // milestone again). Each call while unknown reads again and, once that works, merges what is stored. Never throws.
+  async function known(uid: string): Promise<ReadonlySet<string> | null> {
+    const entry = await setFor(uid);
+    if (entry.readOk) return entry.keys;
+    const stored = await read(uid);
+    if (stored === null) return null;
+    for (const key of stored) entry.keys.add(key);
+    entry.readOk = true;
+    return entry.keys;
+  }
+
   // Adds the keys in memory first (so the next load already sees them), prunes old dated keys, then saves.
   // Never throws; a failed save only means a possible repeat after a restart.
   async function mark(uid: string, keys: string[], today: string): Promise<void> {
@@ -82,5 +94,5 @@ export function createCelebratedStore(storage: KeyValueStorage) {
     return writes;
   }
 
-  return {load, mark};
+  return {load, known, mark};
 }

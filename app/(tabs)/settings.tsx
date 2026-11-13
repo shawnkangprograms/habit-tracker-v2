@@ -1,4 +1,4 @@
-import {useCallback, useState} from 'react';
+import {useCallback, useRef, useState} from 'react';
 import {router, useFocusEffect} from 'expo-router';
 import Constants from 'expo-constants';
 import {SafeAreaView} from 'react-native-safe-area-context';
@@ -18,6 +18,8 @@ import {devSeedEarlyPraise} from '@/db/devSeed';// null outside __DEV__
 import {colors, fonts, radii, spacing} from '@/constants/theme';
 import {SwitchRow} from '@/components/switch-row';
 import {TRACE_ON} from '@/utils/startupTrace';
+import {firstPullFor} from '@/sync/syncEngine';// S-4: read-only
+import {RESTORING_LINE} from '@/utils/firstPull';
 import {SETTINGS_ROW} from '@/utils/onboarding/copy';
 import {NAME_ROW} from '@/utils/profileName';
 import {SETTINGS_PACKS_ROW} from '@/utils/packs/copy';
@@ -55,6 +57,27 @@ export default function SettingsScreen (){
     const [asking, setAsking] = useState(false);
     const [available] = useState(notificationsAvailable);// fixed for the app run: the module loads once or never
     const [showTrace, setShowTrace] = useState(false);// resets on every launch (never saved)
+
+    // S-4: the plan retake creates templates, so it waits for this uid's first pull (utils/firstPull.ts). One open
+    // at a time; the line clears on the next tap that opens it.
+    const [planNotice, setPlanNotice] = useState<string | null>(null);
+    const openingPlan = useRef(false);
+    const openPlan = async () => {
+        const uid = getSessionUid();
+        if (!uid || openingPlan.current) return;
+        openingPlan.current = true;
+        try {
+            const result = await firstPullFor(uid);
+            if (result !== 'done') {
+                setPlanNotice(RESTORING_LINE);
+                return;
+            }
+            setPlanNotice(null);
+            router.push({pathname: '/onboarding', params: {entry: 'settings'}});
+        } finally {
+            openingPlan.current = false;
+        }
+    };
 
     // if the sign-in admin check failed for a network reason, try again whenever Settings gains focus.
     // Notification permission is re-checked on focus and when coming back from the phone's settings.
@@ -210,15 +233,21 @@ export default function SettingsScreen (){
                   <MaterialCommunityIcons name="chevron-right" size={22} color={colors.muted} />
                 </Pressable>
 
-                {/* onboarding for everyone, any time: never opens on its own for users who already have habits */}
+                {/* onboarding for everyone, any time: never opens on its own for users who already have habits.
+                    S-4: it opens only once this uid's first pull is done; until then the tap shows the line below */}
                 <Pressable
                   style={({pressed}) => [styles.row, pressed && styles.pressed]}
-                  onPress={() => router.push({pathname: '/onboarding', params: {entry: 'settings'}})}
+                  onPress={openPlan}
                   accessibilityRole="button">
                   <MaterialCommunityIcons name="compass-outline" size={22} color={colors.accent} />
                   <Text style={styles.rowText}>{SETTINGS_ROW}</Text>
                   <MaterialCommunityIcons name="chevron-right" size={22} color={colors.muted} />
                 </Pressable>
+                {planNotice ? (
+                  <View style={styles.notice}>
+                    <Text style={styles.noticeText} accessibilityLiveRegion="polite">{planNotice}</Text>
+                  </View>
+                ) : null}
 
                 {isAdmin && (
                   <Pressable

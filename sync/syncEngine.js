@@ -7,21 +7,34 @@ import {emitRemoteChange} from '@/db/remoteChanges';
 import {getFirebaseAuth} from '@/services/authInit';
 import {mark, TRACE_ON} from '@/utils/startupTrace';
 import {CURSOR_LINE_MIN_CYCLES} from '@/utils/syncStatusLine';
+import {firstPullResult} from '@/utils/firstPull';
 
 // The app's sync engine: the engine core (sync/engineCore.ts) on the real SQLite store (db/sync.js),
 // Firestore (sync/firestoreRemote.js), pull cursors in AsyncStorage (per uid, kept across sign-outs)
 // and the signed-in user. Each cycle pulls, then pushes. app/_layout.tsx starts it on sign-in and
 // stops it on sign-out; triggers live there.
 
+const cursorStore = createCursorStore(AsyncStorage);
+
 const engine = createSyncEngine({
     getUid: () => getFirebaseAuth().currentUser?.uid ?? null,
     store,
     remote: firestoreRemote,
-    cursors: createCursorStore(AsyncStorage),
+    cursors: cursorStore,
     onRemoteChange: emitRemoteChange, // Home reloads while focused
 });
 
 let activeUid = null;
+
+// S-4: has this uid's first pull finished on this phone? Read-only: the engine's status when it is running for
+// this uid, else this uid's stored sync state (one local read; 'unknown' if it can't be read). Never throws.
+// Phase F (guest mode, not built): a guest has no server copy, so a guest must count as 'done'.
+export function firstPullFor(uid) {
+    return firstPullResult({
+        statusDone: activeUid === uid && engine.getStatus().initialPullDone,
+        loadStored: () => cursorStore.load(uid),
+    });
+}
 
 // Dev only: one line per finished cycle, counts and error kinds (never habit names or doc contents)
 if (__DEV__) {

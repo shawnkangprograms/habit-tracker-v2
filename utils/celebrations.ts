@@ -129,6 +129,18 @@ export function celebrationsFor(
   return {celebrations, keys, repeats};
 }
 
+// The same, with what was celebrated possibly unknown (null: the celebrated keys couldn't be read). Then everything
+// is held for this tick: no celebration, no repeat toast, nothing to mark, since an already celebrated level or
+// milestone would otherwise be shown again. Accepted cost: one reached while unknown is never celebrated later.
+export function celebrationsOrHeld(
+  diff: TickDiff,
+  today: string,
+  celebrated: ReadonlySet<string> | null,
+): {celebrations: Celebration[]; keys: string[]; repeats: Repeat[]; held: boolean} {
+  if (celebrated === null) return {celebrations: [], keys: [], repeats: [], held: true};
+  return {...celebrationsFor(diff, today, celebrated), held: false};
+}
+
 // ---------- Encouragement (toast) ----------
 
 export type Situation =

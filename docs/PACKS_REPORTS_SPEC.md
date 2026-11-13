@@ -252,13 +252,28 @@ Rules decided after the spec red-team in docs/TEST_STRATEGY.md (Part B). Each ha
 for an account that is not in a "normal" state, and the test that checks it. Fixes land in Phase 1b unless marked
 "pinned" (today's behaviour, kept on purpose).
 
-- **S-4, template-creating actions wait for the first pull.** "Add the rest", a Settings retake (ONBOARDING_SPEC
-  section 5) and, later, a report's "Add" suggestion create nothing until this uid's first pull from Firestore has
-  finished on this phone. Picking packs (which only adopts) is not blocked.
+- **S-4, template-creating actions wait for the first pull (built in Phase 1b, 2026-11-13).** "Add the rest", a
+  Settings retake (ONBOARDING_SPEC section 5) and, later, a report's "Add" suggestion create nothing until this uid's
+  first pull from Firestore has finished on this phone. Picking packs (which only adopts), the habit form and its
+  starter ideas are not blocked; first-run onboarding already waits for the first pull (its gate).
+  - The check (sync/syncEngine.js `firstPullFor`, decided in utils/firstPull.ts): 'done' when the engine running for
+    this uid says so, or this uid's stored sync state (`sync:<uid>`) does, so a pull finished earlier counts offline
+    and before sync has started; 'waiting' when the stored state says not yet; 'unknown' when it can't be read (R-1:
+    a failed cursor read leaves `initialPullDone` as the status had it, false after sign-in). Only 'done' runs.
+  - What the user sees, one line for both paths and for 'unknown' (approved 2026-11-13): "Your habits are still
+    being restored. Stay online and try again in a moment." "Add the rest" (Home): nothing is adopted or created and
+    the line shows in the pack's notice, on tap only (no dimmed look). The Settings plan row: onboarding doesn't open
+    and the line shows under the row; once the pull is done the plan is built with the pulled names, so none of them
+    is offered again. After three failed cursor reads Settings also shows R-1's cursor line, which says why.
+  - Known gap (accepted 2026-11-13): a phone that never goes online after a sign-in stays blocked for these two
+    actions.
+  - Phase F (guest mode, not built): a guest has no server copy, so `firstPullFor` must treat a guest as 'done'.
   - Odd states: a new phone, a reinstall, or a sign-in while offline: the other phones' habits are not here yet, so
     name matching can't see them and the templates would be created twice. Once the first pull has finished, later
-    offline use is not blocked. A different uid on the same phone waits for its own first pull. Tests: S4-1 to S4-5
-    (docs/TEST_STRATEGY.md, Phase 1b).
+    offline use is not blocked, even before sync starts. A different uid on the same phone waits for its own first
+    pull. A corrupt `sync:<uid>` waits until the re-pull finishes; a parser-version bump and "Re-sync everything" keep
+    the pull done. Tests: S4-1 to S4-5 and the others in tests/s4-first-pull.test.ts (two phones on the fake
+    Firestore for S4-2 and S4-3).
 - **P-2, a renamed template habit leaves its built-in pack's templates.** Renaming the only habit in a built-in pack
   that carries a template's name adds that template to the pack's `dropped`, so "Add the rest" doesn't create it
   again; renaming it back to the template's name takes it out of `dropped` (the existing "putting it back" rule).
@@ -358,7 +373,11 @@ for an account that is not in a "normal" state, and the test that checks it. Fix
   - Onboarding record: `write()` skips silently until a read of the record succeeds. A Settings retake still creates
     its habits; name dedupe still applies on the next retake (decided 2026-11-13).
   - Celebrated keys: marks stay in memory (nothing repeats in this app run); a later mark reads again, merges what is
-    stored, and only then saves.
+    stored, and only then saves. While they can't be read, a tick or a saved reflection holds every celebration
+    (`celebratedStore.known()` is null; added with S-4, 2026-11-13): no overlay, banner, repeat toast or early praise,
+    and nothing is marked, since a level or milestone celebrated in an earlier run would otherwise show again after
+    an un-tick and re-tick. Ordinary toasts still show, and a reflection keeps its toast. Accepted cost: a level or
+    milestone reached while the keys can't be read is never celebrated later. Tests: tests/s4-first-pull.test.ts.
   - Insight cache: a failed read is not remembered; a write reads again first and, if it still can't, the entry is
     kept in memory only.
   - Sync cursors (`sync:<uid>`): a failed read ends that sync cycle before any network call (no probe, pull, push or

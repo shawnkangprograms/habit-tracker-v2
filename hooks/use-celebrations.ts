@@ -6,7 +6,7 @@ import {createCelebratedStore} from '@/services/celebratedStore';
 import {getCelebrationsEnabled, useCelebrationsEnabled} from '@/services/celebrationPrefs';
 import type {PublishResult} from '@/services/statsStore';
 import {
-  celebrationsFor, createMessagePicker, diffTick, dismissItem, dropToasts, earlyKey, enqueue, messageVars,
+  celebrationsOrHeld, createMessagePicker, diffTick, dismissItem, dropToasts, earlyKey, enqueue, messageVars,
   pickSituation, tickItems, type QueueItem,
 } from '@/utils/celebrations';
 import {isEarlierThanUsual, sameDaySamples} from '@/utils/completionTime';
@@ -86,11 +86,13 @@ export function useCelebrations(userId: string | undefined) {
     });
     if (!diff) return;
 
-    const celebrated = await celebratedStore.load(userId);
-    const {celebrations, keys, repeats} = celebrationsFor(diff, today, celebrated);
+    // null: the celebrated keys can't be read, so every celebration is held for this tick (ordinary toasts still show)
+    const celebrated = await celebratedStore.known(userId);
+    const {celebrations, keys, repeats} = celebrationsOrHeld(diff, today, celebrated);
     // a celebration suppresses the toast and a repeat outranks early praise, so the early read is only needed
-    // without either (and only for a toast that can still be shown). Repeats mark nothing.
-    const readEarly = celebrations.length === 0 && repeats.length === 0 && isLatest() && !celebrated.has(earlyKey(today));
+    // without either (and only for a toast that can still be shown). Repeats mark nothing. No early praise while held.
+    const readEarly = celebrated !== null && celebrations.length === 0 && repeats.length === 0 && isLatest()
+      && !celebrated.has(earlyKey(today));
     const earlyStartedAt = Date.now();
     const early = readEarly && await isEarlyTick(userId, tick.habitId, tick.tickedAt, today);
     const earlyNote = readEarly ? `early read ${Date.now() - earlyStartedAt} ms` : 'early read skipped';
@@ -130,8 +132,9 @@ export function useCelebrations(userId: string | undefined) {
     const diff = before ? diffTick({before, after: result.snapshot.stats, doneToday: 0, scheduledToday: 0}) : null;
     const rewarded = !!before && result.snapshot.stats.reflectionXp > before.reflectionXp;
 
-    const celebrated = diff ? await celebratedStore.load(userId) : new Set<string>();
-    const found = diff ? celebrationsFor(diff, today, celebrated) : null;
+    // unknown celebrated keys: the toast still shows, the level-up overlay is held
+    const celebrated = diff ? await celebratedStore.known(userId) : null;
+    const found = diff ? celebrationsOrHeld(diff, today, celebrated) : null;
     const celebrations = found?.celebrations.filter((c) => c.kind === 'levelUp') ?? [];
     const keys = found?.keys.filter((k) => k.startsWith('level:')) ?? [];
     const vars = diff ? messageVars(diff) : null;

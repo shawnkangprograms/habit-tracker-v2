@@ -11,7 +11,8 @@ import {toggleCompletion} from '@/db/completions';// today's completion toggle
 import {getGamificationStats} from '@/services/gamificationStats';// XP, level and streak, derived from local rows and reflections
 import {beginLoad as beginStatsLoad, publish as publishStats} from '@/services/statsStore';// shared with Profile and the tab icon
 import {onRemoteChange} from '@/db/remoteChanges';// data pulled from another device changed local rows
-import {requestSync} from '@/sync/syncEngine';// pull + push now (does nothing while sync is stopped)
+import {firstPullFor, requestSync} from '@/sync/syncEngine';// pull + push now (does nothing while sync is stopped); S-4
+import {RESTORING_LINE, whenRestored} from '@/utils/firstPull';// S-4: "Add the rest" waits for the first pull
 import {getFirebaseAuth} from '@/services/authInit';// only for an optional display name
 import {useSessionUid} from '@/services/session';// the user whose local data Home shows (presumed or confirmed)
 import {getLocalDateString} from '@/utils/dates';
@@ -473,21 +474,32 @@ export default function HomeScreen() {// default export, becomes the "index" tab
   // "Add the rest" (utils/packs/addRest.ts): adopts, then creates the pack's missing templates daily at 20:00,
   // as many as the habit limit allows. The level comes from the stats Home shows (or services/packLimits.ts if it
   // shows none: the last loaded, else ticks alone, a lower bound whose refusal names no level), never the network.
+  // S-4: nothing is adopted or created until this uid's first pull is done (utils/firstPull.ts); until then the tap
+  // only shows RESTORING_LINE under the pack.
   const addRestFor = async (packId: string) => {
     if (!userId || addingRef.current) return;
     addingRef.current = true;
     setAddingPack(packId);
     let notice: string | null = null;
     try {
-      const parsed = await packsStore.read(userId);
-      if (parsed.kind !== 'ok') return;
-      const habits = await (getActiveHabitsWithDays(userId) as Promise<ActiveHabit[]>);
-      const shown = statsRef.current;
-      const at = shown ? {level: shown.stats.level, known: true} : await currentLevel(userId);
-      const result = await addTheRest({
-        addHabit: (input) => addHabit(userId, input) as Promise<string>,
-        savePacks: (record) => packsStore.write(userId, record),
-      }, {record: parsed.record, packId, habits, level: at.level, reminderTime: ROUTINE_REMINDER_DEFAULT});
+      const run = await whenRestored(() => firstPullFor(userId), async () => {
+        const parsed = await packsStore.read(userId);
+        if (parsed.kind !== 'ok') return null;
+        const habits = await (getActiveHabitsWithDays(userId) as Promise<ActiveHabit[]>);
+        const shown = statsRef.current;
+        const at = shown ? {level: shown.stats.level, known: true} : await currentLevel(userId);
+        const result = await addTheRest({
+          addHabit: (input) => addHabit(userId, input) as Promise<string>,
+          savePacks: (record) => packsStore.write(userId, record),
+        }, {record: parsed.record, packId, habits, level: at.level, reminderTime: ROUTINE_REMINDER_DEFAULT});
+        return {result, at, habits};
+      });
+      if (!run.restored) {
+        notice = RESTORING_LINE;
+        return;
+      }
+      if (!run.value) return;
+      const {result, at, habits} = run.value;
       if (result.failed) notice = ADD_REST_FAILED;
       else if (result.limited) notice = limitMessageAt('habits', at, habits.length + result.added);// active habits after the adds
       if (result.added > 0) askForReminderPermission();// in context, only once habits with a reminder exist
