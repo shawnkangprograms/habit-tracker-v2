@@ -22,11 +22,13 @@ import {Card} from '@/components/ui/card';
 import {Pill} from '@/components/ui/pill';
 import {Row} from '@/components/ui/row';
 import {Screen} from '@/components/ui/screen';
+import {getOtaInfo} from '@/services/otaUpdates';
+import {shortUpdateId} from '@/services/otaUpdatesCore';
 import {
     ADMIN_ROW, CELEBRATIONS_ROW, EVENING_NUDGE_ROW, HABIT_REMINDERS_ROW, NUDGE_TIME_GROUP_LABEL, OPEN_PHONE_SETTINGS_BUTTON,
     PHONE_NOTIFICATIONS_OFF_NOTICE, REMINDERS_UNAVAILABLE_NOTICE, SECTION_ACCOUNT, SECTION_PLAN, SECTION_REMINDERS,
     YOU_TITLE, SIGN_OUT_FAILED_MESSAGE, SIGN_OUT_FAILED_TITLE, SIGN_OUT_ROW, TEST_FAILED_LINE, TEST_NOTIFICATION_HINT,
-    TEST_NOTIFICATION_ROW, TEST_SENT_LINE,
+    TEST_NOTIFICATION_ROW, TEST_SENT_LINE, updateTag, versionLine,
 } from '@/utils/copy/settings';
 import {TRACE_ON} from '@/utils/startupTrace';
 import {firstPullFor} from '@/sync/syncEngine';// S-4: read-only
@@ -53,7 +55,11 @@ function handleSignOut() {
 // "Version 1.0.0 (build 2)": app.json's version and Android versionCode (iOS buildNumber; no build part if unset)
 const appConfig = Constants.expoConfig;
 const buildNumber = appConfig?.android?.versionCode ?? appConfig?.ios?.buildNumber;
-const VERSION_LINE = `Version ${appConfig?.version ?? '?'}${buildNumber != null ? ` (build ${buildNumber})` : ''}`;
+const VERSION_LINE = versionLine(appConfig?.version ?? '?', buildNumber);
+
+// C3 (D5): the running bundle's update id, first 8 characters, so a tester can read out which update they run. Read
+// once, when You first opens (never on the startup path); nothing in a dev build or a binary without updates.
+const readUpdateTag = () => updateTag(shortUpdateId(getOtaInfo()?.updateId ?? null));
 
 // Preview build only: a long press on the version line shows the startup trace (never shown by default)
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- loaded only in a trace build
@@ -68,6 +74,7 @@ export default function YouScreen (){
     const [asking, setAsking] = useState(false);
     const [available] = useState(notificationsAvailable);// fixed for the app run: the module loads once or never
     const [showTrace, setShowTrace] = useState(false);// resets on every launch (never saved)
+    const [updateSuffix] = useState(readUpdateTag);
 
     // S-4: the plan retake creates templates, so it waits for this uid's first pull (utils/firstPull.ts). One open
     // at a time; the line clears on the next tap that opens it.
@@ -287,7 +294,7 @@ export default function YouScreen (){
                 color="muted"
                 style={styles.version}
                 onLongPress={StartupTracePanel ? () => setShowTrace((shown) => !shown) : undefined}>
-                {VERSION_LINE}
+                {VERSION_LINE}{updateSuffix}
               </AppText>
               {StartupTracePanel && showTrace && <StartupTracePanel />}
         </Screen>

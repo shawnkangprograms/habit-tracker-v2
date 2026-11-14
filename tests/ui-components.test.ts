@@ -145,8 +145,12 @@ describe('the Settings pilot', () => {
   test('the version line: its long press (the way into the startup trace panel) is exactly as before', () => {
     assert.match(src, /const \[showTrace, setShowTrace\] = useState\(false\);\/\/ resets on every launch \(never saved\)/);
     assert.match(src, /const StartupTracePanel = TRACE_ON \? \(require\('@\/components\/startup-trace-panel'\) as typeof import\('@\/components\/startup-trace-panel'\)\)\.StartupTracePanel : null;/);
-    assert.match(src, /<AppText\s+variant="caption"\s+color="muted"\s+style=\{styles\.version\}\s+onLongPress=\{StartupTracePanel \? \(\) => setShowTrace\(\(shown\) => !shown\) : undefined\}>\s*\{VERSION_LINE\}\s*<\/AppText>/);
+    assert.match(src, /<AppText\s+variant="caption"\s+color="muted"\s+style=\{styles\.version\}\s+onLongPress=\{StartupTracePanel \? \(\) => setShowTrace\(\(shown\) => !shown\) : undefined\}>\s*\{VERSION_LINE\}\{updateSuffix\}\s*<\/AppText>/);
     assert.match(src, /\{StartupTracePanel && showTrace && <StartupTracePanel \/>\}/);
+    // C3 (D5): the short update id after it, read once when You opens
+    assert.match(src, /const VERSION_LINE = versionLine\(appConfig\?\.version \?\? '\?', buildNumber\);/);
+    assert.match(src, /const readUpdateTag = \(\) => updateTag\(shortUpdateId\(getOtaInfo\(\)\?\.updateId \?\? null\)\);/);
+    assert.match(src, /const \[updateSuffix\] = useState\(readUpdateTag\);/);
   });
 
   test('the title keeps its dev-only long press, and the screen keeps its test id', () => {

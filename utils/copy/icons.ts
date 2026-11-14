@@ -311,3 +311,10 @@ export const ICON_KEYWORDS: Record<IconId, readonly string[]> = {
   bookmark: ['save', 'mark'],
   reminder: ['bell', 'notify'],
 };
+
+// The picker (components/icon-picker.tsx)
+export const ICON_GRID_LABEL = 'Habit icon';// the radio group, for screen readers
+export const ICON_TABS_LABEL = 'Icon groups';
+export const ICON_SEARCH_PLACEHOLDER = 'Search icons';
+export const ICON_SEARCH_EMPTY = 'No icons match.';
+export const ICON_UNKNOWN_LINE = "This habit's icon is from a newer version of HabitQuest. Pick one to change it.";

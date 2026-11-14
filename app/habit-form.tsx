@@ -9,15 +9,15 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import {addHabit, getActiveHabitsWithDays, getDeletedHabitIds, getHabit, softDeleteHabit, updateHabit} from '@/db/habits';
 import {useSessionUid} from '@/services/session';
 import {
-  ICON_IDS, REMIND_BEFORE_OPTIONS, isKnownIcon, type Frequency, type IconId, type RemindBeforeMin, type WeekdayKey,
+  REMIND_BEFORE_OPTIONS, isKnownIcon, type Frequency, type IconId, type RemindBeforeMin, type WeekdayKey,
 } from '@/constants/habits';
-import {HabitIcon} from '@/constants/habitIcons';
-import {colors, fonts, radii, spacing, ICON_COLORS, pressedOpacity} from '@/constants/theme';
+import {colors, fonts, radii, spacing, pressedOpacity} from '@/constants/theme';
 import {
   validateFrequency, validateHabitInput, validateHabitName, validateIcon, validateReminderTime,
 } from '@/validation/validators';
 import {StarterIdeas, type StarterIdea} from '@/components/starter-ideas';
 import {SwitchRow} from '@/components/switch-row';
+import {IconPicker} from '@/components/icon-picker';
 import {TimeField} from '@/components/time-field';
 import {useNotificationPrefs} from '@/services/notificationPrefs';
 import {getNotificationPermission, notificationsAvailable, type PermissionState} from '@/services/notifications';
@@ -339,23 +339,7 @@ export default function HabitFormScreen() {
           {/* ICON */}
           <View style={styles.section}>
             <Text style={[styles.label, styles.labelGap]}>ICON</Text>
-            <View style={styles.iconGrid}>
-              {ICON_IDS.map((id) => {
-                const selected = icon === id;
-                const tint = ICON_COLORS[id];
-                return (
-                  <Pressable
-                    key={id}
-                    onPress={() => { setIcon(id); clearError('icon'); }}
-                    style={[styles.iconTile, selected && {borderWidth: 2, borderColor: tint, backgroundColor: tint + '30'}]}
-                    accessibilityRole="button"
-                    accessibilityLabel={id}
-                    accessibilityState={{selected}}>
-                    <HabitIcon id={id} size={24} color={selected ? tint : colors.muted} />
-                  </Pressable>
-                );
-              })}
-            </View>
+            <IconPicker value={icon} stored={keptIcon} onChange={(id) => { setIcon(id); clearError('icon'); }} />
             {errors.icon ? <Text style={styles.errorText}>{errors.icon}</Text> : null}
           </View>
 
@@ -551,17 +535,6 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   inputError: {borderColor: colors.error},
-  iconGrid: {flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 10},
-  iconTile: {
-    width: 52,
-    height: 52,
-    borderRadius: radii.habitCard,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   repeatRow: {flexDirection: 'row', gap: spacing.md},
   repeatPill: {flex: 1, height: 46, borderRadius: radii.pill, alignItems: 'center', justifyContent: 'center'},
   pillSelected: {backgroundColor: colors.accent},

@@ -11,7 +11,7 @@ export function Pill({label, selected, onPress, role = 'radio', gap, testID, acc
   label: string;
   selected: boolean;
   onPress: () => void;
-  role?: 'radio' | 'button';
+  role?: 'radio' | 'button' | 'tab';
   gap?: number;
   testID?: string;// from constants/testIds.ts
   accessibilityLabel?: string;

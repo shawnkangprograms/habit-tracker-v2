@@ -58,6 +58,12 @@ export async function runUpdateCheck(mod: UpdatesModule | null, isDev: boolean):
 }
 
 // The running bundle, for the hidden trace panel. Never throws.
+// The first 8 characters of an update id, for the You version line (C3, D5); null when there is none
+export const UPDATE_ID_SHORT = 8;
+export function shortUpdateId(updateId: string | null): string | null {
+  return typeof updateId === 'string' && updateId.trim() !== '' ? updateId.trim().slice(0, UPDATE_ID_SHORT) : null;
+}
+
 export function readOtaInfo(mod: UpdatesModule | null): OtaInfo | null {
   if (!mod) return null;
   try {

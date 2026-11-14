@@ -184,7 +184,7 @@ describe('the surface ladder, the input borders and the pressed opacity (C1b Set
     const users = APP.filter((f) => /colors\.inputBorder/.test(read(f))).sort();
     assert.deepEqual(users, [
       'app/admin/users.tsx', 'app/auth.tsx', 'app/habit-form.tsx', 'app/packs/edit.tsx', 'app/profile-name.tsx',
-      'app/profile-setup.tsx', 'app/reflect.tsx', 'components/habit-fields.tsx', 'components/time-field.tsx',
+      'app/profile-setup.tsx', 'app/reflect.tsx', 'components/habit-fields.tsx', 'components/icon-picker.tsx', 'components/time-field.tsx',// the picker's search field (C3)
     ]);
     for (const file of users) {
       for (const block of read(file).match(/\{[^{}]*backgroundColor: colors\.inputFill[^{}]*\}/g) ?? []) {

@@ -25,3 +25,9 @@ export const ADMIN_ROW = 'Admin';
 export const SIGN_OUT_ROW = 'Sign Out';
 export const SIGN_OUT_FAILED_TITLE = "Couldn't sign out";
 export const SIGN_OUT_FAILED_MESSAGE = 'Please try again.';
+
+// The version line at the bottom: app.json's version and build, then (C3, D5) the short id of the running update, so a
+// tester can say which update they have. No build part when it is unset; no update part when there is none.
+export const versionLine = (version: string, build: string | number | null | undefined) =>
+  `Version ${version}${build != null ? ` (build ${build})` : ''}`;
+export const updateTag = (shortId: string | null) => (shortId ? ` · update ${shortId}` : '');

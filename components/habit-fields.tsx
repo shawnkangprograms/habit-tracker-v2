@@ -1,8 +1,8 @@
 import {Pressable, StyleSheet, Text, TextInput, View} from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import {ICON_IDS, type IconId, type WeekdayKey} from '@/constants/habits';
-import {HabitIcon} from '@/constants/habitIcons';
-import {colors, fonts, radii, spacing, ICON_COLORS} from '@/constants/theme';
+import {type IconId, type WeekdayKey} from '@/constants/habits';
+import {colors, fonts, radii, spacing} from '@/constants/theme';
+import {IconPicker} from '@/components/icon-picker';
 
 // Form fields in the habit form's visual language, for the admin catalog form.
 // A copy of the markup in app/habit-form.tsx, which is left untouched for now; unify later.
@@ -51,23 +51,7 @@ export function IconGrid({value, onChange, error}: {
   return (
     <View style={styles.section}>
       <Text style={[styles.label, styles.labelGap]}>ICON</Text>
-      <View style={styles.iconGrid}>
-        {ICON_IDS.map((id) => {
-          const selected = value === id;
-          const tint = ICON_COLORS[id];
-          return (
-            <Pressable
-              key={id}
-              onPress={() => onChange(id)}
-              style={[styles.iconTile, selected && {borderWidth: 2, borderColor: tint, backgroundColor: tint + '30'}]}
-              accessibilityRole="button"
-              accessibilityLabel={id}
-              accessibilityState={{selected}}>
-              <HabitIcon id={id} size={24} color={selected ? tint : colors.muted} />
-            </Pressable>
-          );
-        })}
-      </View>
+      <IconPicker value={value} onChange={onChange} />
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
     </View>
   );
@@ -168,17 +152,6 @@ const styles = StyleSheet.create({
   inputError: {borderColor: colors.error},
   inputRow: {flexDirection: 'row', alignItems: 'center', gap: spacing.md},
   inputInner: {flex: 1, height: '100%', fontFamily: fonts.regular, fontSize: 14, color: colors.text},
-  iconGrid: {flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 10},
-  iconTile: {
-    width: 52,
-    height: 52,
-    borderRadius: radii.habitCard,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   repeatRow: {flexDirection: 'row', gap: spacing.md},
   repeatPill: {flex: 1, height: 46, borderRadius: radii.pill, alignItems: 'center', justifyContent: 'center'},
   pillSelected: {backgroundColor: colors.accent},

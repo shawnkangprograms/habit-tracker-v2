@@ -78,8 +78,8 @@ describe('the manifest', () => {
     assert.equal(new Set(all).size, all.length);
   });
 
-  test('every id starts with its screen: tab-, auth-, home-, settings-, onboarding-', () => {
-    const prefix: Record<string, string> = {tabs: 'tab-', auth: 'auth-', home: 'home-', settings: 'settings-', onboarding: 'onboarding-'};
+  test('every id starts with its screen: tab-, auth-, home-, settings-, onboarding-, icon-', () => {
+    const prefix: Record<string, string> = {tabs: 'tab-', auth: 'auth-', home: 'home-', settings: 'settings-', onboarding: 'onboarding-', icon: 'icon-'};
     for (const [group, entries] of Object.entries(ids.TEST_IDS)) {
       for (const id of Object.values(entries)) assert.ok(id.startsWith(prefix[group]), `${group}: ${id}`);
     }
@@ -138,7 +138,7 @@ describe('the shared controls are derived from components/ui/', () => {
 describe('every control on the demo path and in onboarding has an id', () => {
   const WITH_IDS = [
     'app/auth.tsx', 'app/(tabs)/index.tsx', 'app/(tabs)/you.tsx', 'app/onboarding.tsx',
-    'components/switch-row.tsx', 'components/habit-check.tsx', 'components/insight-card.tsx', 'components/empty-home-card.tsx',
+    'components/switch-row.tsx', 'components/icon-picker.tsx', 'components/habit-check.tsx', 'components/insight-card.tsx', 'components/empty-home-card.tsx',
     'components/reflections/reflection-bar.tsx', 'components/onboarding/step-header.tsx', 'components/onboarding/option-button.tsx',
     'components/onboarding/routine-card.tsx', 'components/onboarding/routine-reminder.tsx', 'components/onboarding/skip-dialog.tsx',
   ];

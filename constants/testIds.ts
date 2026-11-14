@@ -70,6 +70,9 @@ export const TEST_IDS = {
     skipDialogYes: 'onboarding-skip-dialog-yes',
     skipDialogGoHome: 'onboarding-skip-dialog-go-home',
   },
+  icon: {
+    search: 'icon-search',
+  },
 } as const;
 
 // Home: today's rows and the other-days rows, by habit name
@@ -87,3 +90,8 @@ const kebab = (text: string) => text.replace(/([A-Z])/g, '-$1').replace(/_/g, '-
 export const optionId = (step: string, value: string) => `onboarding-option-${kebab(step)}-${kebab(value)}`;
 export const routineCardId = (pickId: string) => `onboarding-routine-card-${kebab(pickId)}`;
 export const routineTimeId = (time: string) => `onboarding-reminder-time-${time.replace(/\D/g, '')}`;
+
+// The icon picker (components/icon-picker.tsx, the habit form and the admin catalog form): a tile by its icon id and a
+// group tab by its group, both kebab-case (no_sugar -> icon-no-sugar, Health -> icon-tab-health)
+export const iconTileId = (iconId: string) => `icon-${kebab(iconId)}`;
+export const iconTabId = (group: string) => `icon-tab-${kebab(group).replace(/^-/, '')}`;
