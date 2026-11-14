@@ -3,8 +3,9 @@ import {AccessibilityInfo, Modal, Pressable, StyleSheet, Text, View} from 'react
 import {colors, fonts, radii, spacing} from '@/constants/theme';
 import type {SkipCopy, SkipDialogEvent, SkipDialogState} from '@/utils/onboarding/skipDialog';
 
-// The "Skip setup" confirmation and the "Taking you home" notice that follows it (state rules in
-// utils/onboarding/skipDialog.ts). React Native's own Modal, so no new dependency: Android's Back reaches
+// The "Skip setup" confirmation and the "Taking you home" notice that follows it, or "Taking you back to Settings…" on
+// a retake started from Settings (wording and state rules in utils/onboarding/skipDialog.ts). React Native's own
+// Modal, so no new dependency: Android's Back reaches
 // onRequestClose, and the dialog is its own window for screen readers. Focus moves to the title when it opens
 // and to the notice when it changes. Motion: the Modal's fade only, and none under reduced motion.
 

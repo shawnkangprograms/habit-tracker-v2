@@ -333,6 +333,15 @@ deferred until then. New: `tests/r3-bar-timer.test.ts` (R3-1 to R3-9 and the dur
 Two mutations were checked by hand ("covered" ignored: fails 5; announced while covered: fails 2). Suite: 1192 tests,
 1192 pass, 0 todo.
 
+**Phase 1b, retake "Skip setup" copy (2026-11-14).** Copy only: `skipCopy` (utils/onboarding/skipDialog.ts) now picks
+the leaving notice and its button by how onboarding was opened. A retake from Settings shows "Taking you back to
+Settings…" with "Back to Settings"; the first run keeps "Taking you home…" and "Go home". Navigation is unchanged:
+closeFlow goes back to whichever screen opened the flow (Settings for a retake, Home for the first run). Tests in
+`tests/onboarding-0b.test.ts`: the retake strings (Skip and Leave), the first run unchanged, the screen passing its
+entry, and where each path navigates; `tests/onboarding-copy.test.ts` checks the two new strings against
+docs/ONBOARDING_COPY.md section 7. One mutation was checked by hand (the entry ignored: fails 1). Suite: 1196 tests,
+1196 pass, 0 todo.
+
 ### Phase 1b test cases (written with the fixes)
 
 S-1, monotonic stamp, stuck rows and the clock line (done; tests/clock-skew.test.ts unless noted):

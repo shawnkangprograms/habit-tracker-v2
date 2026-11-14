@@ -122,14 +122,54 @@ describe('"Skip setup" confirmation', () => {
     assert.equal(run(['open', 'yes', 'no', 'yes']), 'leaving');
   });
 
-  test('the wording: Skip before any habit exists, Leave after; the same notice either way', () => {
-    assert.deepEqual(sd.skipCopy(false), {
-      title: c.SKIP_TITLE, body: c.SKIP_BODY, yes: c.SKIP_YES, no: c.SKIP_NO, notice: c.LEAVING_NOTICE, goHome: c.GO_HOME,
-    });
-    assert.deepEqual(sd.skipCopy(true), {
+  test('the wording: Skip before any habit exists, Leave after; the same notice either way (first run)', () => {
+    for (const copy of [sd.skipCopy(false), sd.skipCopy(false, 'auto')]) {
+      assert.deepEqual(copy, {
+        title: c.SKIP_TITLE, body: c.SKIP_BODY, yes: c.SKIP_YES, no: c.SKIP_NO, notice: c.LEAVING_NOTICE, goHome: c.GO_HOME,
+      });
+    }
+    assert.deepEqual(sd.skipCopy(true, 'auto'), {
       title: c.LEAVE_TITLE, body: c.LEAVE_BODY, yes: c.LEAVE_YES, no: c.LEAVE_NO, notice: c.LEAVING_NOTICE, goHome: c.GO_HOME,
     });
     assert.equal(sd.LEAVING_AUTO_MS, 2000);
+  });
+});
+
+describe('Skip setup on a retake from Settings (decided 2026-11-14)', () => {
+  test('the retake says where it goes: "Taking you back to Settings…" and "Back to Settings"; Skip/Leave wording unchanged', () => {
+    assert.equal(c.RETAKE_LEAVING_NOTICE, 'Taking you back to Settings…');
+    assert.equal(c.BACK_TO_SETTINGS, 'Back to Settings');
+    assert.deepEqual(sd.skipCopy(false, 'settings'), {
+      title: c.SKIP_TITLE, body: c.SKIP_BODY, yes: c.SKIP_YES, no: c.SKIP_NO, notice: c.RETAKE_LEAVING_NOTICE, goHome: c.BACK_TO_SETTINGS,
+    });
+    assert.deepEqual(sd.skipCopy(true, 'settings'), {
+      title: c.LEAVE_TITLE, body: c.LEAVE_BODY, yes: c.LEAVE_YES, no: c.LEAVE_NO, notice: c.RETAKE_LEAVING_NOTICE, goHome: c.BACK_TO_SETTINGS,
+    });
+  });
+
+  test('the first run keeps its copy exactly', () => {
+    assert.equal(c.LEAVING_NOTICE, 'Taking you home. You can set up your plan any time in Settings.');
+    assert.equal(c.GO_HOME, 'Go home');
+  });
+
+  test('the screen picks the wording by how it was opened', () => {
+    const screen = source('../app/onboarding.tsx');
+    assert.match(screen, /const entry = entryFromParam\(params\.entry\);/);
+    assert.match(screen, /<SkipDialog state=\{skipState\} copy=\{skipCopy\(anyCreated, entry\)\}/);
+  });
+
+  test('where Skip setup navigates: back to whichever screen opened it (Home for the first run, Settings for a retake)', () => {
+    const screen = source('../app/onboarding.tsx');
+    assert.match(screen, /function closeFlow\(\) \{\s*if \(router\.canGoBack\(\)\) router\.back\(\);\s*else router\.replace\('\/'\);\s*\}/);
+    assert.match(screen, /if \(skipState === 'done'\) closeFlow\(\);/);
+    // the retake is pushed from Settings with entry 'settings', so back returns to Settings
+    assert.match(source('../app/(tabs)/settings.tsx'), /router\.push\(\{pathname: '\/onboarding', params: \{entry: 'settings'\}\}\);/);
+    // the first run is pushed from Home (sign-up launch or the gate) with no entry, so it is 'auto' and back returns Home
+    assert.match(source('../app/(tabs)/index.tsx'), /router\.push\('\/onboarding'\);/);
+    assert.match(source('../hooks/use-onboarding-gate.ts'), /router\.push\('\/onboarding'\);/);
+    assert.equal(g.entryFromParam(undefined), 'auto');
+    assert.equal(g.entryFromParam('settings'), 'settings');
+    assert.equal(g.entryFromParam('elsewhere'), 'auto');
   });
 });
 

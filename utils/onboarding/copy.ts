@@ -367,6 +367,9 @@ export const LEAVE_YES = 'Yes, leave';
 export const LEAVE_NO = 'No, stay';
 export const LEAVING_NOTICE = 'Taking you home. You can set up your plan any time in Settings.';
 export const GO_HOME = 'Go home';
+// A retake started from Settings returns to Settings (decided 2026-11-14); the first run keeps the two above
+export const RETAKE_LEAVING_NOTICE = 'Taking you back to Settings…';
+export const BACK_TO_SETTINGS = 'Back to Settings';
 
 // ---------- Loading quotes ----------
 

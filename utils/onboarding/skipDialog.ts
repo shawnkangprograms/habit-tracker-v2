@@ -7,8 +7,10 @@
 // done is final: the flow closes exactly once.
 
 import {
-  GO_HOME, LEAVE_BODY, LEAVE_NO, LEAVE_TITLE, LEAVE_YES, LEAVING_NOTICE, SKIP_BODY, SKIP_NO, SKIP_TITLE, SKIP_YES,
+  BACK_TO_SETTINGS, GO_HOME, LEAVE_BODY, LEAVE_NO, LEAVE_TITLE, LEAVE_YES, LEAVING_NOTICE, RETAKE_LEAVING_NOTICE, SKIP_BODY,
+  SKIP_NO, SKIP_TITLE, SKIP_YES,
 } from '@/utils/onboarding/copy';
+import type {OnboardingEntry} from '@/utils/onboarding/gate';
 
 export type SkipDialogState = 'closed' | 'confirm' | 'leaving' | 'done';
 export type SkipDialogEvent = 'open' | 'no' | 'back' | 'yes' | 'goHome' | 'timeout';
@@ -31,10 +33,14 @@ export function skipDialogNext(state: SkipDialogState, event: SkipDialogEvent, b
 
 export type SkipCopy = {title: string; body: string; yes: string; no: string; notice: string; goHome: string};
 
-// Once this run has created a habit (a card or the user's own), the dialog says "Leave" and that they are saved
-export function skipCopy(createdAny: boolean): SkipCopy {
+// Once this run has created a habit (a card or the user's own), the dialog says "Leave" and that they are saved.
+// The notice and its button say where the flow goes: the first run returns to Home, a retake started from Settings
+// returns to Settings (app/onboarding.tsx closeFlow goes back to whichever opened it).
+export function skipCopy(createdAny: boolean, entry: OnboardingEntry = 'auto'): SkipCopy {
   const words = createdAny
     ? {title: LEAVE_TITLE, body: LEAVE_BODY, yes: LEAVE_YES, no: LEAVE_NO}
     : {title: SKIP_TITLE, body: SKIP_BODY, yes: SKIP_YES, no: SKIP_NO};
-  return {...words, notice: LEAVING_NOTICE, goHome: GO_HOME};
+  return entry === 'settings'
+    ? {...words, notice: RETAKE_LEAVING_NOTICE, goHome: BACK_TO_SETTINGS}
+    : {...words, notice: LEAVING_NOTICE, goHome: GO_HOME};
 }

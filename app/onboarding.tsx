@@ -599,7 +599,7 @@ export default function OnboardingScreen() {
         </View>
       )}
 
-      <SkipDialog state={skipState} copy={skipCopy(anyCreated)} reduceMotion={reduceMotion} onEvent={onSkipEvent} />
+      <SkipDialog state={skipState} copy={skipCopy(anyCreated, entry)} reduceMotion={reduceMotion} onEvent={onSkipEvent} />
     </SafeAreaView>
   );
 }

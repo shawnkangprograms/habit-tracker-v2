@@ -173,6 +173,7 @@ describe('matches docs/ONBOARDING_COPY.md section 7', () => {
       SKIP_TITLE: c.SKIP_TITLE, SKIP_BODY: c.SKIP_BODY, SKIP_YES: c.SKIP_YES, SKIP_NO: c.SKIP_NO,
       LEAVE_TITLE: c.LEAVE_TITLE, LEAVE_BODY: c.LEAVE_BODY, LEAVE_YES: c.LEAVE_YES, LEAVE_NO: c.LEAVE_NO,
       LEAVING_NOTICE: c.LEAVING_NOTICE, GO_HOME: c.GO_HOME,
+      RETAKE_LEAVING_NOTICE: c.RETAKE_LEAVING_NOTICE, BACK_TO_SETTINGS: c.BACK_TO_SETTINGS,
     };
     assert.deepEqual(toRecord(rows), fromCode);
     // every row names a real export holding exactly that text

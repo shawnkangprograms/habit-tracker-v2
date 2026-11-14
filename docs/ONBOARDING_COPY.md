@@ -206,5 +206,9 @@ Titles, labels and messages on the screens after Q11, keyed by their constant na
 | LEAVE_NO               | No, stay                                                                              |
 | LEAVING_NOTICE         | Taking you home. You can set up your plan any time in Settings.                       |
 | GO_HOME                | Go home                                                                               |
+| RETAKE_LEAVING_NOTICE  | Taking you back to Settings…                                                          |
+| BACK_TO_SETTINGS       | Back to Settings                                                                      |
+
+LEAVING_NOTICE and GO_HOME are the first run's (onboarding opened from Home); RETAKE_LEAVING_NOTICE and BACK_TO_SETTINGS replace them on a retake opened from Settings (decided 2026-11-14), since that flow returns to Settings. The Skip/Leave titles, bodies and buttons are the same on both.
 
 Routine subtitle (routineSubtitle), under the title when the run uses both chosen packs: "Built from your packs: {pack A} and {pack B}." The group labels are the pack names (docs/PACKS_REPORTS_SPEC.md, section 1) and ROUTINE_OTHER_GROUP.
