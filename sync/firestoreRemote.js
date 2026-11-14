@@ -1,10 +1,12 @@
 import {firestore} from '@/services/firestore';
 import {getFirestoreDb} from '@/services/firebaseInit';
+import {completionWriteFields, habitWriteFields, WRITE_OPTIONS} from '@/sync/merge';
 
 // The Firestore side of the sync engine (sync/engineCore.ts). The only sync file that uses Firestore (loaded
 // on first use through services/firestore.js).
-// Docs carry exactly the fields the rules allow; no userId (the uid is in the path). Whole-doc set(),
-// never merge: the rules check the complete field set on every write.
+// Docs carry exactly the fields the rules allow; no userId (the uid is in the path). Merge writes (WRITE_OPTIONS in
+// sync/merge.ts): fields this build doesn't know stay on the server; the rules check the merged document, so the
+// complete field set is still enforced on every write.
 // JS integers (createdAt, updatedAt, completed 0/1) are stored as Firestore integers by the SDK
 // (safe integers are encoded as integerValue), which the rules' "is int" checks require.
 
@@ -34,19 +36,9 @@ async function writeHabits(uid, items) {
     const batch = writeBatch(db);
     for (const {habitId, doc: d} of items) {
         batch.set(doc(db, 'users', uid, 'habits', habitId), {
-            habitName: d.habitName,
-            icon: d.icon,
-            frequencyType: d.frequencyType,
-            days: d.days,
-            reminderTime: d.reminderTime,
-            alarm: d.alarm, // bool; the rules accept a doc without it (older builds)
-            remindBeforeMin: d.remindBeforeMin, // int in [0, 5, 10, 15, 30, 60]
-            source: d.source,
-            createdAt: d.createdAt,
-            updatedAt: d.updatedAt,
-            deleted: d.deleted,
+            ...habitWriteFields(d),
             serverUpdatedAt: serverTimestamp(),
-        });
+        }, WRITE_OPTIONS);
     }
     try {
         await batch.commit();
@@ -62,12 +54,9 @@ async function writeCompletions(uid, items) {
     const batch = writeBatch(db);
     for (const {docId, doc: d} of items) {
         batch.set(doc(db, 'users', uid, 'completions', docId), {
-            habitId: d.habitId,
-            date: d.date,
-            completed: d.completed,
-            updatedAt: d.updatedAt,
+            ...completionWriteFields(d),
             serverUpdatedAt: serverTimestamp(),
-        });
+        }, WRITE_OPTIONS);
     }
     try {
         await batch.commit();

@@ -34,7 +34,9 @@ export function createFakeServer(serverNow: () => number) {
     refuse: null as ((data: Record<string, unknown>) => string | null) | null,
     failPull: false,
     get: (uid: string, name: PullCollection, id: string) => col(uid, name).get(id)?.data,
-    commit(uid: string, name: PullCollection, items: {id: string; data: Record<string, unknown>}[]) {
+    // options.merge: Firestore's set(..., {merge: true}): fields the write doesn't carry stay as stored (the rules'
+    // checks above look at the written fields, which here are always the full set this build knows)
+    commit(uid: string, name: PullCollection, items: {id: string; data: Record<string, unknown>}[], options: {merge?: boolean} = {}) {
       for (const {id, data} of items) {
         const stored = col(uid, name).get(id)?.data;
         const reason = server.refuse?.(data) ?? ((data.updatedAt as number) > serverNow() + 86_400_000 ? 'updatedAt more than a day ahead'
@@ -47,7 +49,10 @@ export function createFakeServer(serverNow: () => number) {
       }
       tick += 1;
       const ts = {seconds: 1_700_000_000 + tick, nanoseconds: 0};
-      for (const {id, data} of items) col(uid, name).set(id, {id, data, ts});
+      for (const {id, data} of items) {
+        const stored = options.merge ? col(uid, name).get(id)?.data : undefined;
+        col(uid, name).set(id, {id, data: {...stored, ...data}, ts});
+      }
     },
     page(uid: string, name: PullCollection, cursor: Cursor | null, pageSize: number) {
       if (server.failPull) throw fail('permission-denied');
@@ -65,6 +70,7 @@ export type FakeServer = ReturnType<typeof createFakeServer>;
 export async function createDevice(server: FakeServer, uid: string, clock: {now: number}) {
   const core = await import('../../db/syncCore.js');
   const {createSyncEngine} = await import('../../sync/engineCore.ts');
+  const {WRITE_OPTIONS} = await import('../../sync/merge.ts');// the app's own write options (sync/firestoreRemote.js)
   const {createCursorStore} = await import('../../sync/cursorStore.ts');
   const db: TestDb = await createTestDatabase();
   const queue = enqueueWrite;
@@ -85,9 +91,9 @@ export async function createDevice(server: FakeServer, uid: string, clock: {now:
   const remote = {
     probe: async () => {},
     writeHabits: async (u: string, items: {habitId: string; doc: Record<string, unknown>}[]) =>
-      server.commit(u, 'habits', items.map((i) => ({id: i.habitId, data: {...i.doc}}))),
+      server.commit(u, 'habits', items.map((i) => ({id: i.habitId, data: {...i.doc}})), WRITE_OPTIONS),
     writeCompletions: async (u: string, items: {docId: string; doc: Record<string, unknown>}[]) =>
-      server.commit(u, 'completions', items.map((i) => ({id: i.docId, data: {...i.doc}}))),
+      server.commit(u, 'completions', items.map((i) => ({id: i.docId, data: {...i.doc}})), WRITE_OPTIONS),
     pullPage: async (u: string, collection: PullCollection, after: Cursor | null, pageSize: number) => ({
       docs: server.page(u, collection, after, pageSize).map((d) => ({id: d.id, data: {...d.data}, cursor: {...d.ts, docId: d.id}})),
     }),

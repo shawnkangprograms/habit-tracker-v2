@@ -8,8 +8,10 @@ import {STAMP_UPDATE_SQL} from '@/db/stamp';// updatedAt = max(now, previous + 1
 import {getLocalDateString, getLocalWeekdayKey} from '@/utils/dates';
 import {validateHabitInput} from '@/validation/validators';
 
-function validateOrThrow(input) {
-    const result = validateHabitInput(input ?? {});
+// keepIcon: the habit's stored icon (updateHabit only). An icon id this build doesn't know, written by a newer
+// build, stays valid while the edit leaves it alone; any other unknown id is refused.
+function validateOrThrow(input, keepIcon = null) {
+    const result = validateHabitInput(input ?? {}, {keepIcon});
     if (!result.valid) throw new Error(result.error);
     return result.value;
 }
@@ -105,10 +107,16 @@ export async function getDeletedHabitIds(userId) {
 // User action: full edit. Completion rows are never changed, so past history keeps its old frequency.
 export async function updateHabit(userId, habitId, input) {
     requireUserId(userId);
-    const habit = validateOrThrow(input);
 
     await enqueueWrite(async () => {
         const db = await getDatabase();
+        // read in the same queued task as the write, so the allowance is the icon the update replaces
+        const stored = await db.getFirstAsync(
+            'SELECT icon FROM habits WHERE habitId = ? AND userId = ? AND deleted = 0',
+            [habitId, userId]
+        );
+        if (!stored) throw new Error('This habit no longer exists.');
+        const habit = validateOrThrow(input, stored.icon);
         await db.withTransactionAsync(async () => {
             const result = await db.runAsync(
                 `UPDATE habits

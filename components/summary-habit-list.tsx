@@ -3,11 +3,8 @@ import {StyleSheet, Text, View} from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import {colors, fonts, radii, spacing} from '@/constants/theme';
 import {HabitIcon} from '@/constants/habitIcons';
-import {ICON_IDS, type IconId} from '@/constants/habits';
 import type {HabitRate} from '@/utils/summary';
 import {habitDetail, habitLabel, rateText} from '@/utils/summaryLabels';
-
-const isIconId = (icon: string): icon is IconId => (ICON_IDS as readonly string[]).includes(icon);
 
 // Each active habit's rate for the range, already sorted (utils/summary.ts). Icons are muted, not in their
 // Home colours, so no green or pink next to a rate reads as a status. One screen-reader element per row.
@@ -21,7 +18,7 @@ export const HabitRateList = memo(function HabitRateList({habits}: {habits: Habi
           accessible
           accessibilityLabel={habitLabel(h)}>
           <View style={styles.badge}>
-            {isIconId(h.icon) && <HabitIcon id={h.icon} size={20} color={colors.muted} />}
+            <HabitIcon id={h.icon} size={20} color={colors.muted} />
           </View>
           <View style={styles.middle}>
             <Text style={styles.name}>{h.habitName}</Text>

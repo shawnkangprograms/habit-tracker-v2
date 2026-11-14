@@ -519,9 +519,9 @@ describe('pull', () => {
     assert.equal(h.engine.getStatus().initialPullDone, true);
   });
 
-  test('a doc with an unknown icon is skipped and counted; later docs still apply; a parser bump re-pulls', async () => {
+  test('a doc with an invalid icon is skipped and counted; later docs still apply; a parser bump re-pulls', async () => {
     const h = await createHarness();
-    h.server.put(ME, 'habits', H1, habitDoc({icon: 'rocket'})); // from a newer app version
+    h.server.put(ME, 'habits', H1, habitDoc({icon: 'x'.repeat(40)})); // not an icon id at all (an id from a newer app is kept: tests/data-tolerance.test.ts)
     h.server.put(ME, 'habits', H2, habitDoc());
     await h.engine.requestSync();
     assert.equal(await habitRow(h.db, H1), null);

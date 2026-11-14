@@ -9,7 +9,7 @@
 // - serverUpdatedAt (serverTimestamp, the pull cursor) is added by the engine, not here.
 
 import {validateHabitInput} from '@/validation/validators';
-import type {IconId, RemindBeforeMin, WeekdayKey} from '@/constants/habits';
+import type {RemindBeforeMin, WeekdayKey} from '@/constants/habits';
 
 export const BATCH_LIMIT = 450; // Firestore allows 500 writes per batch; headroom for safety
 
@@ -22,7 +22,9 @@ export const FUTURE_STAMP_LIMIT_MS = 24 * 60 * 60 * 1000;
 // phone re-reads all docs once, so docs it skipped as invalid before are picked up.
 // 2: alarm and remindBeforeMin. A phone on an older build stored pulled docs without them, so every phone
 // re-reads all docs once after updating and picks up their values.
-export const PARSER_VERSION = 2;
+// 3: an icon id this build doesn't know (written by a newer build) is accepted and kept as it came; before, such a
+// doc was skipped. Every phone re-reads all docs once after updating (initialPullDone is kept, so nothing is gated).
+export const PARSER_VERSION = 3;
 
 const DAY_ORDER: WeekdayKey[] = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']; // stored order in docs
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -35,7 +37,7 @@ const SOURCES = ['user', 'ai_suggested'] as const;
 export type LocalHabit = {
   habitId: string;
   habitName: string;
-  icon: IconId;
+  icon: string; // an ICON_IDS value, or an id from a newer build (constants/habits.ts STORED_ICON_RE), kept as stored
   frequencyType: 'daily' | 'weekdays';
   days: WeekdayKey[]; // empty for daily
   reminderTime: string | null;
@@ -102,8 +104,9 @@ export function habitToDoc(habit: LocalHabit): HabitDoc {
 }
 
 // A remote habit doc as a LocalHabit, or null if it fails the app's own rules (same validators as the form).
-// The rules are looser on purpose (name up to 60, any icon string), so a doc from a newer app version
-// with an unknown icon is skipped here rather than corrupting local data.
+// The rules are looser on purpose (name up to 60, any icon string). An icon id this build doesn't know is kept as it
+// came (it is drawn with a default glyph and pushed back unchanged); an icon that is not a plain 1-32 character
+// id still skips the doc, rather than corrupting local data.
 // alarm / remindBeforeMin may be missing (a doc written by an older build): off / 0. Present but invalid: skipped.
 export function docToHabit(habitId: string, data: unknown): LocalHabit | null {
   if (!isHabitId(habitId) || typeof data !== 'object' || data === null) return null;
@@ -117,7 +120,7 @@ export function docToHabit(habitId: string, data: unknown): LocalHabit | null {
     reminderTime: d.reminderTime,
     alarm: d.alarm,
     remindBeforeMin: d.remindBeforeMin,
-  });
+  }, {keepIcon: typeof d.icon === 'string' ? d.icon : null});
   if (!checked.valid) return null;
   if (d.reminderTime === undefined) return null; // must be present (null = no reminder)
   if (!(SOURCES as readonly unknown[]).includes(d.source)) return null;
@@ -177,6 +180,36 @@ export function mergeHabit(local: LocalHabit | null, remote: LocalHabit): HabitM
     createdAt: remote.createdAt,
   };
   return {habit: merged, writeLocal: !sameHabit(merged, local), needsPush: !sameHabit(merged, remote)};
+}
+
+// ---------- Writes ----------
+
+// Every push is a MERGE write: only the fields this build knows are written, and a field it doesn't know (added by a
+// newer build, and allowed by firestore.rules' hasOnly list) stays on the server. A whole-document write from an older
+// build would erase it. The rules check the merged document, so the full field set is still enforced on every write.
+// Arrays (days) are replaced as a whole. serverUpdatedAt is added by sync/firestoreRemote.js.
+export const WRITE_OPTIONS = {merge: true} as const;
+
+// The fields of users/{uid}/habits/{habitId} that this build writes, except serverUpdatedAt. tests/data-tolerance.test.ts
+// keeps this list equal to the one in firestore.rules.
+export function habitWriteFields(d: HabitDoc) {
+  return {
+    habitName: d.habitName,
+    icon: d.icon,
+    frequencyType: d.frequencyType,
+    days: d.days,
+    reminderTime: d.reminderTime,
+    alarm: d.alarm, // bool; the rules accept a doc without it (older builds)
+    remindBeforeMin: d.remindBeforeMin, // int in [0, 5, 10, 15, 30, 60]
+    source: d.source,
+    createdAt: d.createdAt,
+    updatedAt: d.updatedAt,
+    deleted: d.deleted,
+  };
+}
+
+export function completionWriteFields(d: CompletionDoc) {
+  return {habitId: d.habitId, date: d.date, completed: d.completed, updatedAt: d.updatedAt};
 }
 
 // ---------- Completions ----------

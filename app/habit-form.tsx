@@ -9,7 +9,7 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import {addHabit, getActiveHabitsWithDays, getDeletedHabitIds, getHabit, softDeleteHabit, updateHabit} from '@/db/habits';
 import {useSessionUid} from '@/services/session';
 import {
-  ICON_IDS, REMIND_BEFORE_OPTIONS, type Frequency, type IconId, type RemindBeforeMin, type WeekdayKey,
+  ICON_IDS, REMIND_BEFORE_OPTIONS, isKnownIcon, type Frequency, type IconId, type RemindBeforeMin, type WeekdayKey,
 } from '@/constants/habits';
 import {HabitIcon} from '@/constants/habitIcons';
 import {colors, fonts, radii, spacing, ICON_COLORS} from '@/constants/theme';
@@ -67,6 +67,9 @@ export default function HabitFormScreen() {
   // Add mode defaults match the Figma frame: star selected, Every day
   const [habitName, setHabitName] = useState('');
   const [icon, setIcon] = useState<IconId | null>('star');
+  // Edit mode: an icon id this build doesn't know (written by a newer build). The grid shows nothing selected, and
+  // saving without choosing keeps it, so a name-only edit never overwrites it (validateIcon's keepIcon).
+  const [keptIcon, setKeptIcon] = useState<string | null>(null);
   const [isWeekdays, setIsWeekdays] = useState(false);
   const [selectedDays, setSelectedDays] = useState<WeekdayKey[]>([]);
   const [reminderOn, setReminderOn] = useState(false);
@@ -104,8 +107,9 @@ export default function HabitFormScreen() {
         }
         setHabitName(habit.habitName);
         setLoadedName(habit.habitName);
-        // an icon id outside the allowed list leaves the grid unselected; Save then shows the icon error
-        setIcon((ICON_IDS as readonly string[]).includes(habit.icon) ? habit.icon : null);
+        // an icon id outside the allowed list leaves the grid unselected and is kept unless another is chosen
+        setIcon(isKnownIcon(habit.icon) ? habit.icon : null);
+        setKeptIcon(isKnownIcon(habit.icon) ? null : habit.icon);
         if (habit.frequency.type === 'weekdays') {
           setIsWeekdays(true);
           setSelectedDays(habit.frequency.days);
@@ -172,7 +176,8 @@ export default function HabitFormScreen() {
 
     // individual validators so every field can show its own message at once
     const name = validateHabitName(habitName);
-    const iconResult = validateIcon(icon);
+    const iconValue = icon ?? keptIcon;
+    const iconResult = validateIcon(iconValue, keptIcon);
     const freq = validateFrequency(frequency);
     const time = validateReminderTime(reminderTime);
     setErrors({
@@ -183,10 +188,10 @@ export default function HabitFormScreen() {
     });
 
     const input = validateHabitInput({
-      habitName, icon, frequency, reminderTime,
+      habitName, icon: iconValue, frequency, reminderTime,
       alarm: reminderOn ? alarm : false,
       remindBeforeMin: reminderOn ? lead : 0,
-    });
+    }, {keepIcon: keptIcon});
     if (!input.valid || !userId) return;
 
     savingRef.current = true;

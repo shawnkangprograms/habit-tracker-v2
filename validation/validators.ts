@@ -2,7 +2,7 @@
 // Each returns { valid: true, value } with the normalised input, or { valid: false, error }
 // with a message written for the user.
 import {
-  ICON_IDS, REMIND_BEFORE_OPTIONS, WEEKDAY_KEYS,
+  ICON_IDS, REMIND_BEFORE_OPTIONS, STORED_ICON_RE, WEEKDAY_KEYS,
   type Frequency, type IconId, type RemindBeforeMin, type WeekdayKey,
 } from '@/constants/habits';
 
@@ -30,11 +30,15 @@ export function validateHabitName(input: unknown): Result<string> {
   return ok(name);
 }
 
-export function validateIcon(input: unknown): Result<IconId> {
-  if (typeof input !== 'string' || !(ICON_IDS as readonly string[]).includes(input)) {
-    return fail('Please choose an icon.');
+// `keepIcon` is the icon id a habit already has. An id outside ICON_IDS (written by a newer build) is accepted only
+// when it equals `keepIcon`, so an edit that leaves the icon alone can't overwrite it; the value is then typed
+// IconId but may be foreign (see STORED_ICON_RE). Callers outside the sync parser and updateHabit pass nothing.
+export function validateIcon(input: unknown, keepIcon?: string | null): Result<IconId> {
+  if (typeof input === 'string' && (ICON_IDS as readonly string[]).includes(input)) return ok(input as IconId);
+  if (typeof input === 'string' && typeof keepIcon === 'string' && input === keepIcon && STORED_ICON_RE.test(input)) {
+    return ok(input as IconId);
   }
-  return ok(input as IconId);
+  return fail('Please choose an icon.');
 }
 
 export function validateFrequency(input: unknown): Result<Frequency> {
@@ -87,13 +91,14 @@ export type HabitInput = {
 
 // Runs the habit validators; returns the first error, or all normalised fields.
 // alarm and remindBeforeMin are stored as given, also without a reminder time (they then have no effect).
+// options.keepIcon: the icon the habit already has (see validateIcon): updateHabit and the sync parser pass it.
 export function validateHabitInput(input: {
   habitName?: unknown; icon?: unknown; frequency?: unknown; reminderTime?: unknown;
   alarm?: unknown; remindBeforeMin?: unknown;
-}): Result<HabitInput> {
+}, options: {keepIcon?: string | null} = {}): Result<HabitInput> {
   const name = validateHabitName(input.habitName);
   if (!name.valid) return name;
-  const icon = validateIcon(input.icon);
+  const icon = validateIcon(input.icon, options.keepIcon);
   if (!icon.valid) return icon;
   const frequency = validateFrequency(input.frequency);
   if (!frequency.valid) return frequency;
