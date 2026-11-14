@@ -166,7 +166,7 @@ export default function ChoosePacksScreen() {
           disabled={!canSave}
           accessibilityRole="button"
           accessibilityState={{disabled: !canSave, busy: saving}}>
-          {saving ? <ActivityIndicator color={colors.white} /> : <Text style={styles.saveText}>{SAVE_PACKS}</Text>}
+          {saving ? <ActivityIndicator color={colors.onAccent} /> : <Text style={styles.saveText}>{SAVE_PACKS}</Text>}
         </Pressable>
       </ScrollView>
     </SafeAreaView>
@@ -221,5 +221,5 @@ const styles = StyleSheet.create({
   },
   saveOff: {opacity: 0.5},
   pressedAccent: {opacity: pressedOpacity.accent},// a filled accent control (constants/theme.ts)
-  saveText: {fontFamily: fonts.title, fontSize: 16, color: colors.white},
+  saveText: {fontFamily: fonts.title, fontSize: 16, color: colors.onAccent},
 });

@@ -59,6 +59,6 @@ const styles = StyleSheet.create({
   number: {fontFamily: fonts.semiBold, fontSize: 12, lineHeight: LINE, color: colors.text},
   message: {flex: 1, fontFamily: fonts.regular, fontSize: 11, lineHeight: LINE, color: colors.muted, textAlign: 'right'},
   track: {height: 6, borderRadius: radii.pill, backgroundColor: colors.track, overflow: 'hidden'},
-  fill: {height: '100%', width: '100%', borderRadius: radii.pill, backgroundColor: colors.green, transformOrigin: 'left'},
+  fill: {height: '100%', width: '100%', borderRadius: radii.pill, backgroundColor: colors.success, transformOrigin: 'left'},
   fillLow: {backgroundColor: colors.amber},
 });

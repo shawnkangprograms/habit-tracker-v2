@@ -9,7 +9,7 @@ const OPTIONS: {value: SummaryRange; label: string; spoken: string}[] = [
 ];
 
 // Week | Month segmented control. Each segment is a tab with its selected state; 48 dp minimum height.
-// The selected segment uses the background ink on accent (5.75:1); white on accent is only 3.08:1.
+// The selected segment uses the onAccent ink on the accent (5.75:1), like every accent fill since C1b; white would be 3.08:1.
 export const RangeToggle = memo(function RangeToggle({value, onChange}: {
   value: SummaryRange;
   onChange: (range: SummaryRange) => void;
@@ -56,5 +56,5 @@ const styles = StyleSheet.create({
   selected: {backgroundColor: colors.accent},
   pressed: {backgroundColor: colors.track},
   label: {fontFamily: fonts.semiBold, fontSize: 15, color: colors.muted, textAlign: 'center'},
-  selectedLabel: {color: colors.background},
+  selectedLabel: {color: colors.onAccent},
 });

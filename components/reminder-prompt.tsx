@@ -90,7 +90,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  primaryText: {fontFamily: fonts.title, fontSize: 14, color: colors.white},
+  primaryText: {fontFamily: fonts.title, fontSize: 14, color: colors.onAccent},
   secondary: {height: 38, paddingHorizontal: spacing.lg, borderRadius: radii.pill, alignItems: 'center', justifyContent: 'center'},
   secondaryText: {fontFamily: fonts.semiBold, fontSize: 14, color: colors.muted},
   pressed: {opacity: pressedOpacity.default},

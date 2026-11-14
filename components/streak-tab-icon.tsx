@@ -46,6 +46,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  number: {fontFamily: fonts.bold, fontSize: 10, lineHeight: 11, color: colors.background, includeFontPadding: false},
+  number: {fontFamily: fonts.bold, fontSize: 10, lineHeight: 11, color: colors.onAccent, includeFontPadding: false},
   numberSmall: {fontSize: 8, lineHeight: 10},
 });

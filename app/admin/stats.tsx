@@ -94,8 +94,8 @@ export default function AdminStatsScreen() {
             accessibilityRole="button"
             accessibilityLabel="Refresh today's numbers">
             {refresh.kind === 'running'
-              ? <ActivityIndicator size="small" color={colors.white} />
-              : <MaterialCommunityIcons name="refresh" size={18} color={colors.white} />}
+              ? <ActivityIndicator size="small" color={colors.onAccent} />
+              : <MaterialCommunityIcons name="refresh" size={18} color={colors.onAccent} />}
             <Text style={styles.refreshText}>Refresh</Text>
           </Pressable>
           <Text style={[styles.refreshStatus, refresh.kind === 'failed' && styles.refreshFailed]} numberOfLines={2}
@@ -224,7 +224,7 @@ const styles = StyleSheet.create({
   segment: {flex: 1, minHeight: 40, borderRadius: radii.pill, alignItems: 'center', justifyContent: 'center'},
   segmentOn: {backgroundColor: colors.accent},
   segmentText: {fontFamily: fonts.semiBold, fontSize: 14, color: colors.muted},
-  segmentTextOn: {color: colors.white},
+  segmentTextOn: {color: colors.onAccent},
   refreshRow: {flexDirection: 'row', alignItems: 'center', gap: spacing.md},
   refreshButton: {
     flexDirection: 'row',
@@ -235,7 +235,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
     backgroundColor: colors.accent,
   },
-  refreshText: {fontFamily: fonts.title, fontSize: 15, color: colors.white},
+  refreshText: {fontFamily: fonts.title, fontSize: 15, color: colors.onAccent},
   refreshStatus: {flex: 1, fontFamily: fonts.regular, fontSize: 13, color: colors.muted},
   refreshFailed: {color: colors.text},
   pressedAccent: {opacity: pressedOpacity.accent},// a filled accent control (constants/theme.ts)

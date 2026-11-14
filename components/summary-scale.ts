@@ -2,8 +2,9 @@ import {colors} from '@/constants/theme';
 import type {ShareStep} from '@/utils/summaryLabels';
 
 // One hue: colors.accent in alpha steps over colors.surface (the card), for steps 1..4 of utils/summaryLabels.
-// Checked with the dataviz ordinal validator (dark, surface #1e1b17): monotone lightness, every adjacent
-// step >= 0.06 apart, faintest step 2.10:1 against the card. Blended: #7d3e19, #a64d1a, #cc5b1a, #f2691b.
+// Re-checked for palette B (C1b, surface #221f1a): monotone OKLab lightness, adjacent steps 0.083, 0.079 and 0.074
+// apart (>= 0.06), faintest step 2.08:1 against the card (tests/palette.test.ts lists it as a known low pair: its meaning
+// is in the labels). Blended: #80401a, #a74e1b, #cd5c1b, #f2691b.
 // Five steps did not fit between that floor and full accent, hence four.
 const STEP_FILL = {
   1: colors.accent + '73', // 45%

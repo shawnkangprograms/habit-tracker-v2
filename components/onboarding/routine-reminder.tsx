@@ -52,5 +52,5 @@ const styles = StyleSheet.create({
   chipOn: {backgroundColor: colors.accent},
   chipOff: {backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border},
   chipText: {fontFamily: fonts.semiBold, fontSize: 13, color: colors.muted},
-  chipTextOn: {color: colors.white},
+  chipTextOn: {color: colors.onAccent},
 });

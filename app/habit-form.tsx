@@ -372,7 +372,7 @@ export default function HabitFormScreen() {
                     style={[styles.repeatPill, selected ? styles.pillSelected : styles.pillUnselected]}
                     accessibilityRole="button"
                     accessibilityState={{selected}}>
-                    <Text style={[styles.repeatText, selected && styles.whiteText]}>{option.text}</Text>
+                    <Text style={[styles.repeatText, selected && styles.onAccentText]}>{option.text}</Text>
                   </Pressable>
                 );
               })}
@@ -389,7 +389,7 @@ export default function HabitFormScreen() {
                       accessibilityRole="button"
                       accessibilityLabel={key}
                       accessibilityState={{selected}}>
-                      <Text style={[styles.dayText, selected && styles.whiteText]}>{label}</Text>
+                      <Text style={[styles.dayText, selected && styles.onAccentText]}>{label}</Text>
                     </Pressable>
                   );
                 })}
@@ -413,7 +413,7 @@ export default function HabitFormScreen() {
                       hitSlop={4}
                       accessibilityRole="radio"
                       accessibilityState={{selected}}>
-                      <Text style={[styles.chipText, selected && styles.whiteText]}>{option.name}</Text>
+                      <Text style={[styles.chipText, selected && styles.onAccentText]}>{option.name}</Text>
                     </Pressable>
                   );
                 })}
@@ -436,7 +436,7 @@ export default function HabitFormScreen() {
                       hitSlop={4}
                       accessibilityRole="radio"
                       accessibilityState={{selected}}>
-                      <Text style={[styles.chipText, selected && styles.whiteText]}>{option === 'none' ? AREA_NOT_COUNTED : option}</Text>
+                      <Text style={[styles.chipText, selected && styles.onAccentText]}>{option === 'none' ? AREA_NOT_COUNTED : option}</Text>
                     </Pressable>
                   );
                 })}
@@ -484,7 +484,7 @@ export default function HabitFormScreen() {
                         hitSlop={4}
                         accessibilityRole="radio"
                         accessibilityState={{selected}}>
-                        <Text style={[styles.chipText, selected && styles.whiteText]}>{LEAD_LABELS[minutes]}</Text>
+                        <Text style={[styles.chipText, selected && styles.onAccentText]}>{LEAD_LABELS[minutes]}</Text>
                       </Pressable>
                     );
                   })}
@@ -567,7 +567,7 @@ const styles = StyleSheet.create({
   pillSelected: {backgroundColor: colors.accent},
   pillUnselected: {backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border},
   repeatText: {fontFamily: fonts.semiBold, fontSize: 14, color: colors.muted},
-  whiteText: {color: colors.white},
+  onAccentText: {color: colors.onAccent},
   dayRow: {flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.md},
   dayChip: {width: 45, height: 39, borderRadius: radii.pill, alignItems: 'center', justifyContent: 'center'},
   dayText: {fontFamily: fonts.bold, fontSize: 11, color: colors.muted},
@@ -600,7 +600,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  primaryText: {fontFamily: fonts.title, fontSize: 16, color: colors.white},
+  primaryText: {fontFamily: fonts.title, fontSize: 16, color: colors.onAccent},
   deleteButton: {
     height: 52,
     borderRadius: radii.pill,

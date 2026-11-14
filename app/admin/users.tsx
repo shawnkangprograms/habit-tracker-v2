@@ -172,7 +172,7 @@ const styles = StyleSheet.create({
   chipSelected: {backgroundColor: colors.accent},
   chipUnselected: {backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border},
   chipText: {fontFamily: fonts.semiBold, fontSize: 12, color: colors.muted},
-  chipTextSelected: {color: colors.white},
+  chipTextSelected: {color: colors.onAccent},
   row: {
     flexDirection: 'row',
     alignItems: 'center',

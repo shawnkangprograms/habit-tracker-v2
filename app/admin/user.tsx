@@ -114,7 +114,7 @@ export default function AdminUserScreen() {
                   <MaterialCommunityIcons
                     name={load.user.disabled ? 'account-cancel-outline' : 'account-check-outline'}
                     size={18}
-                    color={load.user.disabled ? colors.error : colors.green}
+                    color={load.user.disabled ? colors.error : colors.success}
                   />
                   <Text style={styles.value}>{load.user.disabled ? 'Disabled' : 'Active'}</Text>
                 </View>
@@ -133,7 +133,7 @@ export default function AdminUserScreen() {
                 disabled={saving}
                 accessibilityRole="button">
                 {saving ? (
-                  <ActivityIndicator color={load.user.disabled ? colors.white : colors.error} />
+                  <ActivityIndicator color={load.user.disabled ? colors.onAccent : colors.error} />
                 ) : load.user.disabled ? (
                   <Text style={styles.primaryText}>Enable user</Text>
                 ) : (
@@ -178,7 +178,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  primaryText: {fontFamily: fonts.title, fontSize: 16, color: colors.white},
+  primaryText: {fontFamily: fonts.title, fontSize: 16, color: colors.onAccent},
   dangerButton: {
     height: 52,
     borderRadius: radii.pill,

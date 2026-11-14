@@ -75,7 +75,7 @@ export function CelebrationOverlay({item, reduceMotion, onContinue}: {
 }
 
 const styles = StyleSheet.create({
-  backdrop: {flex: 1, backgroundColor: 'rgba(10, 9, 8, 0.82)'},
+  backdrop: {flex: 1, backgroundColor: colors.scrimStrong},
   backdropContent: {flexGrow: 1, alignItems: 'center', justifyContent: 'center'},
   card: {
     width: '100%',
@@ -100,6 +100,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  buttonText: {fontFamily: fonts.title, fontSize: 16, color: colors.white},
+  buttonText: {fontFamily: fonts.title, fontSize: 16, color: colors.onAccent},
   pressedAccent: {opacity: pressedOpacity.accent},// a filled accent control (constants/theme.ts)
 });

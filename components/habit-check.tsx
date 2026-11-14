@@ -34,7 +34,7 @@ export function HabitCheck(props: {
       onPress={props.onPress}
       testID={props.testID}>
       <Animated.View style={[styles.check, props.done && styles.checkDone, pulseStyle]}>
-        {props.done && <MaterialCommunityIcons name="check" size={17} color={colors.white} />}
+        {props.done && <MaterialCommunityIcons name="check" size={17} color={colors.onAccent} />}
       </Animated.View>
     </Pressable>
   );
@@ -50,5 +50,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  checkDone: {backgroundColor: colors.green, borderColor: colors.green},
+  checkDone: {backgroundColor: colors.success, borderColor: colors.success},
 });

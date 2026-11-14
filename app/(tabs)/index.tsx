@@ -143,7 +143,7 @@ function TimeText({time, status}: {time: string; status: TimeStatus}) {
     return (
       <View style={styles.timeRow}>
         <Text style={[styles.time, styles.onTime]}>{time}</Text>
-        <MaterialCommunityIcons name="check" size={11} color={colors.green} />
+        <MaterialCommunityIcons name="check" size={11} color={colors.success} />
       </View>
     );
   }
@@ -858,7 +858,7 @@ const styles = StyleSheet.create({
   shrink: {flexShrink: 1},
   timeRow: {flexDirection: 'row', alignItems: 'center', gap: 2},
   time: {fontFamily: fonts.regular, fontSize: 10, color: colors.muted},
-  onTime: {fontFamily: fonts.semiBold, color: colors.green},
+  onTime: {fontFamily: fonts.semiBold, color: colors.success},
   overdue: {fontFamily: fonts.semiBold, color: colors.error},
   next: {fontFamily: fonts.semiBold, fontSize: 11, color: colors.muted},
   doneContent: {opacity: 0.55},

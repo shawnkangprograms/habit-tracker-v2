@@ -107,7 +107,7 @@ export function RoutineCard({pick, index, selected, added, disabled, reduceMotio
         {/* one fixed slot: the check and "Added" stacked, so the cross-fade never moves the text */}
         <View style={styles.slot}>
           <Animated.View style={[styles.check, selected && styles.checkOn, checkStyle]}>
-            {selected && <MaterialCommunityIcons name="check" size={15} color={colors.white} />}
+            {selected && <MaterialCommunityIcons name="check" size={15} color={colors.onAccent} />}
           </Animated.View>
           <Animated.Text style={[styles.added, addedStyle]}>{ADDED}</Animated.Text>
         </View>
@@ -150,5 +150,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   checkOn: {borderColor: colors.accent, backgroundColor: colors.accent},
-  added: {position: 'absolute', right: 0, fontFamily: fonts.bold, fontSize: 11, letterSpacing: 0.9, color: colors.green},
+  added: {position: 'absolute', right: 0, fontFamily: fonts.bold, fontSize: 11, letterSpacing: 0.9, color: colors.success},
 });

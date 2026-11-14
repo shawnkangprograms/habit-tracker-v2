@@ -212,7 +212,7 @@ export default function EditPackScreen() {
                         hitSlop={4}
                         accessibilityRole="radio"
                         accessibilityState={{selected, disabled: areaLocked}}>
-                        <Text style={[styles.chipText, selected && styles.whiteText]}>{option}</Text>
+                        <Text style={[styles.chipText, selected && styles.onAccentText]}>{option}</Text>
                       </Pressable>
                     );
                   })}
@@ -273,7 +273,7 @@ export default function EditPackScreen() {
             accessibilityRole="button"
             accessibilityState={{disabled: !canSave, busy: saving}}>
             {saving
-              ? <ActivityIndicator color={colors.white} />
+              ? <ActivityIndicator color={colors.onAccent} />
               : <Text style={styles.primaryText}>{packId === null ? CREATE_PACK_SAVE : SAVE_CHANGES}</Text>}
           </Pressable>
           {packId !== null && loaded && (
@@ -326,7 +326,7 @@ const styles = StyleSheet.create({
   chipSelected: {backgroundColor: colors.accent},
   chipUnselected: {backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border},
   chipText: {fontFamily: fonts.semiBold, fontSize: 13, color: colors.muted},
-  whiteText: {color: colors.white},
+  onAccentText: {color: colors.onAccent},
   list: {gap: spacing.sm},
   habit: {
     flexDirection: 'row',
@@ -357,7 +357,7 @@ const styles = StyleSheet.create({
   },
   saveOff: {opacity: 0.5},
   pressedAccent: {opacity: pressedOpacity.accent},// a filled accent control (constants/theme.ts)
-  primaryText: {fontFamily: fonts.title, fontSize: 16, color: colors.white},
+  primaryText: {fontFamily: fonts.title, fontSize: 16, color: colors.onAccent},
   deleteButton: {
     height: 52,
     borderRadius: radii.pill,

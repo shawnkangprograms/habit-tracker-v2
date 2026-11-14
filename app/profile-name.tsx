@@ -126,7 +126,7 @@ export default function ProfileNameScreen() {
             accessibilityRole="button"
             accessibilityState={{disabled: !canSave, busy: status === 'saving'}}>
             {status === 'saving'
-              ? <ActivityIndicator color={colors.white} />
+              ? <ActivityIndicator color={colors.onAccent} />
               : <Text style={styles.saveText}>{NAME_SAVE}</Text>}
           </Pressable>
         </ScrollView>
@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
   },
   inputError: {borderColor: colors.error},
   errorText: {fontFamily: fonts.medium, fontSize: 12, color: colors.error, paddingHorizontal: spacing.sm},
-  saved: {fontFamily: fonts.semiBold, fontSize: 14, color: colors.green, marginTop: spacing.lg, textAlign: 'center'},
+  saved: {fontFamily: fonts.semiBold, fontSize: 14, color: colors.success, marginTop: spacing.lg, textAlign: 'center'},
   failed: {fontFamily: fonts.medium, fontSize: 13, color: colors.error, marginTop: spacing.lg, textAlign: 'center'},
   save: {
     height: 56,
@@ -205,5 +205,5 @@ const styles = StyleSheet.create({
   },
   saveOff: {opacity: 0.5},
   pressedAccent: {opacity: pressedOpacity.accent},// a filled accent control (constants/theme.ts)
-  saveText: {fontFamily: fonts.title, fontSize: 16, color: colors.white},
+  saveText: {fontFamily: fonts.title, fontSize: 16, color: colors.onAccent},
 });

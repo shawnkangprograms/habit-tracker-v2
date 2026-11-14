@@ -72,7 +72,7 @@ function DialogButton({label, primary = false, testID, onPress}: {label: string;
 }
 
 const styles = StyleSheet.create({
-  backdrop: {flex: 1, justifyContent: 'center', padding: spacing.lg, backgroundColor: 'rgba(0, 0, 0, 0.6)'},
+  backdrop: {flex: 1, justifyContent: 'center', padding: spacing.lg, backgroundColor: colors.scrim},
   card: {
     gap: spacing.md,
     padding: spacing.xl,
@@ -85,7 +85,7 @@ const styles = StyleSheet.create({
   body: {fontFamily: fonts.regular, fontSize: 15, lineHeight: 22, color: colors.muted, marginBottom: spacing.sm},
   notice: {fontFamily: fonts.semiBold, fontSize: 16, lineHeight: 23, color: colors.text, marginBottom: spacing.sm},
   primary: {minHeight: 52, borderRadius: radii.pill, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.lg},
-  primaryText: {fontFamily: fonts.title, fontSize: 16, color: colors.white},
+  primaryText: {fontFamily: fonts.title, fontSize: 16, color: colors.onAccent},
   secondary: {
     minHeight: 52, borderRadius: radii.pill, borderWidth: 1, borderColor: colors.accent, alignItems: 'center',
     justifyContent: 'center', paddingHorizontal: spacing.lg,

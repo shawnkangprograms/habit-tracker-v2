@@ -80,7 +80,7 @@ export function StatsCard(props: {
               progress={restDay ? 0 : props.doneToday / props.scheduledToday}
               size={54}
               strokeWidth={5}
-              color={restDay ? colors.muted : colors.green}>
+              color={restDay ? colors.muted : colors.success}>
               <Text style={[styles.ringText, restDay && styles.ringTextRest]}>
                 {restDay ? 'Rest\nday' : `${props.doneToday}/${props.scheduledToday}`}
               </Text>

@@ -137,7 +137,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   secondary: {backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border},
-  buttonText: {fontFamily: fonts.title, fontSize: 14, color: colors.white},
+  buttonText: {fontFamily: fonts.title, fontSize: 14, color: colors.onAccent},
   secondaryText: {color: colors.text},
   pressed: {opacity: pressedOpacity.default},
   pressedAccent: {opacity: pressedOpacity.accent},// a filled accent control (constants/theme.ts)

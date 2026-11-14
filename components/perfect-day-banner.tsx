@@ -28,7 +28,7 @@ export function PerfectDayBanner({text, onDismiss}: {text: string; onDismiss: ()
       entering={FadeInUp.duration(220).reduceMotion(ReduceMotion.System)}
       exiting={FadeOut.duration(180).reduceMotion(ReduceMotion.System)}>
       <Pressable style={styles.banner} onPress={onDismiss} accessibilityRole="button" accessibilityHint="Dismisses the message">
-        <MaterialCommunityIcons name="star-four-points" size={18} color={colors.green} />
+        <MaterialCommunityIcons name="star-four-points" size={18} color={colors.success} />
         <Text style={styles.text} numberOfLines={2}>{text}</Text>
       </Pressable>
     </Animated.View>
@@ -45,7 +45,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     borderRadius: radii.habitCard,
     borderWidth: 1,
-    borderColor: colors.green + '80',
+    borderColor: colors.success + '80',
     backgroundColor: colors.raised,
   },
   text: {flex: 1, fontFamily: fonts.semiBold, fontSize: 14, color: colors.text},

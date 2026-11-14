@@ -52,6 +52,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  retryText: {fontFamily: fonts.title, fontSize: 15, color: colors.white},
+  retryText: {fontFamily: fonts.title, fontSize: 15, color: colors.onAccent},
   pressedAccent: {opacity: pressedOpacity.accent},// a filled accent control (constants/theme.ts)
 });

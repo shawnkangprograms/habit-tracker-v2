@@ -66,7 +66,7 @@ export function OptionButton({label, selected, multi, dimmed = false, reduceMoti
           {selected && (
             <Animated.View style={markStyle}>
               {multi
-                ? <MaterialCommunityIcons name="check" size={15} color={colors.white} />
+                ? <MaterialCommunityIcons name="check" size={15} color={colors.onAccent} />
                 : <View style={styles.dot} />}
             </Animated.View>
           )}
@@ -124,6 +124,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   markOn: {borderColor: colors.accent, backgroundColor: colors.accent},
-  dot: {width: 8, height: 8, borderRadius: 4, backgroundColor: colors.white},
+  dot: {width: 8, height: 8, borderRadius: 4, backgroundColor: colors.onAccent},
   label: {flex: 1, fontFamily: fonts.semiBold, fontSize: 15, color: colors.text},
 });

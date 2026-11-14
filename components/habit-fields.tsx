@@ -93,7 +93,7 @@ export function FrequencyPicker({isWeekdays, onChangeWeekdays, days, onToggleDay
               style={[styles.repeatPill, selected ? styles.pillSelected : styles.pillUnselected]}
               accessibilityRole="button"
               accessibilityState={{selected}}>
-              <Text style={[styles.repeatText, selected && styles.whiteText]}>{option.text}</Text>
+              <Text style={[styles.repeatText, selected && styles.onAccentText]}>{option.text}</Text>
             </Pressable>
           );
         })}
@@ -110,7 +110,7 @@ export function FrequencyPicker({isWeekdays, onChangeWeekdays, days, onToggleDay
                 accessibilityRole="button"
                 accessibilityLabel={key}
                 accessibilityState={{selected}}>
-                <Text style={[styles.dayText, selected && styles.whiteText]}>{label}</Text>
+                <Text style={[styles.dayText, selected && styles.onAccentText]}>{label}</Text>
               </Pressable>
             );
           })}
@@ -184,7 +184,7 @@ const styles = StyleSheet.create({
   pillSelected: {backgroundColor: colors.accent},
   pillUnselected: {backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border},
   repeatText: {fontFamily: fonts.semiBold, fontSize: 14, color: colors.muted},
-  whiteText: {color: colors.white},
+  onAccentText: {color: colors.onAccent},
   dayRow: {flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.md},
   dayChip: {width: 45, height: 39, borderRadius: radii.pill, alignItems: 'center', justifyContent: 'center'},
   dayText: {fontFamily: fonts.bold, fontSize: 11, color: colors.muted},

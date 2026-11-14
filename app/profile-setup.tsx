@@ -153,7 +153,7 @@ export default function ProfileSetupScreen() {
             accessibilityRole="button"
             accessibilityState={{disabled: !canSave, busy: status === 'saving'}}>
             {status === 'saving'
-              ? <ActivityIndicator color={colors.white} />
+              ? <ActivityIndicator color={colors.onAccent} />
               : <Text style={styles.saveText}>{SETUP_SAVE}</Text>}
           </Pressable>
         </ScrollView>
@@ -233,5 +233,5 @@ const styles = StyleSheet.create({
   },
   saveOff: {opacity: 0.5},
   pressedAccent: {opacity: pressedOpacity.accent},// a filled accent control (constants/theme.ts)
-  saveText: {fontFamily: fonts.title, fontSize: 16, color: colors.white},
+  saveText: {fontFamily: fonts.title, fontSize: 16, color: colors.onAccent},
 });

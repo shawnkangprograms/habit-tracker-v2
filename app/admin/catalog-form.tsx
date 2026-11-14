@@ -216,7 +216,7 @@ export default function CatalogFormScreen() {
               disabled={saving}
               accessibilityRole="button">
               {saving
-                ? <ActivityIndicator color={colors.white} />
+                ? <ActivityIndicator color={colors.onAccent} />
                 : <Text style={styles.primaryText}>{isEdit ? 'Save changes' : 'Save starter habit'}</Text>}
             </Pressable>
             {isEdit && (
@@ -252,7 +252,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  primaryText: {fontFamily: fonts.title, fontSize: 16, color: colors.white},
+  primaryText: {fontFamily: fonts.title, fontSize: 16, color: colors.onAccent},
   deleteButton: {
     height: 52,
     borderRadius: radii.pill,

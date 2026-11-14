@@ -666,7 +666,7 @@ const styles = StyleSheet.create({
     ...shadows.glow,// soft orange glow (constants/theme.ts)
   },
   primaryOff: {opacity: 0.4, ...shadows.glowOff},
-  primaryText: {fontFamily: fonts.title, fontSize: 16, color: colors.white},
+  primaryText: {fontFamily: fonts.title, fontSize: 16, color: colors.onAccent},
   secondary: {
     height: 52,
     borderRadius: radii.pill,

@@ -362,7 +362,7 @@ export default function AuthScreen() {
           {submitError ? <Text style={styles.submitError}>{submitError}</Text> : null}
 
           <Pressable
-            style={({pressed}) => [styles.primaryButton, (pressed || buttonDisabled) && styles.pressedAccent]}
+            style={({pressed}) => [styles.primaryButton, buttonDisabled ? styles.primaryOff : pressed && styles.pressedAccent]}
             onPress={isReset ? handleReset : handleSubmit}
             disabled={buttonDisabled}
             accessibilityRole="button"
@@ -370,7 +370,7 @@ export default function AuthScreen() {
             accessibilityState={{busy: submitting, disabled: buttonDisabled}}
             testID={TEST_IDS.auth.submit}>
             {submitting
-              ? <ActivityIndicator color={colors.white} />
+              ? <ActivityIndicator color={colors.onAccent} />
               : <Text style={styles.primaryText}>{buttonLabel}</Text>}
           </Pressable>
 
@@ -430,7 +430,7 @@ const styles = StyleSheet.create({
   inputInner: {flex: 1, height: '100%', fontFamily: fonts.regular, fontSize: 14, color: colors.text},
   errorText: {fontFamily: fonts.medium, fontSize: 12, color: colors.error, marginTop: spacing.sm, marginLeft: 20},
   submitError: {fontFamily: fonts.medium, fontSize: 13, color: colors.error, textAlign: 'center', marginTop: spacing.xs},
-  confirmText: {fontFamily: fonts.medium, fontSize: 13, color: colors.green, textAlign: 'center', marginTop: spacing.xs},
+  confirmText: {fontFamily: fonts.medium, fontSize: 13, color: colors.success, textAlign: 'center', marginTop: spacing.xs},
   forgotRow: {alignSelf: 'flex-end', marginRight: 20, marginBottom: spacing.md},
   forgotText: {fontFamily: fonts.medium, fontSize: 13, color: colors.muted},
   resetIntro: {alignItems: 'center', marginBottom: spacing.lg},
@@ -444,8 +444,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: spacing.lg,
   },
-  primaryText: {fontFamily: fonts.title, fontSize: 16, color: colors.white},
+  primaryText: {fontFamily: fonts.title, fontSize: 16, color: colors.onAccent},
   pressedAccent: {opacity: pressedOpacity.accent},// a filled accent control (constants/theme.ts)
+  primaryOff: {opacity: 0.5},// disabled (signing in, or a reset link on cooldown): the Save buttons' disabled look; pressed stays 0.9
   switchRow: {alignSelf: 'center', marginTop: spacing.lg},
   switchText: {fontFamily: fonts.regular, fontSize: 13, color: colors.muted},
   switchAction: {fontFamily: fonts.medium, color: colors.text},

@@ -164,7 +164,7 @@ export default function ReflectScreen() {
                       accessibilityRole="radio"
                       accessibilityState={{selected}}
                       accessibilityLabel={`${option.label}, ${i + 1} of ${question.options.length}`}>
-                      <Text style={[styles.chipText, selected && styles.whiteText]}>{option.label}</Text>
+                      <Text style={[styles.chipText, selected && styles.onAccentText]}>{option.label}</Text>
                     </Pressable>
                   );
                 })}
@@ -204,7 +204,7 @@ export default function ReflectScreen() {
             accessibilityRole="button"
             accessibilityHint={complete ? undefined : SAVE_HINT_DISABLED}
             accessibilityState={{disabled: !canSave, busy: saving}}>
-            {saving ? <ActivityIndicator color={colors.white} /> : <Text style={styles.primaryText}>{SAVE_BUTTON}</Text>}
+            {saving ? <ActivityIndicator color={colors.onAccent} /> : <Text style={styles.primaryText}>{SAVE_BUTTON}</Text>}
           </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -230,7 +230,7 @@ const styles = StyleSheet.create({
   chipSelected: {backgroundColor: colors.accent},
   chipUnselected: {backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border},
   chipText: {fontFamily: fonts.semiBold, fontSize: 13, color: colors.muted},
-  whiteText: {color: colors.white},
+  onAccentText: {color: colors.onAccent},
   input: {
     minHeight: 96,
     borderRadius: radii.habitCard,
@@ -257,5 +257,5 @@ const styles = StyleSheet.create({
   },
   saveOff: {opacity: 0.5},
   pressedAccent: {opacity: pressedOpacity.accent},// a filled accent control (constants/theme.ts)
-  primaryText: {fontFamily: fonts.title, fontSize: 16, color: colors.white},
+  primaryText: {fontFamily: fonts.title, fontSize: 16, color: colors.onAccent},
 });
