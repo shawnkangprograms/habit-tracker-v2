@@ -1,8 +1,7 @@
-import {useCallback, useRef, useState} from 'react';
+import {useCallback, useRef, useState, type ReactNode} from 'react';
 import {router, useFocusEffect} from 'expo-router';
 import Constants from 'expo-constants';
-import {Alert, AppState, Linking, Pressable, StyleSheet, View} from 'react-native';
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import {Alert, AppState, Linking, StyleSheet, View} from 'react-native';
 import {signOut} from '@/services/authActions';
 import {useIsAdmin} from '@/services/adminContext';
 import {getSessionUid} from '@/services/session';
@@ -14,14 +13,21 @@ import {
 } from '@/services/notifications';
 import {NUDGE_TIMES, reminderSwitchValue} from '@/utils/notificationPrefs';
 import {devSeedEarlyPraise} from '@/db/devSeed';// null outside __DEV__
-import {colors, radii, spacing} from '@/constants/theme';
+import {spacing} from '@/constants/theme';
 import {TEST_IDS, nudgeTimeId} from '@/constants/testIds';
 import {SwitchRow} from '@/components/switch-row';
 import {AppText} from '@/components/ui/app-text';
 import {Button} from '@/components/ui/button';
 import {Card} from '@/components/ui/card';
 import {Pill} from '@/components/ui/pill';
+import {Row} from '@/components/ui/row';
 import {Screen} from '@/components/ui/screen';
+import {
+    ADMIN_ROW, CELEBRATIONS_ROW, EVENING_NUDGE_ROW, HABIT_REMINDERS_ROW, NUDGE_TIME_GROUP_LABEL, OPEN_PHONE_SETTINGS_BUTTON,
+    PHONE_NOTIFICATIONS_OFF_NOTICE, REMINDERS_UNAVAILABLE_NOTICE, SECTION_ACCOUNT, SECTION_PLAN, SECTION_REMINDERS,
+    SETTINGS_TITLE, SIGN_OUT_FAILED_MESSAGE, SIGN_OUT_FAILED_TITLE, SIGN_OUT_ROW, TEST_FAILED_LINE, TEST_NOTIFICATION_HINT,
+    TEST_NOTIFICATION_ROW, TEST_SENT_LINE,
+} from '@/utils/copy/settings';
 import {TRACE_ON} from '@/utils/startupTrace';
 import {firstPullFor} from '@/sync/syncEngine';// S-4: read-only
 import {RESTORING_LINE} from '@/utils/firstPull';
@@ -40,7 +46,7 @@ const onTitleLongPress = devSeed
 function handleSignOut() {
     signOut().catch((err: unknown) => {
         console.log('Sign-out failed', err);
-        Alert.alert("Couldn't sign out", 'Please try again.');
+        Alert.alert(SIGN_OUT_FAILED_TITLE, SIGN_OUT_FAILED_MESSAGE);
     });
 }
 
@@ -137,20 +143,20 @@ export default function SettingsScreen (){
 
     return(
         <Screen testID={TEST_IDS.settings.screen} padding={spacing.lg} gap={spacing.lg} contentStyle={styles.content}>
-              <AppText variant="title" style={styles.title} onLongPress={onTitleLongPress}>Settings</AppText>
+              <AppText variant="title" style={styles.title} onLongPress={onTitleLongPress}>{SETTINGS_TITLE}</AppText>
               {syncMessages.map((line) => <AppText key={line} variant="small" color="muted" style={styles.clockLine}>{line}</AppText>)}
 
-              <View style={styles.list}>
+              <Section title={SECTION_REMINDERS}>
                 <SwitchRow
                   icon="party-popper"
-                  label="Celebrations and messages"
+                  label={CELEBRATIONS_ROW}
                   value={celebrationsOn}
                   onChange={setCelebrationsEnabled}
                   testID={TEST_IDS.settings.celebrations}
                 />
                 <SwitchRow
                   icon="bell-outline"
-                  label="Habit reminders"
+                  label={HABIT_REMINDERS_ROW}
                   value={reminderSwitchValue(notificationPrefs, permission, available)}// the real state: off while the phone blocks notifications
                   onChange={(value) => setNotificationSwitch('remindersOn', value)}
                   disabled={asking || !available}
@@ -158,7 +164,7 @@ export default function SettingsScreen (){
                 />
                 <SwitchRow
                   icon="weather-night"
-                  label="Evening nudge"
+                  label={EVENING_NUDGE_ROW}
                   value={available && notificationPrefs.nudgeOn}
                   onChange={(value) => setNotificationSwitch('nudgeOn', value)}
                   disabled={asking || !available}
@@ -166,7 +172,7 @@ export default function SettingsScreen (){
                 />
 
                 {available && notificationPrefs.nudgeOn && (
-                  <View style={styles.chips} accessibilityRole="radiogroup" accessibilityLabel="Evening nudge time">
+                  <View style={styles.chips} accessibilityRole="radiogroup" accessibilityLabel={NUDGE_TIME_GROUP_LABEL}>
                     {NUDGE_TIMES.map((time) => {
                       const selected = notificationPrefs.nudgeTime === time;
                       return (
@@ -184,37 +190,34 @@ export default function SettingsScreen (){
                   </View>
                 )}
 
-                <Pressable
-                  style={({pressed}) => [styles.row, !available && styles.disabledRow, pressed && available && styles.pressed]}
+                <Row
+                  icon="send-outline"
+                  label={TEST_NOTIFICATION_ROW}
                   onPress={sendTest}
                   disabled={!available || sendingTest}
-                  accessibilityRole="button"
-                  accessibilityLabel="Send a test notification"
-                  accessibilityHint="Arrives in about 10 seconds"
+                  dimmed={!available}
+                  accessibilityLabel={TEST_NOTIFICATION_ROW}
+                  accessibilityHint={TEST_NOTIFICATION_HINT}
+                  accessibilityState={{disabled: !available || sendingTest}}
                   testID={TEST_IDS.settings.testNotification}
-                  accessibilityState={{disabled: !available || sendingTest}}>
-                  <MaterialCommunityIcons name="send-outline" size={22} color={colors.accent} />
-                  <AppText variant="bodyLg" weight="semiBold" style={styles.rowText}>Send a test notification</AppText>
-                </Pressable>
+                />
                 {testStatus && (
                   <AppText variant="caption" color="muted" style={styles.testLine} accessibilityLiveRegion="polite">
-                    {testStatus === 'sent'
-                      ? 'Sent. It arrives in about 10 seconds. Lock your phone to see it as a lock-screen notification.'
-                      : "Couldn't send the test notification."}
+                    {testStatus === 'sent' ? TEST_SENT_LINE : TEST_FAILED_LINE}
                   </AppText>
                 )}
 
                 {!available && (
                   <Card gap={spacing.sm} padding={spacing.lg}>
-                    <AppText variant="body" color="muted">Reminders aren&apos;t available in this version of the app on this phone yet.</AppText>
+                    <AppText variant="body" color="muted">{REMINDERS_UNAVAILABLE_NOTICE}</AppText>
                   </Card>
                 )}
 
                 {available && permission === 'denied' && (
                   <Card gap={spacing.sm} padding={spacing.lg}>
-                    <AppText variant="body" color="muted">Notifications are turned off for HabitQuest in your phone settings.</AppText>
+                    <AppText variant="body" color="muted">{PHONE_NOTIFICATIONS_OFF_NOTICE}</AppText>
                     <Button
-                      label="Open settings"
+                      label={OPEN_PHONE_SETTINGS_BUTTON}
                       size="sm"
                       onPress={() => { Linking.openSettings().catch(() => {}); }}
                       style={styles.noticeButton}
@@ -222,67 +225,62 @@ export default function SettingsScreen (){
                     />
                   </Card>
                 )}
+              </Section>
 
+              <Section title={SECTION_PLAN}>
                 {/* first and last name, for the greeting on Home */}
-                <Pressable
-                  style={({pressed}) => [styles.row, pressed && styles.pressed]}
+                <Row
+                  icon="account-edit-outline"
+                  label={NAME_ROW}
                   onPress={() => router.push('/profile-name')}
-                  accessibilityRole="button"
-                  testID={TEST_IDS.settings.nameRow}>
-                  <MaterialCommunityIcons name="account-edit-outline" size={22} color={colors.accent} />
-                  <AppText variant="bodyLg" weight="semiBold" style={styles.rowText}>{NAME_ROW}</AppText>
-                  <MaterialCommunityIcons name="chevron-right" size={22} color={colors.muted} />
-                </Pressable>
+                  chevron
+                  testID={TEST_IDS.settings.nameRow}
+                />
 
                 {/* the built-in pack picker, for everyone (the same screen as Home's "Choose your habit packs") */}
-                <Pressable
-                  style={({pressed}) => [styles.row, pressed && styles.pressed]}
+                <Row
+                  icon="view-grid-outline"
+                  label={SETTINGS_PACKS_ROW}
                   onPress={() => router.push({pathname: '/packs/choose', params: {from: 'settings'}})}
-                  accessibilityRole="button"
-                  testID={TEST_IDS.settings.packsRow}>
-                  <MaterialCommunityIcons name="view-grid-outline" size={22} color={colors.accent} />
-                  <AppText variant="bodyLg" weight="semiBold" style={styles.rowText}>{SETTINGS_PACKS_ROW}</AppText>
-                  <MaterialCommunityIcons name="chevron-right" size={22} color={colors.muted} />
-                </Pressable>
+                  chevron
+                  testID={TEST_IDS.settings.packsRow}
+                />
 
                 {/* onboarding for everyone, any time: never opens on its own for users who already have habits.
                     S-4: it opens only once this uid's first pull is done; until then the tap shows the line below */}
-                <Pressable
-                  style={({pressed}) => [styles.row, pressed && styles.pressed]}
+                <Row
+                  icon="compass-outline"
+                  label={SETTINGS_ROW}
                   onPress={openPlan}
-                  accessibilityRole="button"
-                  testID={TEST_IDS.settings.planRow}>
-                  <MaterialCommunityIcons name="compass-outline" size={22} color={colors.accent} />
-                  <AppText variant="bodyLg" weight="semiBold" style={styles.rowText}>{SETTINGS_ROW}</AppText>
-                  <MaterialCommunityIcons name="chevron-right" size={22} color={colors.muted} />
-                </Pressable>
+                  chevron
+                  testID={TEST_IDS.settings.planRow}
+                />
                 {planNotice ? (
                   <Card gap={spacing.sm} padding={spacing.lg}>
                     <AppText variant="body" color="muted" accessibilityLiveRegion="polite">{planNotice}</AppText>
                   </Card>
                 ) : null}
+              </Section>
 
+              <Section title={SECTION_ACCOUNT}>
                 {isAdmin && (
-                  <Pressable
-                    style={({pressed}) => [styles.row, pressed && styles.pressed]}
+                  <Row
+                    icon="shield-account-outline"
+                    label={ADMIN_ROW}
                     onPress={() => router.push('/admin/overview')}
-                    accessibilityRole="button"
-                    testID={TEST_IDS.settings.adminRow}>
-                    <MaterialCommunityIcons name="shield-account-outline" size={22} color={colors.accent} />
-                    <AppText variant="bodyLg" weight="semiBold" style={styles.rowText}>Admin</AppText>
-                    <MaterialCommunityIcons name="chevron-right" size={22} color={colors.muted} />
-                  </Pressable>
+                    chevron
+                    testID={TEST_IDS.settings.adminRow}
+                  />
                 )}
 
-                <Pressable
-                  style={({pressed}) => [styles.row, pressed && styles.pressed]}
+                <Row
+                  icon="logout"
+                  label={SIGN_OUT_ROW}
                   onPress={handleSignOut}
-                  accessibilityRole="button"
-                  testID={TEST_IDS.settings.signOut}>
-                  <MaterialCommunityIcons name="logout" size={22} color={colors.error} />
-                  <AppText variant="bodyLg" weight="semiBold" color="error" style={styles.rowText}>Sign Out</AppText>
-                </Pressable>
-              </View>
+                  tone="danger"
+                  testID={TEST_IDS.settings.signOut}
+                />
+              </Section>
 
               <AppText
                 variant="caption"
@@ -296,28 +294,24 @@ export default function SettingsScreen (){
     )
 }
 
+// A titled block of rows: a small header (the header role for screen readers) over a list with the rows' 7 dp gap
+function Section({title, children}: {title: string; children: ReactNode}) {
+  return (
+    <View style={styles.section}>
+      <AppText variant="label" color="muted" accessibilityRole="header">{title}</AppText>
+      <View style={styles.list}>{children}</View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   content: {paddingBottom: spacing.s18},
   title: {paddingTop: spacing.s5},
+  section: {gap: spacing.sm},
   list: {gap: spacing.s7},
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    minHeight: 56,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm, // only shows when large text makes a row taller than 56
-    borderRadius: radii.habitCard,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  rowText: {flex: 1},
-  disabledRow: {opacity: 0.5},
   testLine: {paddingHorizontal: spacing.xs},
   clockLine: {marginTop: -spacing.sm},// S-1; wraps freely
   chips: {flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, paddingHorizontal: spacing.xs},
   noticeButton: {alignSelf: 'flex-start'},
   version: {textAlign: 'center'},
-  pressed: {opacity: 0.85},
 });

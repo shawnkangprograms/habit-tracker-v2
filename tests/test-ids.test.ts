@@ -115,6 +115,26 @@ describe('use', () => {
   });
 });
 
+// The shared controls are read from components/ui/, not listed by hand: every exported component there whose source takes a
+// testID. A new shared control is scanned the day it is added, so it cannot slip past the id check below.
+const takesTestId = (file: string) => /\btestID\b/.test(read(file).replace(/\/\/.*$/gm, ''));// code, not comments
+const SHARED_CONTROLS: string[] = sourceFiles('components/ui')
+  .filter((file) => file.endsWith('.tsx') && takesTestId(file))
+  .flatMap((file) => [...read(file).matchAll(/^export function (\w+)/gm)].map((m) => m[1]));
+
+describe('the shared controls are derived from components/ui/', () => {
+  test('the list is read from the folder and holds the controls that take a testID', () => {
+    for (const name of ['Button', 'Pill', 'Row', 'Screen']) assert.ok(SHARED_CONTROLS.includes(name), name);
+    for (const name of ['AppText', 'Card', 'IconSymbol']) assert.ok(!SHARED_CONTROLS.includes(name), name);
+  });
+
+  test('every shared control forwards its testID to the element it draws', () => {
+    for (const file of sourceFiles('components/ui').filter((f) => f.endsWith('.tsx') && takesTestId(f))) {
+      assert.match(read(file), /testID=\{testID\}/, file);
+    }
+  });
+});
+
 describe('every control on the demo path and in onboarding has an id', () => {
   const WITH_IDS = [
     'app/auth.tsx', 'app/(tabs)/index.tsx', 'app/(tabs)/settings.tsx', 'app/onboarding.tsx',
@@ -127,7 +147,7 @@ describe('every control on the demo path and in onboarding has an id', () => {
     let checked = 0;
     for (const file of WITH_IDS) {
       const source = read(file);
-      for (const name of ['Pressable', 'TextInput', 'Button', 'Pill']) {// C1: the shared controls count too
+      for (const name of ['Pressable', 'TextInput', ...SHARED_CONTROLS]) {
         for (const tag of openingTags(source, name)) {
           checked++;
           assert.match(tag, /testID=\{/, `${file}: ${tag.slice(0, 90).replace(/\s+/g, ' ')}`);

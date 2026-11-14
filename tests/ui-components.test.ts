@@ -129,10 +129,11 @@ describe('the Settings pilot', () => {
   const src = read(SETTINGS);
   const original = (name: string) => src.includes(name);
 
-  test('it draws no Text, sets no size or face by hand, and imports the five shared components', () => {
+  test('it draws no Text or Pressable, sets no size or face by hand, and imports the shared components', () => {
     assert.doesNotMatch(src, /<Text[\s>]/);
+    assert.doesNotMatch(src, /<Pressable[\s>]/);
     assert.doesNotMatch(src, /fontSize|fontFamily|fonts\./);
-    for (const name of ['AppText', 'Button', 'Card', 'Pill', 'Screen']) assert.match(src, new RegExp(`import \\{${name}\\} from '@/components/ui/`));
+    for (const name of ['AppText', 'Button', 'Card', 'Pill', 'Row', 'Screen']) assert.match(src, new RegExp(`import \\{${name}\\} from '@/components/ui/`));
   });
 
   test('the version line: its long press (the way into the startup trace panel) is exactly as before', () => {
@@ -143,7 +144,7 @@ describe('the Settings pilot', () => {
   });
 
   test('the title keeps its dev-only long press, and the screen keeps its test id', () => {
-    assert.match(src, /<AppText variant="title" style=\{styles\.title\} onLongPress=\{onTitleLongPress\}>Settings<\/AppText>/);
+    assert.match(src, /<AppText variant="title" style=\{styles\.title\} onLongPress=\{onTitleLongPress\}>\{SETTINGS_TITLE\}<\/AppText>/);
     assert.match(src, /<Screen testID=\{TEST_IDS\.settings\.screen\}/);
   });
 
@@ -152,26 +153,26 @@ describe('the Settings pilot', () => {
       assert.ok(original(`TEST_IDS.settings.${id}`), id);
     }
     assert.ok(original('testID={nudgeTimeId(time)}'));
-    for (const label of ['accessibilityRole="radiogroup" accessibilityLabel="Evening nudge time"', 'accessibilityLabel={time}',
-      'accessibilityLabel="Send a test notification"', 'accessibilityHint="Arrives in about 10 seconds"', 'accessibilityLiveRegion="polite"']) {
+    for (const label of ['accessibilityRole="radiogroup" accessibilityLabel={NUDGE_TIME_GROUP_LABEL}', 'accessibilityLabel={time}',
+      'accessibilityLabel={TEST_NOTIFICATION_ROW}', 'accessibilityHint={TEST_NOTIFICATION_HINT}', 'accessibilityLiveRegion="polite"']) {
       assert.ok(original(label), label);
     }
     assert.match(src, /<Pill\s+key=\{time\}\s+label=\{time\}\s+selected=\{selected\}/);
-    assert.match(src, /<Button\s+label="Open settings"\s+size="sm"/);
+    assert.match(src, /<Button\s+label=\{OPEN_PHONE_SETTINGS_BUTTON\}\s+size="sm"/);
+    assert.match(src, /accessibilityState=\{\{disabled: !available \|\| sendingTest\}\}/);
+    assert.match(src, /dimmed=\{!available\}/);
   });
 
-  test('Sign Out is still red (icon and label), the other rows\' icons accent and chevrons muted', () => {
-    assert.match(src, /<AppText variant="bodyLg" weight="semiBold" color="error" style=\{styles\.rowText\}>Sign Out<\/AppText>/);
-    assert.match(src, /<MaterialCommunityIcons name="logout" size=\{22\} color=\{colors\.error\} \/>/);
-    assert.equal((src.match(/name="chevron-right" size=\{22\} color=\{colors\.muted\}/g) ?? []).length, 4);
+  test('Sign Out is still red (icon and label, through tone="danger") and the four chevron rows keep theirs', () => {
+    assert.match(src, /<Row\s+icon="logout"\s+label=\{SIGN_OUT_ROW\}\s+onPress=\{handleSignOut\}\s+tone="danger"/);
+    assert.equal((src.match(/^\s+chevron$/gm) ?? []).length, 4);// name, packs, plan, admin
   });
 
-  test('the layout numbers are the same ones: list gap 7, content bottom 18, title top 5, row, chips and notices', () => {
+  test('the layout numbers are the same ones: list gap 7, content bottom 18, title top 5, chips and notices', () => {
     assert.match(src, /list: \{gap: spacing\.s7\}/);
     assert.match(src, /content: \{paddingBottom: spacing\.s18\}/);
     assert.match(src, /title: \{paddingTop: spacing\.s5\}/);
     assert.match(src, /<Screen[^>]*padding=\{spacing\.lg\} gap=\{spacing\.lg\}/);
-    assert.match(src, /minHeight: 56,/);
     assert.match(src, /chips: \{flexDirection: 'row', flexWrap: 'wrap', gap: spacing\.sm, paddingHorizontal: spacing\.xs\}/);
     assert.equal((src.match(/<Card gap=\{spacing\.sm\} padding=\{spacing\.lg\}>/g) ?? []).length, 3);
   });

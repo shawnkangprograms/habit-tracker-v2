@@ -65,3 +65,36 @@ export function buttonA11y(label: string, accessibilityLabel: string | undefined
     accessibilityState: {disabled: disabled || loading, busy: loading},
   };
 }
+
+// Row (a list row: icon, label, optional trailing content and chevron). The numbers are the ones Settings' rows and
+// SwitchRow had before C2 (56 dp tall, so already above the 48 dp target); tests/ui-row.test.ts pins them.
+export const ROW = {
+  minHeight: 56,
+  paddingHorizontal: spacing.lg,
+  paddingVertical: spacing.sm,// only shows when large text makes a row taller than 56
+  gap: spacing.md,
+  borderRadius: radii.habitCard,
+  borderWidth: 1,
+  iconSize: 22,
+  pressedOpacity: 0.85,
+  dimmedOpacity: 0.5,
+} as const;
+
+// The fixed, centred box that holds a native switch, so the row lays out the same whatever size the switch reports
+export const SWITCH_BOX = {width: 52, height: 32, alignItems: 'center', justifyContent: 'center'} as const;
+
+// What a Row looks like at rest (the resolved style of its Pressable)
+export function rowStyle() {
+  return {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: ROW.gap,
+    minHeight: ROW.minHeight,
+    paddingHorizontal: ROW.paddingHorizontal,
+    paddingVertical: ROW.paddingVertical,
+    borderRadius: ROW.borderRadius,
+    backgroundColor: colors.surface,
+    borderWidth: ROW.borderWidth,
+    borderColor: colors.border,
+  } as const;
+}

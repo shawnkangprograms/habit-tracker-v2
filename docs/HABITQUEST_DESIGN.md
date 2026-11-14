@@ -42,7 +42,7 @@ Full Figma prototype scope: Sign In/Up, 10-question onboarding, building-profile
 
 ## Build order and testing
 1. Data model + rough UI (with validation) -> 2. sync with last-write-wins -> 3. AI Cloud Function -> 4. polish pass -> charts only if time remains
-- Tests: the original plan was 3-5 unit tests for the sync conflict-merge function, with everything else manual. Today (end of Stage A, 2026-11-14) the suites under tests/ run on Node's built-in runner (`npm test`): 1245 tests at the end of Stage A, 1276 after C1, all passing, plus 45 in functions/. They cover pure logic, sequences over a fake Firestore and real SQLite, odd-state fixtures, and scans of the source; they cannot render a screen, so screens are checked by hand (docs/RELEASE_CHECKLIST.md) until the Maestro flows exist (docs/TEST_STRATEGY.md)
+- Tests: the original plan was 3-5 unit tests for the sync conflict-merge function, with everything else manual. Today (end of Stage A, 2026-11-14) the suites under tests/ run on Node's built-in runner (`npm test`): 1245 tests at the end of Stage A, 1276 after C1, 1295 after C2 Set 1, all passing, plus 45 in functions/. They cover pure logic, sequences over a fake Firestore and real SQLite, odd-state fixtures, and scans of the source; they cannot render a screen, so screens are checked by hand (docs/RELEASE_CHECKLIST.md) until the Maestro flows exist (docs/TEST_STRATEGY.md)
 
 ## Decisions made after the first code audit
 - Naming: keep the existing camelCase in code and SQLite (habitId, habitName, reminderTime). The snake_case names in the validation doc are descriptive only
@@ -155,6 +155,19 @@ C1 changes nothing visible: no colour, size, spacing, string, test id or accessi
 | pink (icon tint only) | `#d4537e` | `#e0658f` | 4.36 | 5.03 on new surface |
 
   Blue (`#378add`, 4.77) and purple (`#7f77dd`, 4.56) already pass 4.5 on the current surface. Text and muted on the proposed raised surface: 13.34 and 6.44.
+
+## C2 decisions (three-place navigation, locked 2026-11-14; built in three sets, each reviewed and committed on its own)
+Where these meet an older line that says otherwise ("bottom tabs Home/Summary/Profile/Settings" in Scope), this section is the newer decision; the older line stands until Set 3 is built.
+1. Three tabs, not four: **Today, Progress, You**. Profile merges into Progress. (Route files: `index` stays the route `/`, so a notification tap still opens Today; `progress`; `you`, renamed from `settings` in Set 3.)
+2. The radar leaves Home and lives on Progress. **There is one radar in the app**: the full `RadarSummary` plus the Strongest and Needs-care lines; `RadarCard` and its placeholder are deleted (Set 2). Home keeps the greeting, the level/streak/XP card, the insight card, today's habits, packs, the reflection bar and celebrations, with a reserved empty space under the greeting for the goal sentence: 20 dp, no text, no placeholder (Stage D builds the sentence and sets the real height).
+3. The streak flame with its count moves from the Profile tab icon to the Progress tab icon (Set 2).
+4. Tab names: Today, Progress, You. Screen headings: "Progress." and "You." (Set 3). The habit form's "Open Settings" link is left unchanged for now; it is on the copy-pass list.
+5. You is Settings in three sections with small headers (built in Set 1): **Reminders** (celebrations, habit reminders, evening nudge and its time chips, send a test notification, with the notices that belong to them), **Your plan** (Your name, Habit packs, Set up your plan, with its "still being restored" notice), **Account** (Admin, for admins only, then Sign Out, still red, last). The version line stays at the bottom with its trace-panel long press untouched; the clock and cursor lines stay under the title. There is room, and no row, for Privacy, Feedback and Delete account. The three headers are the only new strings; the Settings words moved to utils/copy/settings.ts with no change of wording.
+6. Habit packs stay reachable from both Home and You.
+7. The palette change (dark label on the orange and the rest of the C1 table) is C1b, not part of C2.
+8. The range toggle stays Week and Month. Day and Year are a later step: they are new statistics, not part of C2.
+- Set 1 (You), built 2026-11-14: `Row` (components/ui/row.tsx: icon, label, optional trailing content and chevron, tone, 56 dp, testID and accessibility pass-through) and `SwitchRow` rebuilt on it. SwitchRow's look is pinned in tests/ui-row.test.ts: the resolved row style, the label, the switch box, the opacities and the icon size equal the numbers the old file had, and the source keeps role "switch", the label as its name, the checked/disabled state, the hidden inner switch and its colours. tests/test-ids.test.ts now derives its list of shared controls from components/ui/ (every exported component there that takes a testID, so a new one is scanned the day it is added, and must forward its id).
+- The string inventory baseline is left as written at the end of Stage A on purpose: `scripts/string-inventory.ts --write` would drop the 19 inventory entries for the words that moved to utils/copy/settings.ts (they are no longer inline) and add none (utils/copy/ is outside its scan), which would remove the copy-identical guard on those words. The three new headers are pinned in tests/ui-row.test.ts instead.
 
 ## Later (backlog, design notes only, nothing built)
 - Swipe between the main screens (Home, Summary, Profile, Settings) left and right, in addition to the tab buttons, which stay. To settle at design time:
