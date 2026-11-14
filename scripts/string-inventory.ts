@@ -27,6 +27,7 @@ export function areaOf(file: string): string {
   if (file === 'app/auth.tsx' || file === 'services/authActions.js') return 'auth';
   if (file === 'app/onboarding.tsx' || file.startsWith('components/onboarding/')) return 'onboarding';
   if (file === 'app/(tabs)/settings.tsx' || file === 'components/switch-row.tsx') return 'settings';
+  if (file === 'app/(tabs)/progress.tsx' || file.startsWith('components/progress/')) return 'progress';// C2 Set 2: Summary and Profile merged
   if (file === 'app/(tabs)/summary.tsx' || file.startsWith('components/summary-')) return 'summary';
   if (file === 'app/(tabs)/profile.tsx' || file === 'components/medal.tsx' || file === 'components/stats-card.tsx') return 'profile';
   if (file === 'app/habit-form.tsx' || file === 'components/habit-fields.tsx' || file === 'components/time-field.tsx') return 'habitForm';
@@ -66,7 +67,7 @@ export function summary(entries: Entry[]) {
   return {total: entries.length, distinct: new Set(entries.map((e) => e.text)).size, areas: by((e) => e.area), kinds: by((e) => e.kind), files: by((e) => e.file)};
 }
 
-function docText(entries: Entry[]): string {
+export function docText(entries: Entry[]): string {
   const s = summary(entries);
   const lines: string[] = [
     '# String inventory',

@@ -107,9 +107,9 @@ describe('use', () => {
     }
   });
 
-  test('the four tabs carry their ids', () => {
+  test('the three tabs carry their ids', () => {
     const layout = read('app/(tabs)/_layout.tsx');
-    for (const tab of ['home', 'summary', 'profile', 'settings']) {
+    for (const tab of ['home', 'progress', 'settings']) {
       assert.match(layout, new RegExp(`tabBarButtonTestID: TEST_IDS\\.tabs\\.${tab},`), tab);
     }
   });

@@ -67,88 +67,109 @@
   "text": "Next:"
  },
  {
-  "file": "app/(tabs)/profile.tsx",
-  "line": 76,
-  "kind": "text",
-  "area": "profile",
-  "text": "Profile."
- },
- {
-  "file": "app/(tabs)/profile.tsx",
+  "file": "app/(tabs)/progress.tsx",
   "line": 79,
   "kind": "text",
-  "area": "profile",
+  "area": "progress",
   "text": "Your stats couldn't be loaded. They'll try again next time you open this tab."
  },
  {
-  "file": "app/(tabs)/profile.tsx",
+  "file": "app/(tabs)/progress.tsx",
   "line": 87,
   "kind": "text",
-  "area": "profile",
+  "area": "progress",
   "partial": true,
   "text": "Level"
  },
  {
-  "file": "app/(tabs)/profile.tsx",
+  "file": "app/(tabs)/progress.tsx",
   "line": 95,
   "kind": "attr",
   "attr": "accessibilityLabel",
-  "area": "profile",
+  "area": "progress",
   "text": "Current streak ${…}. Longest ${…}"
  },
  {
-  "file": "app/(tabs)/profile.tsx",
+  "file": "app/(tabs)/progress.tsx",
+  "line": 97,
+  "kind": "text",
+  "area": "progress",
+  "text": "Your summary couldn't be loaded. It'll try again next time you open this tab."
+ },
+ {
+  "file": "app/(tabs)/progress.tsx",
   "line": 98,
   "kind": "text",
-  "area": "profile",
+  "area": "progress",
   "partial": true,
   "text": "streak"
  },
  {
-  "file": "app/(tabs)/profile.tsx",
+  "file": "app/(tabs)/progress.tsx",
   "line": 99,
   "kind": "text",
-  "area": "profile",
+  "area": "progress",
   "partial": true,
   "text": "Longest:"
  },
  {
-  "file": "app/(tabs)/profile.tsx",
+  "file": "app/(tabs)/progress.tsx",
   "line": 103,
   "kind": "text",
-  "area": "profile",
+  "area": "progress",
   "text": "Medals"
  },
  {
-  "file": "app/(tabs)/profile.tsx",
+  "file": "app/(tabs)/progress.tsx",
+  "line": 111,
+  "kind": "text",
+  "area": "progress",
+  "text": "Last 7 days"
+ },
+ {
+  "file": "app/(tabs)/progress.tsx",
+  "line": 111,
+  "kind": "text",
+  "area": "progress",
+  "text": "Last 30 days"
+ },
+ {
+  "file": "app/(tabs)/progress.tsx",
   "line": 116,
   "kind": "text",
-  "area": "profile",
+  "area": "progress",
   "text": "Lifetime"
  },
  {
-  "file": "app/(tabs)/profile.tsx",
+  "file": "app/(tabs)/progress.tsx",
   "line": 118,
   "kind": "attr",
   "attr": "label",
-  "area": "profile",
+  "area": "progress",
   "text": "Total XP"
  },
  {
-  "file": "app/(tabs)/profile.tsx",
+  "file": "app/(tabs)/progress.tsx",
   "line": 119,
   "kind": "attr",
   "attr": "label",
-  "area": "profile",
+  "area": "progress",
   "text": "Longest streak"
  },
  {
-  "file": "app/(tabs)/profile.tsx",
+  "file": "app/(tabs)/progress.tsx",
   "line": 120,
   "kind": "attr",
   "attr": "label",
-  "area": "profile",
+  "area": "progress",
   "text": "Perfect days"
+ },
+ {
+  "file": "app/(tabs)/progress.tsx",
+  "line": 122,
+  "kind": "text",
+  "area": "progress",
+  "text": "By habit"
  },
  {
   "file": "app/(tabs)/settings.tsx",
@@ -295,41 +316,6 @@
   "kind": "text",
   "area": "settings",
   "text": "Sign Out"
- },
- {
-  "file": "app/(tabs)/summary.tsx",
-  "line": 94,
-  "kind": "text",
-  "area": "summary",
-  "text": "Summary."
- },
- {
-  "file": "app/(tabs)/summary.tsx",
-  "line": 97,
-  "kind": "text",
-  "area": "summary",
-  "text": "Your summary couldn't be loaded. It'll try again next time you open this tab."
- },
- {
-  "file": "app/(tabs)/summary.tsx",
-  "line": 111,
-  "kind": "text",
-  "area": "summary",
-  "text": "Last 7 days"
- },
- {
-  "file": "app/(tabs)/summary.tsx",
-  "line": 111,
-  "kind": "text",
-  "area": "summary",
-  "text": "Last 30 days"
- },
- {
-  "file": "app/(tabs)/summary.tsx",
-  "line": 122,
-  "kind": "text",
-  "area": "summary",
-  "text": "By habit"
  },
  {
   "file": "app/_layout.tsx",

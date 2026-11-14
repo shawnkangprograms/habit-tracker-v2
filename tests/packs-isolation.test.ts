@@ -147,8 +147,8 @@ describe('radar modules (on-device only, Stage 5)', () => {
   test('exist, are covered by the ESLint block, and import nothing that reaches Firebase, sync or the network', () => {
     for (const file of ['utils/radar/areas.ts', 'utils/radar/score.ts', 'utils/radar/copy.ts', 'services/areasStoreCore.ts',
       'services/areasStore.ts', 'services/profileOutlineStoreCore.ts', 'services/profileOutlineStore.ts',
-      'components/radar/radar-drawing.tsx', 'components/radar/radar-card.tsx', 'components/radar/radar-summary.tsx',
-      'components/radar/window-switch.tsx', 'hooks/use-radar-window.ts', 'utils/appStats.ts']) {
+      'components/radar/radar-drawing.tsx', 'components/radar/radar-highlights.tsx', 'components/radar/radar-summary.tsx',
+      'hooks/use-radar-window.ts', 'utils/appStats.ts']) {
       assert.ok(RADAR_FILES.map(rel).includes(file), `${file} is scanned`);
     }
     const config = readFileSync(join(ROOT, 'eslint.config.js'), 'utf8');

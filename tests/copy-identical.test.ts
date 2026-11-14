@@ -18,7 +18,7 @@ import {areaOf, BASELINE_PATH, DOC_PATH, scanApp, summary} from '../scripts/stri
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const COPY_DIR = 'utils/copy';
-const AREAS = ['account', 'admin', 'auth', 'common', 'dev', 'habitForm', 'home', 'onboarding', 'packs', 'profile', 'reflections', 'settings', 'summary'];
+const AREAS = ['account', 'admin', 'auth', 'common', 'dev', 'habitForm', 'home', 'onboarding', 'packs', 'profile', 'progress', 'reflections', 'settings', 'summary'];
 
 type BaselineEntry = {file: string; line: number; kind: string; attr?: string; area: string; partial?: boolean; text: string};
 const baseline: BaselineEntry[] = JSON.parse(readFileSync(join(ROOT, BASELINE_PATH), 'utf8'));

@@ -30,8 +30,6 @@ import {useReduceMotion} from '@/hooks/use-reduce-motion';
 import {useCelebrations, type TickStats} from '@/hooks/use-celebrations';// overlays, banner and toasts after a tick
 import {coversBar} from '@/utils/celebrations';// R-3: an overlay pauses the reflection bar
 import {CelebrationLayer} from '@/components/celebration-layer';
-import {RadarCard, RadarCardPlaceholder} from '@/components/radar/radar-card';// the live radar, below the lists
-import {setRadarWindow, useRadarWindow} from '@/hooks/use-radar-window';
 import {useReflectionBar} from '@/hooks/use-reflection-bar';// the reflection offer after a tick
 import {ReflectionBar} from '@/components/reflections/reflection-bar';
 import {reflectionsStore} from '@/services/reflectionsStore';
@@ -85,6 +83,8 @@ const LAUNCH_FALLBACK_MS = 1500;
 
 // Starts at load time: sign-in/launch already runs a cycle, so the first focus doesn't add another.
 const FOCUS_SYNC_MIN_INTERVAL_MS = 30 * 1000;
+// C2: the empty space under the greeting held for the goal sentence (Stage D builds it and sets the real height)
+const GOAL_SLOT_HEIGHT = 20;
 let lastFocusSyncAt = Date.now();
 
 type StatsSnapshot = {userId: string; date: string; stats: AppStats};// stats plus whose and the local date they were computed for
@@ -278,8 +278,6 @@ export default function HomeScreen() {// default export, becomes the "index" tab
   const celebration = useCelebrations(userId);
   const {onTick, onReflection} = celebration;
   const reflection = useReflectionBar(userId);
-  const radarWindow = useRadarWindow();// shared with Summary's Week/Month toggle
-  const openSummary = useCallback(() => router.navigate('/summary'), []);
   const {dayChanged: reflectionDayChanged, untick: reflectionUntick, offer: offerReflection} = reflection;// stable callbacks
   useNotificationPrefs();// loads the saved settings, so the soft prompt below knows whether it was answered
   const [reminderPrompt, setReminderPrompt] = useState(false);
@@ -664,6 +662,9 @@ export default function HomeScreen() {// default export, becomes the "index" tab
             <Text style={styles.hello}>{greetingFor(currentHour(), firstName)}</Text>
           </View>
 
+          {/* C2: held for the goal sentence (Stage D builds it and sets the real height); empty on purpose, no text */}
+          <View style={styles.goalSlot} />
+
           {/* the card's exact space is held from the first frame until the first stats load has finished; after a
               failed load it stays hidden as before (utils/homeLoading.ts) */}
           {slot === 'card' && loaded && stats ? (
@@ -797,11 +798,6 @@ export default function HomeScreen() {// default export, becomes the "index" tab
             </>
           )}
 
-          {/* the live radar, below the habit lists; its space is held from the first frame like the stats card's */}
-          {slot === 'card' && loaded && stats && emptyState === 'hidden' ? (
-            <RadarCard radar={stats.stats.radar} window={radarWindow} onWindow={setRadarWindow} onOpen={openSummary} />
-          ) : (slot === 'placeholder' || (slot === 'card' && !loaded)) && <RadarCardPlaceholder />}
-
         </ScrollView>
 
         {/* one at a time: level-up / milestone overlay, perfect-day banner (top) or toast (bottom, so above the bar) */}
@@ -829,6 +825,7 @@ const styles = StyleSheet.create({
   main: {flex: 1},// the list and the celebration layer, above the reflection bar
   content: {paddingHorizontal: spacing.lg, paddingBottom: 18, gap: 10},
   greeting: {paddingTop: 5, gap: 1},
+  goalSlot: {height: GOAL_SLOT_HEIGHT},
   date: {fontFamily: fonts.regular, fontSize: 12, color: colors.muted},
   hello: {fontFamily: fonts.title, fontSize: 26, color: colors.text},
   title: {fontFamily: fonts.title, fontSize: 21, color: colors.text},

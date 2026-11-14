@@ -262,7 +262,6 @@ describe('copy', () => {
     assert.equal(copy.AREA_ROW_LABEL, 'AREA');
     assert.equal(copy.AREA_NOT_COUNTED, 'Not counted');
     assert.equal(copy.AREA_ROW_HELPER, "Used for your radar. Habits in a pack use the pack's area.");
-    assert.equal(copy.RADAR_CARD_HINT, 'Opens Summary');
   });
 });
 

@@ -5,7 +5,6 @@ import type {AxisResult, RadarWindowId} from '@/utils/radar/score';
 
 export const RADAR_TITLE = 'Habit radar';
 export const RADAR_STARTING = 'Starts after your first full day.';
-export const RADAR_CARD_HINT = 'Opens Summary';
 export const NO_DATA = 'No data';
 export const NO_HABITS_HERE = 'No habits here yet';
 export const WINDOW_CAPTION: Record<RadarWindowId, string> = {week: 'Last 7 days', month: 'Last 28 days'};

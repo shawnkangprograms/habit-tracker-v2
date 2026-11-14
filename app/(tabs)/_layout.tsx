@@ -58,18 +58,10 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="summary"
+        name="progress"
         options={{
-          title: 'Summary',
-          tabBarButtonTestID: TEST_IDS.tabs.summary,
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="chart.bar.fill" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: 'Profile',
-          tabBarButtonTestID: TEST_IDS.tabs.profile,
+          title: 'Progress',
+          tabBarButtonTestID: TEST_IDS.tabs.progress,
           // the icon reads the shared stats store itself, so a streak change never re-renders the navigator
           tabBarIcon: ({ color }) => <StreakTabIcon color={color} />,
         }}

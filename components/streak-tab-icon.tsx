@@ -6,7 +6,7 @@ import {colors, fonts, radii} from '@/constants/theme';
 
 const ICON_SIZE = 28;
 
-// Profile tab icon: a flame with the current streak on it. Reads the shared stats store only (never loads),
+// Progress tab icon: a flame with the current streak on it. Reads the shared stats store only (never loads),
 // so a published change re-renders just this icon, not the tab bar. No number until stats have loaded.
 export function StreakTabIcon({color}: {color: ColorValue}) {
   const entry = useStatsEntry();

@@ -1,7 +1,6 @@
 import {useCallback, useMemo, useRef, useState} from 'react';
 import {router, useFocusEffect} from 'expo-router';
-import {SafeAreaView} from 'react-native-safe-area-context';
-import {ScrollView, StyleSheet, Text} from 'react-native';
+import {StyleSheet, Text} from 'react-native';
 import {getSummaryRows} from '@/db/gamification';// three local reads, one per table; never touches sync
 import {useSessionUid} from '@/services/session';
 import {getLocalDateString} from '@/utils/dates';
@@ -16,6 +15,7 @@ import {HeatStrip} from '@/components/summary-heat-strip';
 import {HabitRateList} from '@/components/summary-habit-list';
 import {SummaryEmptyCard} from '@/components/summary-empty-card';
 import {RadarSummary} from '@/components/radar/radar-summary';
+import {RadarHighlights} from '@/components/radar/radar-highlights';
 import {setRadarWindow, useRadarWindow} from '@/hooks/use-radar-window';
 import {areasStore} from '@/services/areasStore';
 import {packsStore} from '@/services/packsStore';
@@ -25,6 +25,7 @@ import type {PacksRecord} from '@/utils/packs/record';
 import type {AreasMap} from '@/utils/radar/areas';
 import {RADAR_TITLE} from '@/utils/radar/copy';
 import {computeRadar} from '@/utils/radar/score';
+import {BY_HABIT_TITLE, LAST_30_DAYS_TITLE, LAST_7_DAYS_TITLE, SUMMARY_FAILED_LINE} from '@/utils/copy/progress';
 
 type Loaded = {
   userId: string;
@@ -37,11 +38,13 @@ type Loaded = {
   outline: Outline | null;
 };
 
-// Read-only progress summary, derived from local SQLite rows (utils/summary.ts). Works offline.
-// Refreshes on focus only: no sync trigger and no remote- or local-change listener (known limitation: a change
-// that lands while the tab is open shows on the next visit). The Week/Month toggle is the one choice shared with
-// Home's radar card (hooks/use-radar-window.ts); the stats keep their 30-day month, the radar its 28 closed days.
-export default function SummaryScreen() {
+// The old Summary screen's body, moved here unchanged under Progress's level and streak cards: derived from local
+// SQLite rows (utils/summary.ts), works offline. Refreshes on focus only: no sync trigger and no remote- or
+// local-change listener (known limitation: a change that lands while the tab is open shows on the next visit). The
+// Week/Month toggle is the one choice shared with the radar (hooks/use-radar-window.ts); the stats keep their 30-day
+// month, the radar its 28 closed days. The radar is the only one in the app: Home's compact card is gone, and its
+// Strongest and Needs-care lines sit under the radar's title.
+export function SummarySection() {
   const userId = useSessionUid() ?? undefined;// this screen is only reachable while signed in (presumed or confirmed)
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [failed, setFailed] = useState(false);// the last load failed and nothing is shown: one quiet line
@@ -89,52 +92,43 @@ export default function SummaryScreen() {
   const createHabit = useCallback(() => router.push('/habit-form'), []);
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title} accessibilityRole="header">Summary.</Text>
+    <>
+      {!summary && failed && <Text style={styles.empty}>{SUMMARY_FAILED_LINE}</Text>}
 
-        {!summary && failed && (
-          <Text style={styles.empty}>Your summary couldn&apos;t be loaded. It&apos;ll try again next time you open this tab.</Text>
-        )}
-
-        {summary && current && (summary.month.empty === 'noHabits' ? (
-          <SummaryEmptyCard kind="noHabits" onCreate={createHabit} />
-        ) : (
-          <>
-            <RangeToggle value={range} onChange={setRadarWindow} />
-            {current.empty ? (
-              <SummaryEmptyCard kind="nothingScheduled" onCreate={createHabit} />
-            ) : (
-              <>
-                <SummaryStats range={current} currentStreak={summary.currentStreak} />
-                <Text style={styles.section} accessibilityRole="header">
-                  {range === 'week' ? 'Last 7 days' : 'Last 30 days'}
-                </Text>
-                {range === 'week'
-                  ? <WeekBars days={current.days} />
-                  : <HeatStrip days={current.days} leadingBlanks={current.leadingBlanks} />}
-                {radar && visible && (
-                  <>
-                    <Text style={styles.section} accessibilityRole="header">{RADAR_TITLE}</Text>
-                    <RadarSummary window={radar[range]} outline={visible.outline} />
-                  </>
-                )}
-                <Text style={styles.section} accessibilityRole="header">By habit</Text>
-                <HabitRateList habits={current.habits} />
-              </>
-            )}
-          </>
-        ))}
-      </ScrollView>
-    </SafeAreaView>
+      {summary && current && (summary.month.empty === 'noHabits' ? (
+        <SummaryEmptyCard kind="noHabits" onCreate={createHabit} />
+      ) : (
+        <>
+          <RangeToggle value={range} onChange={setRadarWindow} />
+          {current.empty ? (
+            <SummaryEmptyCard kind="nothingScheduled" onCreate={createHabit} />
+          ) : (
+            <>
+              <SummaryStats range={current} currentStreak={summary.currentStreak} />
+              <Text style={styles.section} accessibilityRole="header">
+                {range === 'week' ? LAST_7_DAYS_TITLE : LAST_30_DAYS_TITLE}
+              </Text>
+              {range === 'week'
+                ? <WeekBars days={current.days} />
+                : <HeatStrip days={current.days} leadingBlanks={current.leadingBlanks} />}
+              {radar && visible && (
+                <>
+                  <Text style={styles.section} accessibilityRole="header">{RADAR_TITLE}</Text>
+                  <RadarHighlights window={radar[range]} />
+                  <RadarSummary window={radar[range]} outline={visible.outline} />
+                </>
+              )}
+              <Text style={styles.section} accessibilityRole="header">{BY_HABIT_TITLE}</Text>
+              <HabitRateList habits={current.habits} />
+            </>
+          )}
+        </>
+      ))}
+    </>
   );
 }
 
-// Profile's layout rhythm: same padding, gap, title and section styles
 const styles = StyleSheet.create({
-  safe: {flex: 1, backgroundColor: colors.background},
-  content: {paddingHorizontal: spacing.lg, paddingBottom: 18, gap: 10},
-  title: {fontFamily: fonts.title, fontSize: 26, color: colors.text, paddingTop: 5},
   empty: {fontFamily: fonts.regular, fontSize: 14, color: colors.muted},
   section: {fontFamily: fonts.title, fontSize: 18, color: colors.text, paddingTop: spacing.sm},
 });
