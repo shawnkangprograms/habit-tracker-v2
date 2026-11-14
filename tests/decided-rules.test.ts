@@ -83,7 +83,9 @@ describe('S-2: a habit created while the clock was ahead counts from today (crea
         if (/\.(ts|tsx|js)$/.test(path) && readers(path) > 0) found.push(path);
       }
     }
-    assert.deepEqual(found.sort(), ['db/gamificationCore.js', 'utils/dailyCompletion.ts', 'utils/gamification.ts']);
+    // C4: the awards read createdDate too, and clamp on entry like the rest
+    assert.match(source('utils/awards.ts'), /requireToday\(today\);\s*const habits = clampCreatedDates\(\[\.\.\.habitsIn\], today\);/);
+    assert.deepEqual(found.sort(), ['db/gamificationCore.js', 'utils/awards.ts', 'utils/dailyCompletion.ts', 'utils/gamification.ts']);
     assert.match(source('utils/radar/score.ts'), /dailyCompletion\(habits, input\.completions, input\.today\)/);
   });
 

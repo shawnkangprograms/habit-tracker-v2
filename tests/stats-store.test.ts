@@ -17,6 +17,7 @@ const BASE: AppStats = {
   ...computeGamification([], [], TODAY),
   vitality: {state: 'starting', restarts: false},
   radar: computeRadar({habits: [], completions: [], today: TODAY, packs: null, areas: {}}),
+  awards: [],
 };
 const withStreak = (currentStreak: number): AppStats => ({...BASE, currentStreak, longestStreak: currentStreak});
 

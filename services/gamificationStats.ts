@@ -14,6 +14,7 @@ import {areasStore} from '@/services/areasStore';
 import {packsStore} from '@/services/packsStore';
 import {reflectionsStore} from '@/services/reflectionsStore';
 import type {AppStats} from '@/utils/appStats';
+import {computeAwards} from '@/utils/awards';
 import {dailyCompletion} from '@/utils/dailyCompletion';
 import {getLocalDateString} from '@/utils/dates';
 import {computeGamification, type GamiCompletion} from '@/utils/gamification';
@@ -35,6 +36,8 @@ export async function getGamificationStats(userId: string, today = getLocalDateS
       habits: rows.habits, completions: rows.completions, today, areas,
       packs: packs.kind === 'ok' ? packs.record : null,
     }),
+    // C4: from the synced habits and completions only (never the reflections, areas or packs read above)
+    awards: computeAwards(rows.habits, rows.completions, today),
   };
 }
 
