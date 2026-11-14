@@ -109,9 +109,11 @@ describe('endSession: the one way to sign out', () => {
       }
     }
     assert.deepEqual(offenders, []);
-    // and the scan really sees the two wrapped calls (sign-out and the sign-up rollback)
+    // and the scan really sees the wrapped sign-out; since the orphan-account fix nothing in the app deletes a user
+    // (sign-up completes its profile instead of rolling back; the recovery screen signs an under-18 user out)
     const actions = readFileSync(join(root, 'services/authActions.js'), 'utf8');
     assert.match(actions, /endSession\(\(\) => firebaseSignOut\(auth\)\)/);
-    assert.match(actions, /endSession\(\(\) => userCredential\.user\.delete\(\)/);
+    assert.doesNotMatch(actions, /\.delete\(\)|deleteUser/);
+    assert.doesNotMatch(readFileSync(join(root, 'app/profile-setup.tsx'), 'utf8'), /\.delete\(\)|deleteUser/);
   });
 });

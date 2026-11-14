@@ -170,11 +170,13 @@ describe('sign-up and saving', () => {
   const actions = source('services/authActions.js');
   const signUp = actions.slice(actions.indexOf('export async function signUp'), actions.indexOf('export async function saveName'));
 
-  test('the names go in the same profile write as the age; the rollback also clears the phone\'s copy', () => {
-    assert.match(signUp, /setDoc\(userDocRef, \{age, firstName: name\.firstName, lastName: name\.lastName, createdAt: serverTimestamp\(\)\}\)/);
-    assert.ok(signUp.indexOf('profileNameStore.clear(uid)') > signUp.indexOf('user.delete()'));
-    // displayName comes after the profile write and is not part of the rollback
-    assert.ok(signUp.indexOf('updateProfile(') > signUp.indexOf('throw err;'));
+  test('the names go in the same profile write as the age (kept pending until it lands); no rollback clears them', () => {
+    assert.match(signUp, /const profile = \{age, firstName: name\.firstName, lastName: name\.lastName\};/);
+    assert.match(source('services/profileCompletion.ts'),
+      /setDoc\(ref, \{\s*age: profile\.age, firstName: profile\.firstName, lastName: profile\.lastName, createdAt: serverTimestamp\(\),\s*\}\)/);
+    assert.equal(signUp.indexOf('profileNameStore.clear('), -1);
+    // displayName comes after the profile write attempt
+    assert.ok(signUp.indexOf('updateProfile(') > signUp.indexOf('profileCompletion.writeNow(uid, profile)'));
   });
 
   test('the sign-up form checks both names before creating the account', () => {

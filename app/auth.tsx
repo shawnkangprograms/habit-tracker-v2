@@ -1,6 +1,6 @@
 import {useEffect, useRef, useState} from 'react';
 import {
-  ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
+  ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
   type KeyboardTypeOptions,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
@@ -213,10 +213,8 @@ export default function AuthScreen() {
       }
       // on success onAuthStateChanged in app/_layout.tsx swaps this screen for the tabs
     } catch (err) {
-      if (authErrorCode(err) === 'profile-write-failed') {
-        // this screen has usually unmounted by now (sign-in swapped it for the tabs), so the message goes in an Alert
-        Alert.alert("Couldn't create your account", 'Please check your internet connection and try again.');
-      }
+      // A profile write that fails after the account exists no longer fails sign-up: it is completed later
+      // (services/profileCompletionCore.ts), so only Firebase Auth's own errors arrive here
       setSubmitError(friendlyAuthError(err));
     } finally {
       submittingRef.current = false;

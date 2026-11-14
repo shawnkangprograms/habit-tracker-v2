@@ -137,6 +137,7 @@ Every persisted format:
 | `reflections:v1:<uid>` | `version: 1` | read only since F-1 (copied into the year items, never written; delete after the next store build) |
 | `reflections:v2:<uid>:<yyyy>` | key; `version: 1` inside | F-1 (Phase 1b): one item per year |
 | `reflections:migrated:v2:<uid>` | key; `version: 1` inside | F-1 marker: `years`, `v1Length` |
+| `profile:pending:v1:<uid>` | key; `version: 1` inside | orphan fix (2026-11-14): sign-up's profile details until the users doc lands; never re-saved |
 | `areas:v1:<uid>` | key | R-1 (Phase 1b): deleted habits' entries pruned at the next write; never written over when unreadable |
 | `profile:outline:v1:<uid>` | key | — |
 | `celebrated:v1:<uid>` | key | `level:N` to `level:v2:N` |
@@ -298,6 +299,21 @@ form on a rename (before any pack move) and after a delete, with one read of the
 `tests/p2-rename-delete.test.ts`. Changed: odd-state-fixtures (renamedPackHabit is a pin now). Two mutations were
 checked by hand (another carrier ignored; a delete never dropping): each fails 2 tests. Suite: 1148 tests, 1148 pass,
 0 todo.
+
+**Phase 1b, orphan Auth accounts, parts (a) and (b) (2026-11-14).** Built: sign-up saves the profile details on the
+phone first and completes the users doc later (`utils/profilePending.ts`, `services/profileCompletionCore.ts`,
+`services/profileCompletion.ts`; 10 s write timeout, no rollback delete), and "Finish setting up your account"
+(`app/profile-setup.tsx`), opened by `services/useDisabledCheck.ts` only on a server-confirmed missing profile. New:
+`tests/orphan-profile.test.ts`: the completer (first try, a timeout with a late landing, offline, a permanent refusal,
+two phones racing, per uid, an unreadable or corrupt record, two runs at once), sign-up (order, no rollback, the
+timeout, a kill after the details were saved, off the startup path), recovery (only on a confirmed missing profile, the
+approved copy, under 18 signs out and writes nothing, no back, the failure line, an existing profile opens nothing;
+admins: an admin with no profile never sees the screen and its pending record is left alone, a failed admin read opens
+and completes nothing, a normal user with no profile still sees it, and admins/{uid} is read only when the profile is
+missing) and the rollback-bundle case. Changed: the sign-up pins in auth-session, onboarding-0b, onboarding-gate and
+profile-name. Three mutations were checked by hand (recovery on an unknown profile; a write without reading the server
+first: each fails 1 test; the admin guard removed: fails 3). (c) the stats orphan count and (d) find-orphans.mjs are
+later steps. Suite: 1171 tests, 1171 pass, 0 todo.
 
 ### Phase 1b test cases (written with the fixes)
 

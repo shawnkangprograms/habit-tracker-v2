@@ -72,13 +72,14 @@ describe('onboarding straight after sign-up', () => {
     assert.equal(calls, 3);
   });
 
-  test('the sign-up path: begin before the account exists, cancel on both failures', () => {
+  test('the sign-up path: begin before the account exists, cancel only if the account wasn\'t created', () => {
     const actions = source('../services/authActions.js');
     const signUp = actions.slice(actions.indexOf('export async function signUp'), actions.indexOf('export async function signIn'));
     const begin = signUp.indexOf('onboardingLaunch.beginSignUp()');
     assert.ok(begin >= 0 && begin < signUp.indexOf('createUserWithEmailAndPassword('));
-    assert.equal(signUp.split('onboardingLaunch.cancelSignUp()').length - 1, 2);// account creation failed; profile rolled back
-    assert.ok(signUp.lastIndexOf('onboardingLaunch.cancelSignUp()') > signUp.indexOf('user.delete()'));
+    // the orphan-account fix: a profile write that fails no longer rolls back, so onboarding carries on
+    assert.equal(signUp.split('onboardingLaunch.cancelSignUp()').length - 1, 1);
+    assert.doesNotMatch(signUp, /\.delete\(\)/);
   });
 
   test('onboarding closes itself when no one is signed in (a rolled-back sign-up)', () => {

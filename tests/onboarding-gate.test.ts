@@ -218,13 +218,15 @@ describe('sign-up pending flag', () => {
     assert.equal(g.recordOnSkip('settings'), null);
   });
 
-  test('sign-up sets it after the account exists and before the profile write; the rollback clears it', () => {
+  test('sign-up sets it after the account exists (and its details are saved) and before the profile write; never cleared by sign-up', () => {
     const source = readFileSync(new URL('../services/authActions.js', import.meta.url), 'utf8');
     const signUp = source.slice(source.indexOf('export async function signUp'), source.indexOf('export async function signIn'));
     const at = (needle: string) => signUp.indexOf(needle);
     assert.ok(at('createUserWithEmailAndPassword(') >= 0 && at('createUserWithEmailAndPassword(') < at('markPending(uid)'));
-    assert.ok(at('markPending(uid)') < at('setDoc('));
-    assert.ok(at('user.delete()') < at('clearPending(uid)'));
+    assert.ok(at('profileCompletion.savePending(uid, profile)') < at('markPending(uid)'));
+    assert.ok(at('markPending(uid)') < at('profileCompletion.writeNow(uid, profile)'));
+    // no rollback any more (the orphan-account fix): sign-up never clears the flag
+    assert.equal(at('clearPending('), -1);
     // the only caller: sign-in never sets it
     assert.equal(source.split('markPending').length - 1, 1);
   });

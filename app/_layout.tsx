@@ -210,6 +210,8 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" options={{headerShown: false}} />
           <Stack.Screen name="habit-form" options={{headerShown: false}} />
           <Stack.Screen name="profile-name" options={{headerShown: false}} />
+          {/* "Finish setting up your account": blocks until saved (services/useDisabledCheck.ts opens it) */}
+          <Stack.Screen name="profile-setup" options={{headerShown: false, presentation: 'fullScreenModal', gestureEnabled: false}} />
           <Stack.Screen name="packs/choose" options={{headerShown: false}} />
           <Stack.Screen name="packs/edit" options={{headerShown: false}} />
           {/* full-screen, swipe-back off: leaving goes through its Back, which asks before dropping answers */}

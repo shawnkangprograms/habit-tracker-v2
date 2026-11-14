@@ -10,6 +10,7 @@ import {endSession} from '@/services/authMarker';
 import {onboardingStore} from '@/services/onboardingStore';
 import {onboardingLaunch} from '@/services/onboardingLaunch';
 import {profileNameStore} from '@/services/profileName';
+import {profileCompletion} from '@/services/profileCompletion';
 import {codedError, withTimeout} from '@/services/admin';
 // Every sign-out goes through endSession (clears the sign-in marker first); tests/auth-session.test.ts checks
 // that nothing else in the app calls Firebase's signOut or deletes the user.
@@ -36,6 +37,11 @@ export async function signUp(email, password, age, name){
     }
 
     const uid = userCredential.user.uid;
+    // The orphan-account fix (docs/HABITQUEST_DESIGN.md): the profile is completed, never rolled back. Its details go
+    // on this phone first, before anything else, so a kill or a failed write from here on is finished later by the
+    // completer (services/profileCompletionCore.ts); the account is never deleted.
+    const profile = {age, firstName: name.firstName, lastName: name.lastName};
+    await profileCompletion.savePending(uid, profile);// never throws
     // Onboarding opens on its own only after a sign-up on this phone (utils/onboarding/gate.ts). Set before the
     // profile write, because the auth listener can mount Home before setDoc returns. Local only; a failed save
     // just means it doesn't open on its own (Settings still has it).
@@ -43,25 +49,11 @@ export async function signUp(email, password, age, name){
     // the greeting's copy, so Home has the name on its first render after onboarding (never throws)
     await profileNameStore.set({uid, firstName: name.firstName, lastName: name.lastName});
 
-    const {doc, serverTimestamp, setDoc} = firestore();
-    const db = getFirestoreDb();
-    const userDocRef = doc(db, 'users', uid);
-    try {
-        await setDoc(userDocRef, {age, firstName: name.firstName, lastName: name.lastName, createdAt: serverTimestamp()});
-    } catch (cause) {
-        // roll back: no account may exist without its users doc (age). The sign-in is seconds old, so no reauth is needed.
-        // Deleting also signs out, so it goes through endSession; it goes ahead even if the marker can't be cleared.
-        await endSession(() => userCredential.user.delete(), {proceedIfMarkerClearFails: true}).catch(() => {});
-        await onboardingStore.clearPending(uid).catch(() => {});
-        await profileNameStore.clear(uid);
-        onboardingLaunch.cancelSignUp();// onboarding, if already open, closes itself once no one is signed in
-        const err = new Error('Could not create the user profile');
-        err.code = 'profile-write-failed';
-        err.cause = cause;
-        throw err;
-    }
-    // Not part of the rollback: the doc and the phone's copy already hold the name, and saving it in Settings sets
-    // displayName again
+    // One try now, at most 10 s. If it isn't confirmed (offline, a timeout, a refusal), sign-up still succeeds: the
+    // details stay pending and the completer writes them on the next sign-in, launch, foreground or sync cycle, or
+    // the recovery screen asks for them (app/profile-setup.tsx).
+    await profileCompletion.writeNow(uid, profile);
+    // the doc (or the pending copy) and the phone's copy hold the name; saving it in Settings sets displayName again
     await updateProfile(userCredential.user, {displayName: displayNameOf(name)})
         .catch((err) => console.log('Setting the display name failed', err?.code));
 }
