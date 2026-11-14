@@ -1,4 +1,5 @@
 import {Pressable, StyleSheet, Text, View} from 'react-native';
+import {TEST_IDS} from '@/constants/testIds';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import Animated, {FadeIn} from 'react-native-reanimated';
 import {colors, fonts, radii, spacing} from '@/constants/theme';
@@ -7,7 +8,7 @@ import {colors, fonts, radii, spacing} from '@/constants/theme';
 // starter ideas. Fades in only when Reduce Motion is off.
 export function EmptyHomeCard({reduceMotion, onPick}: {reduceMotion: boolean; onPick: () => void}) {
   return (
-    <Animated.View style={styles.card} entering={reduceMotion ? undefined : FadeIn.duration(250)}>
+    <Animated.View style={styles.card} entering={reduceMotion ? undefined : FadeIn.duration(250)} testID={TEST_IDS.home.emptyCard}>
       <View style={styles.badge}>
         <MaterialCommunityIcons name="fire" size={26} color={colors.accent} />
       </View>
@@ -18,6 +19,7 @@ export function EmptyHomeCard({reduceMotion, onPick}: {reduceMotion: boolean; on
         onPress={onPick}
         accessibilityRole="button"
         accessibilityLabel="Pick a starter habit"
+        testID={TEST_IDS.home.emptyPick}
         accessibilityHint="Opens the new habit screen with starter ideas">
         <Text style={styles.buttonText}>Pick a starter habit</Text>
       </Pressable>

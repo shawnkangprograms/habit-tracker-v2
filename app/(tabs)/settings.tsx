@@ -16,6 +16,7 @@ import {
 import {NUDGE_TIMES, reminderSwitchValue} from '@/utils/notificationPrefs';
 import {devSeedEarlyPraise} from '@/db/devSeed';// null outside __DEV__
 import {colors, fonts, radii, spacing} from '@/constants/theme';
+import {TEST_IDS, nudgeTimeId} from '@/constants/testIds';
 import {SwitchRow} from '@/components/switch-row';
 import {TRACE_ON} from '@/utils/startupTrace';
 import {firstPullFor} from '@/sync/syncEngine';// S-4: read-only
@@ -131,7 +132,7 @@ export default function SettingsScreen (){
     };
 
     return(
-        <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
+        <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']} testID={TEST_IDS.settings.screen}>
             <ScrollView contentContainerStyle={styles.content}>
               <Text style={styles.title} onLongPress={onTitleLongPress}>Settings</Text>
               {syncMessages.map((line) => <Text key={line} style={styles.clockLine}>{line}</Text>)}
@@ -142,6 +143,7 @@ export default function SettingsScreen (){
                   label="Celebrations and messages"
                   value={celebrationsOn}
                   onChange={setCelebrationsEnabled}
+                  testID={TEST_IDS.settings.celebrations}
                 />
                 <SwitchRow
                   icon="bell-outline"
@@ -149,6 +151,7 @@ export default function SettingsScreen (){
                   value={reminderSwitchValue(notificationPrefs, permission, available)}// the real state: off while the phone blocks notifications
                   onChange={(value) => setNotificationSwitch('remindersOn', value)}
                   disabled={asking || !available}
+                  testID={TEST_IDS.settings.reminders}
                 />
                 <SwitchRow
                   icon="weather-night"
@@ -156,6 +159,7 @@ export default function SettingsScreen (){
                   value={available && notificationPrefs.nudgeOn}
                   onChange={(value) => setNotificationSwitch('nudgeOn', value)}
                   disabled={asking || !available}
+                  testID={TEST_IDS.settings.nudge}
                 />
 
                 {available && notificationPrefs.nudgeOn && (
@@ -168,7 +172,9 @@ export default function SettingsScreen (){
                           style={[styles.chip, selected ? styles.chipSelected : styles.chipUnselected]}
                           onPress={() => setNotificationPrefs({nudgeTime: time})}
                           accessibilityRole="radio"
-                          accessibilityState={{selected}}>
+                          accessibilityLabel={time}
+                          accessibilityState={{selected}}
+                          testID={nudgeTimeId(time)}>
                           <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{time}</Text>
                         </Pressable>
                       );
@@ -183,6 +189,7 @@ export default function SettingsScreen (){
                   accessibilityRole="button"
                   accessibilityLabel="Send a test notification"
                   accessibilityHint="Arrives in about 10 seconds"
+                  testID={TEST_IDS.settings.testNotification}
                   accessibilityState={{disabled: !available || sendingTest}}>
                   <MaterialCommunityIcons name="send-outline" size={22} color={colors.accent} />
                   <Text style={styles.rowText}>Send a test notification</Text>
@@ -207,7 +214,8 @@ export default function SettingsScreen (){
                     <Pressable
                       style={({pressed}) => [styles.noticeButton, pressed && styles.pressed]}
                       onPress={() => { Linking.openSettings().catch(() => {}); }}
-                      accessibilityRole="button">
+                      accessibilityRole="button"
+                      testID={TEST_IDS.settings.openPhoneSettings}>
                       <Text style={styles.noticeButtonText}>Open settings</Text>
                     </Pressable>
                   </View>
@@ -217,7 +225,8 @@ export default function SettingsScreen (){
                 <Pressable
                   style={({pressed}) => [styles.row, pressed && styles.pressed]}
                   onPress={() => router.push('/profile-name')}
-                  accessibilityRole="button">
+                  accessibilityRole="button"
+                  testID={TEST_IDS.settings.nameRow}>
                   <MaterialCommunityIcons name="account-edit-outline" size={22} color={colors.accent} />
                   <Text style={styles.rowText}>{NAME_ROW}</Text>
                   <MaterialCommunityIcons name="chevron-right" size={22} color={colors.muted} />
@@ -227,7 +236,8 @@ export default function SettingsScreen (){
                 <Pressable
                   style={({pressed}) => [styles.row, pressed && styles.pressed]}
                   onPress={() => router.push({pathname: '/packs/choose', params: {from: 'settings'}})}
-                  accessibilityRole="button">
+                  accessibilityRole="button"
+                  testID={TEST_IDS.settings.packsRow}>
                   <MaterialCommunityIcons name="view-grid-outline" size={22} color={colors.accent} />
                   <Text style={styles.rowText}>{SETTINGS_PACKS_ROW}</Text>
                   <MaterialCommunityIcons name="chevron-right" size={22} color={colors.muted} />
@@ -238,7 +248,8 @@ export default function SettingsScreen (){
                 <Pressable
                   style={({pressed}) => [styles.row, pressed && styles.pressed]}
                   onPress={openPlan}
-                  accessibilityRole="button">
+                  accessibilityRole="button"
+                  testID={TEST_IDS.settings.planRow}>
                   <MaterialCommunityIcons name="compass-outline" size={22} color={colors.accent} />
                   <Text style={styles.rowText}>{SETTINGS_ROW}</Text>
                   <MaterialCommunityIcons name="chevron-right" size={22} color={colors.muted} />
@@ -253,7 +264,8 @@ export default function SettingsScreen (){
                   <Pressable
                     style={({pressed}) => [styles.row, pressed && styles.pressed]}
                     onPress={() => router.push('/admin/overview')}
-                    accessibilityRole="button">
+                    accessibilityRole="button"
+                    testID={TEST_IDS.settings.adminRow}>
                     <MaterialCommunityIcons name="shield-account-outline" size={22} color={colors.accent} />
                     <Text style={styles.rowText}>Admin</Text>
                     <MaterialCommunityIcons name="chevron-right" size={22} color={colors.muted} />
@@ -263,7 +275,8 @@ export default function SettingsScreen (){
                 <Pressable
                   style={({pressed}) => [styles.row, pressed && styles.pressed]}
                   onPress={handleSignOut}
-                  accessibilityRole="button">
+                  accessibilityRole="button"
+                  testID={TEST_IDS.settings.signOut}>
                   <MaterialCommunityIcons name="logout" size={22} color={colors.error} />
                   <Text style={[styles.rowText, styles.signOutText]}>Sign Out</Text>
                 </Pressable>

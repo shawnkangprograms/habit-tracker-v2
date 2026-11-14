@@ -19,6 +19,7 @@ import {getLocalDateString} from '@/utils/dates';
 import {isDeepEqual} from '@/utils/equality';// skip a re-render when a reload returned what is already shown
 import type {AppStats} from '@/utils/appStats';
 import {colors, fonts, radii, spacing, ICON_COLORS} from '@/constants/theme';
+import {TEST_IDS, habitCheckId, habitRowId, otherHabitRowId} from '@/constants/testIds';
 import {HabitIcon} from '@/constants/habitIcons';
 import type {IconId} from '@/constants/habits';
 import {StatsCard, StatsCardPlaceholder} from '@/components/stats-card';
@@ -601,7 +602,8 @@ export default function HomeScreen() {// default export, becomes the "index" tab
         onPress={() => router.push({pathname: '/habit-form', params: {habitId: habit.habitId}})}
         accessibilityRole="button"
         accessibilityLabel={label}
-        accessibilityHint="Opens the edit form">
+        accessibilityHint="Opens the edit form"
+        testID={habitRowId(habit.habitName)}>
 
         <View style={[styles.badge, {backgroundColor: `${color}30`, borderColor: `${color}80`}, done && styles.doneContent]}>
           <HabitIcon id={habit.icon} size={21} color={color} />
@@ -621,6 +623,7 @@ export default function HomeScreen() {// default export, becomes the "index" tab
         <HabitCheck
           done={done}
           habitName={habit.habitName}
+          testID={habitCheckId(habit.habitName)}
           reduceMotion={reduceMotion}
           onPress={() => handleToggle(habit)}
         />
@@ -640,11 +643,12 @@ export default function HomeScreen() {// default export, becomes the "index" tab
   if (launching) return <View style={styles.safe} />;
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']} testID={TEST_IDS.home.screen}>
       {/* the tab bar sits below the scene and handles the bottom inset itself */}
       <View style={styles.main}>
         <ScrollView
           contentContainerStyle={styles.content}
+          testID={TEST_IDS.home.scroll}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -722,7 +726,7 @@ export default function HomeScreen() {// default export, becomes the "index" tab
                 ))}
                 {addControls && (
                   <>
-                    <Pressable style={styles.addRow} onPress={createPackTap} accessibilityRole="button">
+                    <Pressable style={styles.addRow} onPress={createPackTap} accessibilityRole="button" testID={TEST_IDS.home.addPack}>
                       <MaterialCommunityIcons name="view-grid-plus-outline" size={20} color={colors.accent} />
                       <Text style={styles.addText}>{CREATE_PACK_BUTTON}</Text>
                     </Pressable>
@@ -740,7 +744,7 @@ export default function HomeScreen() {// default export, becomes the "index" tab
             {/* hidden while the first-run card shows, so there is one clear action, and until habits are known */}
             {emptyState !== 'empty' && addControls && (
               <>
-                <Pressable style={styles.addRow} onPress={addHabitTap} accessibilityRole="button">
+                <Pressable style={styles.addRow} onPress={addHabitTap} accessibilityRole="button" testID={TEST_IDS.home.addHabit}>
                   <MaterialCommunityIcons name="plus" size={20} color={colors.accent} />
                   <Text style={styles.addText}>Add a habit</Text>
                 </Pressable>
@@ -768,7 +772,8 @@ export default function HomeScreen() {// default export, becomes the "index" tab
                       onPress={() => router.push({pathname: '/habit-form', params: {habitId: habit.habitId}})}
                       accessibilityRole="button"
                       accessibilityLabel={label}
-                      accessibilityHint="Opens the edit form">
+                      accessibilityHint="Opens the edit form"
+                      testID={otherHabitRowId(habit.habitName)}>
 
                       <View style={[styles.badge, {backgroundColor: `${color}30`, borderColor: `${color}80`}]}>
                         <HabitIcon id={icon} size={21} color={color} />

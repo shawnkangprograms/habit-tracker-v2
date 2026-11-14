@@ -8,6 +8,7 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
 import {resetPassword, signUp, signIn} from '@/services/authActions';
 import {colors, fonts, radii, spacing} from '@/constants/theme';
+import {TEST_IDS} from '@/constants/testIds';
 import {
   validateAge, validateConfirmPassword, validateEmail, validatePassword, validatePersonName,
 } from '@/validation/validators';
@@ -52,6 +53,7 @@ function AuthInput(props: {
   value: string;
   onChangeText: (text: string) => void;
   placeholder: string;
+  testID: string;
   error?: string;
   secure?: boolean;
   keyboardType?: KeyboardTypeOptions;
@@ -85,6 +87,7 @@ function AuthInput(props: {
           onBlur={props.onBlur}
           onFocus={props.onFocus}
           accessibilityLabel={props.placeholder}
+          testID={props.testID}
         />
       </View>
       {props.error ? <Text style={styles.errorText}>{props.error}</Text> : null}
@@ -229,7 +232,7 @@ export default function AuthScreen() {
     : (isSignUp ? 'Create Account' : 'Sign In');
 
   return (
-    <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.screen} edges={['top', 'bottom']} testID={TEST_IDS.auth.screen}>
       {/* iOS: padding lifts the content above the keyboard. Android: edge-to-edge, so the window doesn't resize;
           the keyboard's height is added to the content instead (hooks/use-keyboard-scroll.ts) */}
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -265,6 +268,7 @@ export default function AuthScreen() {
                 onChangeText={edit('firstName', setFirstName)}
                 onBlur={() => setNameTouched((t) => ({...t, first: true}))}
                 placeholder="First name"
+                testID={TEST_IDS.auth.firstName}
                 error={visibleError(firstResult, nameTouched.first)}
                 textContentType="givenName"
                 editable={!submitting}
@@ -276,6 +280,7 @@ export default function AuthScreen() {
                 onChangeText={edit('lastName', setLastName)}
                 onBlur={() => setNameTouched((t) => ({...t, last: true}))}
                 placeholder="Last name"
+                testID={TEST_IDS.auth.lastName}
                 error={visibleError(lastResult, nameTouched.last)}
                 textContentType="familyName"
                 editable={!submitting}
@@ -288,6 +293,7 @@ export default function AuthScreen() {
             value={email}
             onChangeText={edit('email', setEmail)}
             placeholder="Email address"
+            testID={TEST_IDS.auth.email}
             error={errors.email}
             keyboardType="email-address"
             textContentType="emailAddress"
@@ -300,6 +306,7 @@ export default function AuthScreen() {
               value={password}
               onChangeText={edit('password', setPassword)}
               placeholder="Password"
+              testID={TEST_IDS.auth.password}
               error={errors.password}
               secure
               textContentType={isSignUp ? 'newPassword' : 'password'}
@@ -313,7 +320,8 @@ export default function AuthScreen() {
               onPress={() => goToMode('reset')}
               disabled={submitting}
               hitSlop={8}
-              accessibilityRole="button">
+              accessibilityRole="button"
+              testID={TEST_IDS.auth.forgot}>
               <Text style={styles.forgotText}>Forgot password?</Text>
             </Pressable>
           )}
@@ -324,6 +332,7 @@ export default function AuthScreen() {
                 value={confirmPassword}
                 onChangeText={edit('confirmPassword', setConfirmPassword)}
                 placeholder="Confirm password"
+                testID={TEST_IDS.auth.confirmPassword}
                 error={errors.confirmPassword}
                 secure
                 textContentType="newPassword"
@@ -335,6 +344,7 @@ export default function AuthScreen() {
                 value={age}
                 onChangeText={edit('age', setAge)}
                 placeholder="Age"
+                testID={TEST_IDS.auth.age}
                 error={errors.age}
                 keyboardType="number-pad"
                 textContentType="none"
@@ -356,14 +366,16 @@ export default function AuthScreen() {
             onPress={isReset ? handleReset : handleSubmit}
             disabled={buttonDisabled}
             accessibilityRole="button"
-            accessibilityState={{busy: submitting, disabled: buttonDisabled}}>
+            accessibilityLabel={buttonLabel}// the spinner replaces the text while submitting
+            accessibilityState={{busy: submitting, disabled: buttonDisabled}}
+            testID={TEST_IDS.auth.submit}>
             {submitting
               ? <ActivityIndicator color={colors.white} />
               : <Text style={styles.primaryText}>{buttonLabel}</Text>}
           </Pressable>
 
           {isReset ? (
-            <Pressable style={styles.switchRow} onPress={() => goToMode('signIn')} hitSlop={8} accessibilityRole="button">
+            <Pressable style={styles.switchRow} onPress={() => goToMode('signIn')} hitSlop={8} accessibilityRole="button" testID={TEST_IDS.auth.backToSignIn}>
               <Text style={[styles.switchText, styles.switchAction]}>Back to sign in</Text>
             </Pressable>
           ) : (
@@ -371,7 +383,8 @@ export default function AuthScreen() {
               style={styles.switchRow}
               onPress={() => goToMode(isSignUp ? 'signIn' : 'signUp')}
               hitSlop={8}
-              accessibilityRole="button">
+              accessibilityRole="button"
+              testID={TEST_IDS.auth.switchMode}>
               <Text style={styles.switchText}>
                 {isSignUp ? 'Already have an account?  ' : 'New to HabitQuest?  '}
                 <Text style={styles.switchAction}>{isSignUp ? 'Sign in' : 'Create an account'}</Text>

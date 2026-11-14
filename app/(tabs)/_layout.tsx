@@ -8,6 +8,7 @@ import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { StreakTabIcon } from '@/components/streak-tab-icon';
 import { colors, fonts } from '@/constants/theme';
+import {TEST_IDS} from '@/constants/testIds';
 import { mark } from '@/utils/startupTrace';
 
 mark('layout:tabsEvaluated');
@@ -52,6 +53,7 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Home',
+          tabBarButtonTestID: TEST_IDS.tabs.home,
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
         }}
       />
@@ -59,6 +61,7 @@ export default function TabLayout() {
         name="summary"
         options={{
           title: 'Summary',
+          tabBarButtonTestID: TEST_IDS.tabs.summary,
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="chart.bar.fill" color={color} />,
         }}
       />
@@ -66,6 +69,7 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: 'Profile',
+          tabBarButtonTestID: TEST_IDS.tabs.profile,
           // the icon reads the shared stats store itself, so a streak change never re-renders the navigator
           tabBarIcon: ({ color }) => <StreakTabIcon color={color} />,
         }}
@@ -74,6 +78,7 @@ export default function TabLayout() {
         name="settings"
         options={{
           title: 'Settings',
+          tabBarButtonTestID: TEST_IDS.tabs.settings,
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="gearshape.fill" color={color} />,
         }}
       />

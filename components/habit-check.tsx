@@ -9,6 +9,7 @@ import {colors, radii} from '@/constants/theme';
 export function HabitCheck(props: {
   done: boolean;
   habitName: string;
+  testID: string;
   reduceMotion: boolean;
   onPress: () => void;
 }) {
@@ -30,7 +31,8 @@ export function HabitCheck(props: {
       accessibilityRole="checkbox"
       accessibilityState={{checked: props.done}}
       accessibilityLabel={`Mark ${props.habitName} as ${props.done ? 'not done' : 'done'}`}
-      onPress={props.onPress}>
+      onPress={props.onPress}
+      testID={props.testID}>
       <Animated.View style={[styles.check, props.done && styles.checkDone, pulseStyle]}>
         {props.done && <MaterialCommunityIcons name="check" size={17} color={colors.white} />}
       </Animated.View>

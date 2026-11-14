@@ -6,6 +6,7 @@ import {useInsight} from '@/hooks/use-insight';
 import {cardContent} from '@/utils/insightSchedule';
 import {getLocalDateString} from '@/utils/dates';
 import {colors, fonts, radii, spacing} from '@/constants/theme';
+import {TEST_IDS} from '@/constants/testIds';
 
 // A render error anywhere in the card hides the card; Home keeps working
 class InsightErrorBoundary extends Component<{children: ReactNode}, {failed: boolean}> {
@@ -47,6 +48,7 @@ function InsightCardBody({userId}: {userId: string}) {
         style={({pressed}) => [styles.card, pressed && styles.pressed]}
         onPress={() => setExpanded((e) => !e)}
         accessibilityRole="button"
+        testID={TEST_IDS.home.insightCard}
         accessibilityState={{expanded}}
         accessibilityLabel={`Insight, ${label}. ${insight.teaser}`}
         accessibilityHint={expanded ? 'Hides the full insight' : 'Shows the full insight'}>

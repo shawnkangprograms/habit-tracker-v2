@@ -33,10 +33,11 @@ export function timePickerAvailable(): boolean {
   return loadPicker() !== null;
 }
 
-export function TimeField({value, onChange, error}: {
+export function TimeField({value, onChange, error, testID}: {
   value: string;
   onChange: (time: string) => void;
   error?: boolean;
+  testID?: string;// constants/testIds.ts
 }) {
   const mod = loadPicker();
 
@@ -54,6 +55,7 @@ export function TimeField({value, onChange, error}: {
           keyboardType="numbers-and-punctuation"
           returnKeyType="done"
           accessibilityLabel="Reminder time, 24-hour, like 08:30"
+          testID={testID}
         />
       </View>
     );
@@ -78,7 +80,8 @@ export function TimeField({value, onChange, error}: {
         onPress={open}
         accessibilityRole="button"
         accessibilityLabel={`Reminder time, ${value}`}
-        accessibilityHint="Opens the time picker">
+        accessibilityHint="Opens the time picker"
+        testID={testID}>
         <MaterialCommunityIcons name="clock-outline" size={20} color={colors.muted} />
         <Text style={styles.value}>{value}</Text>
         <Text style={styles.change}>Change</Text>
@@ -88,7 +91,7 @@ export function TimeField({value, onChange, error}: {
 
   const Picker = mod.default;
   return (
-    <View style={[styles.field, error && styles.fieldError]}>
+    <View style={[styles.field, error && styles.fieldError]} testID={testID}>
       <MaterialCommunityIcons name="clock-outline" size={20} color={colors.muted} />
       <Text style={styles.label}>Time</Text>
       <Picker

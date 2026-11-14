@@ -33,13 +33,14 @@ function cardEntering(index: number) {
   }).duration(ITEM_ENTER_MS).delay(staggerDelay(index, ROUTINE_STAGGER_MS)).reduceMotion(SYSTEM);
 }
 
-export function RoutineCard({pick, index, selected, added, disabled, reduceMotion, onToggle}: {
+export function RoutineCard({pick, index, selected, added, disabled, reduceMotion, testID, onToggle}: {
   pick: Pick<StarterPick, 'habitName' | 'icon' | 'reason'>;// a starter, or the user's own habit
   index: number;// position in the list, for the stagger
   selected: boolean;
   added: boolean;
   disabled: boolean;// while habits are being created
   reduceMotion: boolean;
+  testID?: string;// constants/testIds.ts routineCardId; none for a habit made in the form
   onToggle: () => void;
 }) {
   const animate = shouldAnimate(reduceMotion);
@@ -93,6 +94,7 @@ export function RoutineCard({pick, index, selected, added, disabled, reduceMotio
           pressed && styles.pressed,
         ]}
         accessibilityRole="checkbox"
+        testID={testID}
         accessibilityState={{checked: on, disabled: added || disabled}}
         accessibilityLabel={`${pick.habitName}. ${pick.reason}${added ? `. ${ADDED}` : ''}`}>
         <View style={[styles.badge, {backgroundColor: `${tint}30`, borderColor: `${tint}80`}, !on && styles.faded]}>

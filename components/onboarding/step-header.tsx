@@ -1,6 +1,7 @@
 import {Pressable, StyleSheet, Text, View} from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import {colors, fonts, spacing} from '@/constants/theme';
+import {TEST_IDS} from '@/constants/testIds';
 import {BACK, SKIP_SETUP, stepLabel} from '@/utils/onboarding/copy';
 import {ProgressBar} from '@/components/onboarding/progress-bar';
 
@@ -16,12 +17,12 @@ export function StepHeader({progress, canGoBack, onBack, onSkip}: {
     <View style={styles.wrap}>
       <View style={styles.topRow}>
         {canGoBack ? (
-          <Pressable style={styles.back} onPress={onBack} hitSlop={12} accessibilityRole="button" accessibilityLabel={BACK}>
+          <Pressable style={styles.back} onPress={onBack} hitSlop={12} accessibilityRole="button" accessibilityLabel={BACK} testID={TEST_IDS.onboarding.back}>
             <MaterialCommunityIcons name="chevron-left" size={22} color={colors.muted} />
             <Text style={styles.backText}>{BACK}</Text>
           </Pressable>
         ) : <View />}
-        <Pressable onPress={onSkip} hitSlop={12} accessibilityRole="button">
+        <Pressable onPress={onSkip} hitSlop={12} accessibilityRole="button" accessibilityLabel={SKIP_SETUP} testID={TEST_IDS.onboarding.skipSetup}>
           <Text style={styles.skip}>{SKIP_SETUP}</Text>
         </Pressable>
       </View>

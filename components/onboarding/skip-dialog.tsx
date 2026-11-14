@@ -1,6 +1,7 @@
 import {useEffect, useRef} from 'react';
 import {AccessibilityInfo, Modal, Pressable, StyleSheet, Text, View} from 'react-native';
 import {colors, fonts, radii, spacing} from '@/constants/theme';
+import {TEST_IDS} from '@/constants/testIds';
 import type {SkipCopy, SkipDialogEvent, SkipDialogState} from '@/utils/onboarding/skipDialog';
 
 // The "Skip setup" confirmation and the "Taking you home" notice that follows it, or "Taking you back to Settings…" on
@@ -40,15 +41,15 @@ export function SkipDialog({state, copy, reduceMotion, onEvent}: {
           {leaving ? (
             <>
               <Text ref={heading} style={styles.notice} accessibilityLiveRegion="polite">{copy.notice}</Text>
-              <DialogButton label={copy.goHome} primary onPress={() => onEvent('goHome')} />
+              <DialogButton label={copy.goHome} primary testID={TEST_IDS.onboarding.skipDialogGoHome} onPress={() => onEvent('goHome')} />
             </>
           ) : (
             <>
               <Text ref={heading} style={styles.title} accessibilityRole="header">{copy.title}</Text>
               <Text style={styles.body}>{copy.body}</Text>
               {/* staying is the main action; leaving is the outlined one */}
-              <DialogButton label={copy.no} primary onPress={() => onEvent('no')} />
-              <DialogButton label={copy.yes} onPress={() => onEvent('yes')} />
+              <DialogButton label={copy.no} primary testID={TEST_IDS.onboarding.skipDialogNo} onPress={() => onEvent('no')} />
+              <DialogButton label={copy.yes} testID={TEST_IDS.onboarding.skipDialogYes} onPress={() => onEvent('yes')} />
             </>
           )}
         </View>
@@ -57,12 +58,13 @@ export function SkipDialog({state, copy, reduceMotion, onEvent}: {
   );
 }
 
-function DialogButton({label, primary = false, onPress}: {label: string; primary?: boolean; onPress: () => void}) {
+function DialogButton({label, primary = false, testID, onPress}: {label: string; primary?: boolean; testID: string; onPress: () => void}) {
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={label}
+      testID={testID}
       style={({pressed}) => [primary ? styles.primary : styles.secondary, pressed && styles.pressed]}>
       <Text style={primary ? styles.primaryText : styles.secondaryText}>{label}</Text>
     </Pressable>

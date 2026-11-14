@@ -15,12 +15,13 @@ import {
 
 const SYSTEM = ReduceMotion.System;// a backstop for the first render, before useReduceMotion has read the setting
 
-export function OptionButton({label, selected, multi, dimmed = false, reduceMotion, onPress}: {
+export function OptionButton({label, selected, multi, dimmed = false, reduceMotion, testID, onPress}: {
   label: string;
   selected: boolean;
   multi: boolean;
   dimmed?: boolean;
   reduceMotion: boolean;
+  testID: string;// constants/testIds.ts optionId
   onPress: () => void;
 }) {
   const animate = shouldAnimate(reduceMotion);
@@ -57,7 +58,8 @@ export function OptionButton({label, selected, multi, dimmed = false, reduceMoti
       disabled={dimmed}
       accessibilityRole={multi ? 'checkbox' : 'radio'}
       accessibilityState={multi ? {checked: selected, disabled: dimmed} : {selected, disabled: dimmed}}
-      accessibilityLabel={label}>
+      accessibilityLabel={label}
+      testID={testID}>
       <Animated.View style={[styles.row, dimmed && styles.dimmed, rowStyle]}>
         <Animated.View style={[styles.selectedOverlay, overlayStyle]} pointerEvents="none" />
         <View style={[multi ? styles.checkbox : styles.radio, selected && styles.markOn]}>

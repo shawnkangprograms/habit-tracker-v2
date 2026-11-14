@@ -32,11 +32,12 @@ const EASE = Easing.out(Easing.quad);
 
 // value null: the step was skipped. The number shows "–" and the thumb rests at the default; any touch (even on the
 // default) answers it again (docs/ONBOARDING_SPEC.md, section 1).
-export function ConfidenceSlider({value, onChange, label, reduceMotion}: {
+export function ConfidenceSlider({value, onChange, label, reduceMotion, testID}: {
   value: number | null;
   onChange: (value: number) => void;
   label: string;// read by screen readers with the value
   reduceMotion: boolean;
+  testID: string;// constants/testIds.ts
 }) {
   const animate = shouldAnimate(reduceMotion);
   const at = value ?? CONFIDENCE_DEFAULT;// where the thumb rests
@@ -136,6 +137,7 @@ export function ConfidenceSlider({value, onChange, label, reduceMotion}: {
       accessible
       accessibilityRole="adjustable"
       accessibilityLabel={label}
+      testID={testID}
       accessibilityValue={value === null
         ? {min: CONFIDENCE_MIN, max: CONFIDENCE_MAX, text: SKIPPED_CONFIDENCE_A11Y}
         : {min: CONFIDENCE_MIN, max: CONFIDENCE_MAX, now: value, text: `${value} of ${CONFIDENCE_MAX}`}}

@@ -1,4 +1,5 @@
 import {useEffect, useState} from 'react';
+import {TEST_IDS} from '@/constants/testIds';
 import {AccessibilityInfo, Pressable, StyleSheet, Text, View} from 'react-native';
 import Animated, {FadeIn, FadeInDown, FadeOut, ReduceMotion} from 'react-native-reanimated';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
@@ -55,6 +56,7 @@ export function ReflectionBar({bar, covered, reduceMotion, onOpen, onExpire}: {
         style={({pressed}) => [styles.bar, pressed && styles.pressed]}
         onPress={() => onOpen(bar)}
         accessibilityRole="button"
+        testID={TEST_IDS.home.reflectionBar}
         accessibilityLabel={barLabel(bar.habitName)}
         accessibilityHint={BAR_HINT}>
         <MaterialCommunityIcons name="lightbulb-on-outline" size={20} color={colors.accent} />

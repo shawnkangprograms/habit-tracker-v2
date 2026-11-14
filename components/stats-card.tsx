@@ -5,6 +5,7 @@ import Animated, {ReduceMotion, useAnimatedStyle, useSharedValue, withTiming} fr
 import {ProgressRing} from '@/components/progress-ring';
 import {VitalityBar} from '@/components/vitality-bar';
 import {colors, fonts, radii, spacing} from '@/constants/theme';
+import {TEST_IDS} from '@/constants/testIds';
 import type {Vitality} from '@/utils/vitality';
 
 // Round level badge; also used on Profile at a larger size
@@ -55,7 +56,7 @@ export function StatsCard(props: {
   const streakLabel = `${props.currentStreak} day${props.currentStreak === 1 ? '' : 's'}`;
 
   return (
-    <View style={styles.card}>
+    <View style={styles.card} testID={props.placeholder ? undefined : TEST_IDS.home.statsCard}>
       <View
         style={styles.content}
         importantForAccessibility={props.placeholder ? 'no-hide-descendants' : 'auto'}

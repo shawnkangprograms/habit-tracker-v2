@@ -14,6 +14,7 @@ import {onboardingStore} from '@/services/onboardingStore';
 import {askForReminderPermission} from '@/services/reminderPermission';
 import {useReduceMotion} from '@/hooks/use-reduce-motion';
 import {colors, fonts, radii, spacing} from '@/constants/theme';
+import {TEST_IDS, optionId, routineCardId} from '@/constants/testIds';
 import {timePickerAvailable} from '@/components/time-field';
 import {OptionButton} from '@/components/onboarding/option-button';
 import {StepHeader} from '@/components/onboarding/step-header';
@@ -446,6 +447,7 @@ export default function OnboardingScreen() {
       added={created.has(pick.id)}
       disabled={running}
       reduceMotion={reduceMotion}
+      testID={routineCardId(pick.id)}
       onToggle={() => toggleCard(pick.id)}
     />
   );
@@ -455,7 +457,7 @@ export default function OnboardingScreen() {
   const hint = STEP_HINTS[step];
 
   return (
-    <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.screen} edges={['top', 'bottom']} testID={TEST_IDS.onboarding.screen}>
       <StepHeader
         progress={phase === 'questions' ? {index: stepIndex, count: STEP_COUNT} : null}
         canGoBack={canGoBack}
@@ -480,6 +482,7 @@ export default function OnboardingScreen() {
                   onChange={(n) => setAnswers((a) => setConfidence(a, n))}
                   label={title}
                   reduceMotion={reduceMotion}
+                  testID={TEST_IDS.onboarding.slider}
                 />
               ) : isMulti(step) ? (
                 <View style={styles.options}>
@@ -493,6 +496,7 @@ export default function OnboardingScreen() {
                         multi
                         dimmed={!isSelected && isAtMax(answers, step)}
                         reduceMotion={reduceMotion}
+                        testID={optionId(step, value)}
                         onPress={() => pickMulti(step, value)}
                       />
                     );
@@ -507,6 +511,7 @@ export default function OnboardingScreen() {
                       selected={answers[step] === value}
                       multi={false}
                       reduceMotion={reduceMotion}
+                      testID={optionId(step, value)}
                       onPress={() => pickSingle(step, value)}
                     />
                   ))}
@@ -572,28 +577,29 @@ export default function OnboardingScreen() {
         <View style={styles.footer}>
           {phase === 'questions' && (
             <>
-              <PressButton label={CONTINUE} enabled={continueOn} reduceMotion={reduceMotion} onPress={nextQuestion} />
+              <PressButton label={CONTINUE} enabled={continueOn} reduceMotion={reduceMotion} onPress={nextQuestion} testID={TEST_IDS.onboarding.next} />
               {canSkip(step) && (
                 <Pressable
                   style={styles.textButton}
                   onPress={skipQuestion}
                   accessibilityRole="button"
-                  accessibilityLabel={SKIP_QUESTION}>
+                  accessibilityLabel={SKIP_QUESTION}
+                  testID={TEST_IDS.onboarding.skipQuestion}>
                   <Text style={styles.textButtonText}>{SKIP_QUESTION}</Text>
                 </Pressable>
               )}
             </>
           )}
 
-          {phase === 'toldUs' && <PressButton label={CONTINUE} enabled reduceMotion={reduceMotion} onPress={() => setPhase('profile')} />}
-          {phase === 'profile' && <PressButton label={CONTINUE} enabled reduceMotion={reduceMotion} onPress={() => setPhase('routine')} />}
+          {phase === 'toldUs' && <PressButton label={CONTINUE} enabled reduceMotion={reduceMotion} onPress={() => setPhase('profile')} testID={TEST_IDS.onboarding.next} />}
+          {phase === 'profile' && <PressButton label={CONTINUE} enabled reduceMotion={reduceMotion} onPress={() => setPhase('routine')} testID={TEST_IDS.onboarding.next} />}
 
           {phase === 'routine' && plan && (
             <>
               {createFailed && <Text style={styles.error} accessibilityLiveRegion="polite">{CREATE_FAILED}</Text>}
               {limitMessage && <Text style={styles.error} accessibilityLiveRegion="polite">{limitMessage}</Text>}
-              <PressButton label={plan.picks.length > 0 ? START : DONE} enabled={!running} reduceMotion={reduceMotion} onPress={start} />
-              <PressButton label={ADD_OWN_HABIT} variant="secondary" enabled={!running} reduceMotion={reduceMotion} onPress={addOwnHabit} />
+              <PressButton label={plan.picks.length > 0 ? START : DONE} enabled={!running} reduceMotion={reduceMotion} onPress={start} testID={TEST_IDS.onboarding.start} />
+              <PressButton label={ADD_OWN_HABIT} variant="secondary" enabled={!running} reduceMotion={reduceMotion} onPress={addOwnHabit} testID={TEST_IDS.onboarding.addOwn} />
             </>
           )}
         </View>
@@ -605,11 +611,12 @@ export default function OnboardingScreen() {
 }
 
 // Continue, Start, Done (primary) and Add your own habit (secondary): scale to 0.97 while pressed
-function PressButton({label, enabled, onPress, reduceMotion, variant = 'primary'}: {
+function PressButton({label, enabled, onPress, reduceMotion, testID, variant = 'primary'}: {
   label: string;
   enabled: boolean;
   onPress: () => void;
   reduceMotion: boolean;
+  testID: string;
   variant?: 'primary' | 'secondary';
 }) {
   const scale = useSharedValue(1);
@@ -628,7 +635,9 @@ function PressButton({label, enabled, onPress, reduceMotion, variant = 'primary'
       onPressOut={() => pressTo(false)}
       disabled={!enabled}
       accessibilityRole="button"
-      accessibilityState={{disabled: !enabled}}>
+      accessibilityLabel={label}
+      accessibilityState={{disabled: !enabled}}
+      testID={testID}>
       <Animated.View style={[primary ? styles.primary : styles.secondary, !enabled && (primary ? styles.primaryOff : styles.off), style]}>
         <Text style={primary ? styles.primaryText : styles.secondaryText}>{label}</Text>
       </Animated.View>

@@ -1,5 +1,6 @@
 import {Pressable, StyleSheet, Text, View} from 'react-native';
 import {colors, fonts, radii, spacing} from '@/constants/theme';
+import {TEST_IDS, routineTimeId} from '@/constants/testIds';
 import {SwitchRow} from '@/components/switch-row';
 import {TimeField} from '@/components/time-field';
 import {ROUTINE_REMINDER_LABEL} from '@/utils/onboarding/copy';
@@ -17,9 +18,9 @@ export function RoutineReminder({on, time, pickerAvailable, disabled, onToggle, 
 }) {
   return (
     <View style={styles.wrap}>
-      <SwitchRow icon="clock-outline" label={ROUTINE_REMINDER_LABEL} value={on} onChange={onToggle} disabled={disabled} />
+      <SwitchRow icon="clock-outline" label={ROUTINE_REMINDER_LABEL} value={on} onChange={onToggle} disabled={disabled} testID={TEST_IDS.onboarding.reminderSwitch} />
       {on && (pickerAvailable ? (
-        <TimeField value={time} onChange={onTime} />
+        <TimeField value={time} onChange={onTime} testID={TEST_IDS.onboarding.reminderTime} />
       ) : (
         <View style={styles.chips} accessibilityRole="radiogroup" accessibilityLabel={ROUTINE_REMINDER_LABEL}>
           {ROUTINE_TIME_CHOICES.map((choice) => {
@@ -31,7 +32,9 @@ export function RoutineReminder({on, time, pickerAvailable, disabled, onToggle, 
                 disabled={disabled}
                 style={[styles.chip, selected ? styles.chipOn : styles.chipOff]}
                 accessibilityRole="radio"
-                accessibilityState={{selected}}>
+                accessibilityLabel={choice}
+                accessibilityState={{selected}}
+                testID={routineTimeId(choice)}>
                 <Text style={[styles.chipText, selected && styles.chipTextOn]}>{choice}</Text>
               </Pressable>
             );

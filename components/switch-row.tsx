@@ -9,12 +9,13 @@ type IconName = ComponentProps<typeof MaterialCommunityIcons>['name'];
 // and screen readers get one "switch" with its label and on/off state (the inner Switch is hidden from them).
 // At least 56 dp tall. The switch sits in a fixed, centred box, so the row lays out the same whatever size
 // the native switch reports.
-export function SwitchRow({icon, label, value, onChange, disabled}: {
+export function SwitchRow({icon, label, value, onChange, disabled, testID}: {
   icon: IconName;
   label: string;
   value: boolean;
   onChange: (value: boolean) => void;
   disabled?: boolean;
+  testID?: string;// from constants/testIds.ts
 }) {
   return (
     <Pressable
@@ -22,6 +23,7 @@ export function SwitchRow({icon, label, value, onChange, disabled}: {
       onPress={() => onChange(!value)}
       disabled={disabled}
       accessibilityRole="switch"
+      testID={testID}
       accessibilityLabel={label}
       accessibilityState={{checked: value, disabled: !!disabled}}>
       <MaterialCommunityIcons name={icon} size={22} color={colors.accent} />
