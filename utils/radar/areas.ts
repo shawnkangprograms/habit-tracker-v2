@@ -5,23 +5,32 @@
 // 2. for a habit in no pack, or in a custom pack with no area: the value stored on this phone in
 //    areas:v1:<uid> (an area, or 'none' = Not counted)
 // 3. the icon pre-fill below (a habit never given an area, or one pulled onto a new phone: the map is on-device only)
-// Discipline has no icon of its own, so it is only ever chosen by hand or through a pack.
+// Since C3 every icon of the set has its group's area (General is Not counted), Discipline included; the twelve icons
+// of 1.0 keep the areas they had.
 
 import {packArea} from '@/utils/packs/manage';
 import type {PacksRecord} from '@/utils/packs/record';
 import {AXES, type Axis} from '@/utils/onboarding/types';
+import {HABIT_ICON_SET} from '@/constants/habitIconSet';
 
 export type AreaValue = Axis | 'none';// 'none': Not counted
 export type AreasMap = Record<string, AreaValue>;// habitId -> area, unpacked habits only
 
-// Approved in the Stage 5 plan. star (and any unknown icon) is Not counted.
-export const ICON_AREA: Readonly<Record<string, Axis>> = {
+// Approved in the Stage 5 plan for the twelve icons of 1.0. star (and any unknown icon) is Not counted.
+const LEGACY_ICON_AREA: Readonly<Record<string, Axis>> = {
   run: 'Health', water: 'Health', food: 'Health', sleep: 'Health',
   meditate: 'Mind', music: 'Mind',
   work: 'Career', money: 'Career',
   book: 'Learning', study: 'Learning',
   heart: 'Relations',
 };
+
+// The icon -> area pre-fill: every icon of the set in a group that is an area (C3, D3), then the twelve of 1.0 as they
+// were. A copy lives in functions/src/stats/aggregate.js (parity-tested).
+export const ICON_AREA: Readonly<Record<string, Axis>> = Object.freeze({
+  ...Object.fromEntries(HABIT_ICON_SET.filter((icon) => icon.group !== 'General').map((icon) => [icon.id, icon.group as Axis])),
+  ...LEGACY_ICON_AREA,
+});
 
 export function isAreaValue(value: unknown): value is AreaValue {
   return value === 'none' || (AXES as readonly unknown[]).includes(value);

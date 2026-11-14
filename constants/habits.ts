@@ -1,15 +1,22 @@
-// Shared habit constants and types. No imports, so validators and helpers stay pure.
+// Shared habit constants and types. The only import is the icon set, which is pure data, so validators and helpers
+// stay pure.
+import {ALL_ICON_IDS, LEGACY_ICON_IDS, type IconId} from '@/constants/habitIconSet';
+
+export type {IconId};
 
 // Weekday keys in getDay() order: index 0 is Sunday.
 export const WEEKDAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const;
 export type WeekdayKey = (typeof WEEKDAY_KEYS)[number];
 
-// PLACEHOLDER icon list (to be confirmed). Stable string ids, not emoji.
-export const ICON_IDS = [
-  'book', 'water', 'run', 'meditate', 'sleep', 'food',
-  'study', 'work', 'music', 'money', 'heart', 'star',
-] as const;
-export type IconId = (typeof ICON_IDS)[number];
+// The release switch for the C3 icons (docs/HABITQUEST_DESIGN.md, C3). Every build draws the whole set
+// (constants/habitIconSet.ts), but only ICON_IDS can be picked, validated as a new choice and sent to the insight
+// function. Turn it on only after (1) every tester runs a bundle with the Stage A tolerance (an older 1.0 build skips a
+// habit whose icon it doesn't know) and (2) the insight function with the full ICON_LABELS is deployed (it refuses the
+// whole request for an icon it doesn't know). tests/icon-set.test.ts pins it to false: a release commit changes both.
+export const RELEASE_NEW_ICONS = false;
+
+// The icon ids that can be chosen: the twelve of 1.0 until the switch is on, then the whole set
+export const ICON_IDS: readonly IconId[] = RELEASE_NEW_ICONS ? ALL_ICON_IDS : LEGACY_ICON_IDS;
 
 // An icon id this build doesn't know (written by a newer build) is stored and pushed as it came, so an older build
 // never erases it, and drawn with a default glyph. The shape is the one the rules allow (a string of 1 to 32

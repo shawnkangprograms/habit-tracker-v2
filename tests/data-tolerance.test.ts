@@ -73,9 +73,9 @@ const iconOn = async (d: Device, id: string) =>
 
 describe('(i) an icon id this build does not know', () => {
   test('docToHabit keeps it as it came, and habitToDoc writes it back unchanged', () => {
-    const parsed = merge.docToHabit(ID, habitDoc({icon: 'rocket'}));
-    assert.equal(parsed?.icon, 'rocket');
-    assert.equal(merge.habitToDoc(parsed!).icon, 'rocket');
+    const parsed = merge.docToHabit(ID, habitDoc({icon: 'zz_test_unknown'}));
+    assert.equal(parsed?.icon, 'zz_test_unknown');
+    assert.equal(merge.habitToDoc(parsed!).icon, 'zz_test_unknown');
     assert.equal(merge.docToHabit(ID, habitDoc({icon: 'book'}))?.icon, 'book');
   });
 
@@ -88,24 +88,24 @@ describe('(i) an icon id this build does not know', () => {
 
   test('validateIcon: an unknown id passes only when it equals the icon the habit already has', () => {
     const {validateIcon, validateHabitInput} = validators;
-    assert.equal(validateIcon('rocket').valid, false);
-    assert.equal(validateIcon('rocket', null).valid, false);
-    assert.equal(validateIcon('rocket', 'comet').valid, false);
-    assert.equal(validateIcon('rocket', 'rocket').valid, true);
-    assert.equal(validateIcon('book', 'rocket').valid, true); // choosing a known icon is always fine
+    assert.equal(validateIcon('zz_test_unknown').valid, false);
+    assert.equal(validateIcon('zz_test_unknown', null).valid, false);
+    assert.equal(validateIcon('zz_test_unknown', 'comet').valid, false);
+    assert.equal(validateIcon('zz_test_unknown', 'zz_test_unknown').valid, true);
+    assert.equal(validateIcon('book', 'zz_test_unknown').valid, true); // choosing a known icon is always fine
     assert.equal(validateIcon('big rocket', 'big rocket').valid, false); // the kept id must still be a plain id
     assert.equal(validateIcon(5, '5').valid, false);
-    assert.equal(validateIcon(null, 'rocket').valid, false);
+    assert.equal(validateIcon(null, 'zz_test_unknown').valid, false);
 
     const base = {habitName: 'Read', frequency: {type: 'daily'}, reminderTime: null};
-    assert.equal(validateHabitInput({...base, icon: 'rocket'}).valid, false);
-    assert.equal(validateHabitInput({...base, icon: 'rocket'}, {keepIcon: 'rocket'}).valid, true);
-    assert.equal(validateHabitInput({...base, icon: 'rocket'}, {keepIcon: 'comet'}).valid, false);
+    assert.equal(validateHabitInput({...base, icon: 'zz_test_unknown'}).valid, false);
+    assert.equal(validateHabitInput({...base, icon: 'zz_test_unknown'}, {keepIcon: 'zz_test_unknown'}).valid, true);
+    assert.equal(validateHabitInput({...base, icon: 'zz_test_unknown'}, {keepIcon: 'comet'}).valid, false);
   });
 
   test('glyphFor: known ids map to their glyph, anything else to the default (never a prototype key)', () => {
     assert.equal(glyphs.glyphFor('book'), glyphs.HABIT_ICONS.book);
-    assert.equal(glyphs.glyphFor('rocket'), glyphs.FALLBACK_GLYPH);
+    assert.equal(glyphs.glyphFor('zz_test_unknown'), glyphs.FALLBACK_GLYPH);
     assert.equal(glyphs.glyphFor(''), glyphs.FALLBACK_GLYPH);
     for (const key of ['constructor', '__proto__', 'toString', 'hasOwnProperty']) {
       assert.equal(glyphs.glyphFor(key), glyphs.FALLBACK_GLYPH, key);
@@ -115,35 +115,35 @@ describe('(i) an icon id this build does not know', () => {
 
   test('a name-only edit on this phone keeps the unknown icon, on the phone and on the server', async () => {
     const {server, a} = await setup();
-    server.commit(UID, 'habits', [{id: ID, data: habitDoc({icon: 'rocket'})}]);
+    server.commit(UID, 'habits', [{id: ID, data: habitDoc({icon: 'zz_test_unknown'})}]);
     await a.engine.requestSync();
-    assert.equal(await iconOn(a, ID), 'rocket'); // pulled, not skipped
+    assert.equal(await iconOn(a, ID), 'zz_test_unknown'); // pulled, not skipped
 
     a.clock.now = T0 + 10 * MIN;
-    await onPhone(a, () => habits.updateHabit(UID, ID, input('Read more', 'rocket'))); // what the form sends untouched
-    assert.equal(await iconOn(a, ID), 'rocket');
+    await onPhone(a, () => habits.updateHabit(UID, ID, input('Read more', 'zz_test_unknown'))); // what the form sends untouched
+    assert.equal(await iconOn(a, ID), 'zz_test_unknown');
     await a.engine.requestSync();
     assert.deepEqual(server.rejections, []);
-    assert.equal(server.get(UID, 'habits', ID)?.icon, 'rocket');
+    assert.equal(server.get(UID, 'habits', ID)?.icon, 'zz_test_unknown');
     assert.equal(server.get(UID, 'habits', ID)?.habitName, 'Read more');
   });
 
   test('updateHabit refuses an unknown icon the habit does not have, and a known habit refuses any unknown icon', async () => {
     const {server, a} = await setup();
-    server.commit(UID, 'habits', [{id: ID, data: habitDoc({icon: 'rocket'})}]);
+    server.commit(UID, 'habits', [{id: ID, data: habitDoc({icon: 'zz_test_unknown'})}]);
     await a.engine.requestSync();
     await assert.rejects(onPhone(a, () => habits.updateHabit(UID, ID, input('Read', 'comet'))), /choose an icon/i);
-    assert.equal(await iconOn(a, ID), 'rocket');
+    assert.equal(await iconOn(a, ID), 'zz_test_unknown');
 
     const known = await onPhone(a, () => habits.addHabit(UID, input('Walk', 'run'))) as string;
-    await assert.rejects(onPhone(a, () => habits.updateHabit(UID, known, input('Walk', 'rocket'))), /choose an icon/i);
+    await assert.rejects(onPhone(a, () => habits.updateHabit(UID, known, input('Walk', 'zz_test_unknown'))), /choose an icon/i);
     await onPhone(a, () => habits.updateHabit(UID, known, input('Walk far', 'run'))); // a normal edit still works
     assert.equal(await iconOn(a, known), 'run');
   });
 
   test('choosing an icon replaces the unknown one, and that choice reaches the server', async () => {
     const {server, a} = await setup();
-    server.commit(UID, 'habits', [{id: ID, data: habitDoc({icon: 'rocket'})}]);
+    server.commit(UID, 'habits', [{id: ID, data: habitDoc({icon: 'zz_test_unknown'})}]);
     await a.engine.requestSync();
     a.clock.now = T0 + 10 * MIN;
     await onPhone(a, () => habits.updateHabit(UID, ID, input('Read', 'star')));
@@ -153,32 +153,32 @@ describe('(i) an icon id this build does not know', () => {
 
   test('a second phone pulls the unknown icon and shows the rename (nothing hidden)', async () => {
     const {server, a, b} = await setup();
-    server.commit(UID, 'habits', [{id: ID, data: habitDoc({icon: 'rocket'})}]);
+    server.commit(UID, 'habits', [{id: ID, data: habitDoc({icon: 'zz_test_unknown'})}]);
     await a.engine.requestSync();
     a.clock.now = T0 + 10 * MIN;
-    await onPhone(a, () => habits.updateHabit(UID, ID, input('Read more', 'rocket')));
+    await onPhone(a, () => habits.updateHabit(UID, ID, input('Read more', 'zz_test_unknown')));
     await a.engine.requestSync();
     b.clock.now = T0 + 20 * MIN;
     await b.engine.requestSync();
-    assert.equal(await iconOn(b, ID), 'rocket');
+    assert.equal(await iconOn(b, ID), 'zz_test_unknown');
   });
 });
 
 describe('(ii) pushes are merge writes: an older build edits a newer build\'s doc', () => {
   test('a field this build does not know is still on the server after this phone edits and pushes', async () => {
     const {server, a} = await setup();
-    server.commit(UID, 'habits', [{id: ID, data: habitDoc({icon: 'rocket', targetDays: 21, futureNote: 'keep me'})}]);
+    server.commit(UID, 'habits', [{id: ID, data: habitDoc({icon: 'zz_test_unknown', targetDays: 21, futureNote: 'keep me'})}]);
     await a.engine.requestSync();
 
     a.clock.now = T0 + 10 * MIN;
-    await onPhone(a, () => habits.updateHabit(UID, ID, input('Read more', 'rocket')));
+    await onPhone(a, () => habits.updateHabit(UID, ID, input('Read more', 'zz_test_unknown')));
     await a.engine.requestSync();
     assert.deepEqual(server.rejections, []);
     const doc = server.get(UID, 'habits', ID)!;
     assert.equal(doc.habitName, 'Read more');
     assert.equal(doc.targetDays, 21, 'the unknown field was erased by the old build');
     assert.equal(doc.futureNote, 'keep me');
-    assert.equal(doc.icon, 'rocket');
+    assert.equal(doc.icon, 'zz_test_unknown');
   });
 
   test('a soft delete and a tick from the older phone keep the unknown fields too', async () => {

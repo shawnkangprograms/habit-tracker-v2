@@ -61,7 +61,7 @@ describe('eligibility', () => {
   });
 
   test('tracked days with only habits that cannot be sent: noHabits', () => {
-    assert.deepEqual(build([daily('a', '2026-10-01', {icon: 'rocket'})]), {ok: false, reason: 'noHabits'});
+    assert.deepEqual(build([daily('a', '2026-10-01', {icon: 'zz_test_unknown'})]), {ok: false, reason: 'noHabits'});
   });
 
   test('a full window counts 29 past days', () => {
@@ -97,7 +97,7 @@ describe('habits', () => {
       daily('keep', '2026-10-01'),
       daily('deleted', '2026-10-01', {deleted: true}),
       daily('new', TODAY, {icon: 'run'}),
-      daily('odd', '2026-10-01', {icon: 'rocket'}),
+      daily('odd', '2026-10-01', {icon: 'zz_test_unknown'}),
       onDays('empty', [], '2026-10-01', {icon: 'book'}),
     ];
     assert.deepEqual(requestOf(build(habits)).habits.map((h) => h.icon), ['water']);

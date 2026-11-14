@@ -1,6 +1,8 @@
 // Design tokens from the HabitQuest Figma file. Use these instead of hard-coded values.
 
-import type { IconId } from '@/constants/habits';
+import {HABIT_ICON_SET, LEGACY_ICON_IDS, type IconGroup, type IconId} from '@/constants/habitIconSet';
+
+type LegacyIconId = (typeof LEGACY_ICON_IDS)[number];
 
 // Palette B (C1b, docs/HABITQUEST_DESIGN.md): the warm dark base and the orange stay; the ratios are pinned in
 // tests/palette.test.ts. Every colour here is #rrggbb (a screen may add two hex digits of alpha to one, e.g.
@@ -96,7 +98,23 @@ export const shadows = {
   glowOff: {shadowOpacity: 0, elevation: 0},
 } as const;
 
-export const ICON_COLORS: Record<IconId, string> = {
+// The colour of each icon group (C3), from the existing tokens only: the same area colours the admin stats screen uses
+// (Health green, Mind purple, Career blue, Discipline accent, Learning amber, Relations pink), and the accent for
+// General, like the star. A colour is never the only cue: every icon has a spoken label and a caption in the picker.
+// tests/palette.test.ts checks each group colour as an icon on the surface (3:1).
+export const ICON_GROUP_COLORS: Record<IconGroup, string> = {
+  Health: colors.green,
+  Mind: colors.purple,
+  Discipline: colors.accent,
+  Career: colors.blue,
+  Learning: colors.amber,
+  Relations: colors.pink,
+  General: colors.accent,
+};
+
+// The twelve icons of 1.0 keep the colours they always had (some differ from their group's: water pink, sleep purple,
+// food amber, study blue, money green); every other icon takes its group's colour.
+const LEGACY_ICON_COLORS: Record<LegacyIconId, string> = {
   book: colors.amber,
   water: colors.pink,
   run: colors.green,
@@ -110,6 +128,11 @@ export const ICON_COLORS: Record<IconId, string> = {
   heart: colors.pink,
   star: colors.accent,
 };
+
+export const ICON_COLORS = {
+  ...Object.fromEntries(HABIT_ICON_SET.map((icon) => [icon.id, ICON_GROUP_COLORS[icon.group]])),
+  ...LEGACY_ICON_COLORS,
+} as Record<IconId, string>;
 
 // TEMPORARY until Home and Settings are restyled: the template's ThemedText/ThemedView
 // read Colors via useThemeColor. Both schemes point at the dark tokens so the app stays

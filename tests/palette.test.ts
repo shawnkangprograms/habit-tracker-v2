@@ -12,7 +12,7 @@ import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import './helpers/alias.ts'; // must come before the dynamic imports below
 
-const {colors, medalTiers, pressedOpacity} = await import('../constants/theme.ts');
+const {colors, medalTiers, pressedOpacity, ICON_GROUP_COLORS} = await import('../constants/theme.ts');
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const read = (path: string) => readFileSync(join(ROOT, path), 'utf8');
@@ -323,5 +323,19 @@ describe('the scrims and the Sign in button', () => {
     const src = read('components/themed-text.tsx');
     assert.doesNotMatch(src, /link/);
     assert.match(src, /type\?: 'default' \| 'title' \| 'defaultSemiBold' \| 'subtitle';/);
+  });
+});
+
+describe('the icon group colours (C3, D4)', () => {
+  test('every group colour reaches 3:1 as an icon on the surface (habit rows, the picker) and on the page', () => {
+    for (const [group, colour] of Object.entries(ICON_GROUP_COLORS)) {
+      assert.ok(contrast(colour, colors.surface) >= UI, `${group} on surface: ${contrast(colour, colors.surface).toFixed(2)}`);
+      assert.ok(contrast(colour, colors.background) >= UI, `${group} on background: ${contrast(colour, colors.background).toFixed(2)}`);
+    }
+  });
+
+  test('the group colours are drawn: each group names its token in theme.ts', () => {
+    const theme = read('constants/theme.ts');
+    for (const group of Object.keys(ICON_GROUP_COLORS)) assert.match(theme, new RegExp(`^\\s+${group}: colors\\.\\w+,$`, 'm'), group);
   });
 });

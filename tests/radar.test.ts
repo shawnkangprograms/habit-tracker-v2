@@ -12,7 +12,7 @@ import type {WeekdayKey} from '../constants/habits.ts';
 const areas = await import('../utils/radar/areas.ts');
 const score = await import('../utils/radar/score.ts');
 const copy = await import('../utils/radar/copy.ts');
-const {ICON_IDS} = await import('../constants/habits.ts');
+const {ALL_ICON_IDS, HABIT_ICON_SET, LEGACY_ICON_IDS} = await import('../constants/habitIconSet.ts');
 const {AXES} = await import('../utils/onboarding/types.ts');
 const {LABEL_SIZE, fitRadar} = await import('../utils/onboarding/radar.ts');
 const {fitRadarTwoLine} = await import('../utils/radar/fit.ts');
@@ -171,14 +171,27 @@ describe('area resolution', () => {
     assert.equal(resolve('x', 'run', {x: 'Nonsense'}), 'Health', 'an invalid stored value falls back to the icon');
   });
 
-  test('the approved icon table, and every id in it is a real icon', () => {
-    assert.deepEqual(areas.ICON_AREA, {
+  test('the approved table for the twelve icons of 1.0 is unchanged, and every id in the table is a real icon', () => {
+    const legacy = {
       run: 'Health', water: 'Health', food: 'Health', sleep: 'Health', meditate: 'Mind', music: 'Mind',
       work: 'Career', money: 'Career', book: 'Learning', study: 'Learning', heart: 'Relations',
-    });
-    for (const id of [...Object.keys(areas.ICON_AREA), 'star']) assert.ok((ICON_IDS as readonly string[]).includes(id), id);
+    };
+    for (const [id, area] of Object.entries(legacy)) assert.equal(areas.ICON_AREA[id], area, id);
+    for (const id of [...Object.keys(areas.ICON_AREA), 'star']) assert.ok((ALL_ICON_IDS as readonly string[]).includes(id), id);
     assert.equal(areas.iconArea('star'), 'none');
-    assert.ok(!Object.values(areas.ICON_AREA).includes('Discipline'), 'Discipline has no icon of its own');
+  });
+
+  test('C3 (D3): every other icon takes its group\'s area; General is Not counted; Discipline now has icons', () => {
+    for (const icon of HABIT_ICON_SET) {
+      if ((LEGACY_ICON_IDS as readonly string[]).includes(icon.id)) continue;
+      assert.equal(areas.iconArea(icon.id), icon.group === 'General' ? 'none' : icon.group, icon.id);
+    }
+    assert.ok(Object.values(areas.ICON_AREA).includes('Discipline'));
+    // the twelve of 1.0 sit in the group of the area they already had, so the set and the old table agree
+    for (const icon of HABIT_ICON_SET.filter((i) => (LEGACY_ICON_IDS as readonly string[]).includes(i.id))) {
+      assert.equal(areas.iconArea(icon.id), icon.group === 'General' ? 'none' : icon.group, icon.id);
+    }
+    assert.equal(Object.keys(areas.ICON_AREA).length, HABIT_ICON_SET.filter((i) => i.group !== 'General').length);
   });
 });
 

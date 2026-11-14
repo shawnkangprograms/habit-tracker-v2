@@ -39,13 +39,43 @@ const WEEKDAYS_BY_UTC_DAY = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 // The app's six areas in its own order, plus 'none' (Not counted). Parity-tested.
 export const AREAS = ['Learning', 'Mind', 'Career', 'Discipline', 'Relations', 'Health', 'none'];
 
-// Copy of the app's ICON_AREA (parity-tested). star and unknown icons are Not counted.
+// Copy of the app's ICON_AREA (parity-tested). star, the General icons and unknown icons are Not counted.
 export const ICON_AREA = Object.freeze({
+  // the twelve icons of 1.0
   run: 'Health', water: 'Health', food: 'Health', sleep: 'Health',
   meditate: 'Mind', music: 'Mind',
   work: 'Career', money: 'Career',
   book: 'Learning', study: 'Learning',
   heart: 'Relations',
+  // the C3 icons: their group's area
+  // Health
+  walk: 'Health', running: 'Health', bike: 'Health', swim: 'Health', yoga: 'Health', weights: 'Health',
+  hike: 'Health', dance: 'Health', football: 'Health', basketball: 'Health', tennis: 'Health', stairs: 'Health',
+  vitamins: 'Health', medicine: 'Health', teeth: 'Health', shower: 'Health', skincare: 'Health', fruit: 'Health',
+  vegetables: 'Health', cook: 'Health', breakfast: 'Health', no_sugar: 'Health', no_alcohol: 'Health', no_smoking: 'Health',
+  less_coffee: 'Health', weigh_in: 'Health', posture: 'Health', eye_rest: 'Health', nap: 'Health', sunlight: 'Health',
+  // Mind
+  journal: 'Mind', gratitude: 'Mind', breathe: 'Mind', relax: 'Mind', mood: 'Mind', therapy: 'Mind',
+  pray: 'Mind', nature: 'Mind', flowers: 'Mind', no_phone: 'Mind', no_tv: 'Mind', art: 'Mind',
+  draw: 'Mind', guitar: 'Mind', piano: 'Mind', sing: 'Mind', puzzle: 'Mind', self_care: 'Mind',
+  // Discipline
+  checklist: 'Discipline', plan_day: 'Discipline', timer: 'Discipline', focus: 'Discipline', wake_early: 'Discipline', tidy: 'Discipline',
+  laundry: 'Discipline', dishes: 'Discipline', clean: 'Discipline', declutter: 'Discipline', no_snooze: 'Discipline', routine: 'Discipline',
+  goal: 'Discipline', done: 'Discipline', inbox_zero: 'Discipline', cold_shower: 'Discipline', fasting: 'Discipline', screen_limit: 'Discipline',
+  shopping_list: 'Discipline', meal_prep: 'Discipline', essentials: 'Discipline',
+  // Career
+  laptop: 'Career', code: 'Career', present: 'Career', growth: 'Career', savings: 'Career', invest: 'Career',
+  network: 'Career', cv: 'Career', calendar: 'Career', write: 'Career', idea: 'Career', side_project: 'Career',
+  business: 'Career', tools: 'Career', budget: 'Career', receipt: 'Career',
+  // Learning
+  language: 'Learning', flashcards: 'Learning', course: 'Learning', library: 'Learning', notes: 'Learning', math: 'Learning',
+  science: 'Learning', history: 'Learning', geography: 'Learning', video_lesson: 'Learning', audiobook: 'Learning', news: 'Learning',
+  chess: 'Learning', quiz: 'Learning', brain: 'Learning', research: 'Learning', vocabulary: 'Learning', teach: 'Learning',
+  // Relations
+  family: 'Relations', call_family: 'Relations', message: 'Relations', friends: 'Relations', partner: 'Relations', kids: 'Relations',
+  pet: 'Relations', dog: 'Relations', gift: 'Relations', volunteer: 'Relations', community: 'Relations', faith: 'Relations',
+  mosque: 'Relations', letter: 'Relations', coffee_chat: 'Relations', birthday: 'Relations', compliment: 'Relations', listen: 'Relations',
+  video_call: 'Relations', share_meal: 'Relations',
 });
 
 export const HABITS_PER_USER_BUCKETS = ['0', '1', '2', '3', '4', '5', '6-9', '10+'];

@@ -164,7 +164,7 @@ describe('radar modules (on-device only, Stage 5)', () => {
   });
 
   test('the maths in utils/radar imports only pure modules', () => {
-    const allowed = /^@\/utils\/(radar\/\w+|packs\/(manage|record)|onboarding\/(types|radar)|gamification|dailyCompletion)$/;
+    const allowed = /^@\/(utils\/(radar\/\w+|packs\/(manage|record)|onboarding\/(types|radar)|gamification|dailyCompletion)|constants\/habitIconSet)$/;// the icon set: pure data (C3)
     for (const file of files('utils/radar')) {
       for (const spec of specifiers(readFileSync(file, 'utf8'))) assert.match(spec, allowed, `${rel(file)} imports ${spec}`);
     }

@@ -2,10 +2,12 @@
 /// <reference types="node" />
 import {describe, test} from 'node:test';
 import assert from 'node:assert/strict';
+import './helpers/alias.ts'; // constants/habits.ts imports the icon set by its @/ path (C3)
 
 const {validateInput} = await import('../functions/src/validateInput.js');
 const {ICON_LABELS, MAX_HABITS} = await import('../functions/src/config.js');
 const {ICON_IDS} = await import('../constants/habits.ts');
+const {ALL_ICON_IDS, HABIT_ICON_SET, LEGACY_ICON_IDS} = await import('../constants/habitIconSet.ts');
 
 type Habit = {icon: unknown; freq: unknown; daysPerWeek: unknown; done: unknown; scheduled: unknown};
 
@@ -21,16 +23,38 @@ function reason(data: unknown): string | null {
 }
 
 describe('icon allow-list', () => {
-  test('the server label table has exactly the app icon ids', () => {
-    assert.deepEqual(Object.keys(ICON_LABELS).sort(), [...ICON_IDS].sort());
+  test('the server label table covers every id of the icon set (C3), so no icon a phone can send is refused', () => {
+    assert.deepEqual(Object.keys(ICON_LABELS).sort(), [...ALL_ICON_IDS].sort());
+    for (const icon of ICON_IDS) assert.ok(Object.hasOwn(ICON_LABELS, icon), icon);// and so every selectable one
   });
 
-  test('every allowed icon is accepted', () => {
-    for (const icon of ICON_IDS) assert.equal(reason(request({habits: [habit({icon})]})), null, icon);
+  test('the twelve icons of 1.0 keep their labels', () => {
+    assert.deepEqual(Object.fromEntries(LEGACY_ICON_IDS.map((id) => [id, ICON_LABELS[id as keyof typeof ICON_LABELS]])), {
+      book: 'Reading', water: 'Hydration', run: 'Exercise', meditate: 'Meditation', sleep: 'Sleep', food: 'Nutrition',
+      study: 'Study', work: 'Work', music: 'Music', money: 'Finances', heart: 'Wellbeing', star: 'Personal goal',
+    });
+  });
+
+  test('D8: no new icon is described to the model more specifically than its group', () => {
+    const COARSE: Record<string, string> = {
+      Health: 'Health', Mind: 'Mind', Discipline: 'Discipline', Career: 'Career', Learning: 'Learning', Relations: 'Relations', General: 'Personal',
+    };
+    const labels = ICON_LABELS as Record<string, string>;
+    for (const icon of HABIT_ICON_SET) {
+      if ((LEGACY_ICON_IDS as readonly string[]).includes(icon.id)) continue;
+      assert.equal(labels[icon.id], COARSE[icon.group], icon.id);
+    }
+    for (const id of ['pray', 'faith', 'mosque', 'therapy', 'no_alcohol', 'no_smoking', 'medicine']) {
+      assert.ok(Object.values(COARSE).includes(labels[id]), id);// the private ones are never named
+    }
+  });
+
+  test('every icon of the set is accepted', () => {
+    for (const icon of ALL_ICON_IDS) assert.equal(reason(request({habits: [habit({icon})]})), null, icon);
   });
 
   test('unknown, inherited, wrongly cased and non-string icons are rejected', () => {
-    for (const icon of ['rocket', 'toString', '__proto__', 'Book', '', 7, null]) {
+    for (const icon of ['zz_test_unknown', 'toString', '__proto__', 'Book', '', 7, null]) {
       assert.equal(reason(request({habits: [habit({icon})]})), 'habit_icon', String(icon));
     }
   });
