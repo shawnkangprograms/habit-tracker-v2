@@ -74,7 +74,7 @@ export const ICON_COLORS: Record<IconId, string> = {
 
 // TEMPORARY until Home and Settings are restyled: the template's ThemedText/ThemedView
 // read Colors via useThemeColor. Both schemes point at the dark tokens so the app stays
-// dark even when the phone is in light mode (app.json userInterfaceStyle is "automatic").
+// dark even when the phone is in light mode (app.json userInterfaceStyle is "dark"; the app is dark-only in 1.1).
 const legacyScheme = {
   text: colors.text,
   background: colors.background,

@@ -342,6 +342,21 @@ entry, and where each path navigates; `tests/onboarding-copy.test.ts` checks the
 docs/ONBOARDING_COPY.md section 7. One mutation was checked by hand (the entry ignored: fails 1). Suite: 1196 tests,
 1196 pass, 0 todo.
 
+**Stage A, hygiene for 1.1 (2026-11-14).** Built in six sets, each reviewed before the next, all OTA-only (the Android fingerprint
+stayed `d820d50154d72f636213ae4251d04c3f0beb8f8a` after every set). New tests: `tests/data-tolerance.test.ts` (15: an unknown icon
+id kept and drawn with a default glyph, a name-only edit keeps it, pushes are merge writes, the old-build-edits-new-doc stories,
+the fields written equal the fields in firestore.rules, PARSER_VERSION 3), `tests/test-ids.test.ts` (15: the manifest, every
+Pressable and TextInput on the demo path and in onboarding has an id, the labels), `tests/copy-identical.test.ts` (12: the string
+inventory baseline, and the check that text moved into utils/copy/<area>.ts keeps its words), 4 in `tests/onboarding-starters.test.ts`
+(the sleep force keeps the first pack's only starter, over 11,520 answer sets) and 3 in `tests/onboarding-0b.test.ts` (the skip
+dialog on a retake with habits). Two older tests were changed on purpose (`tests/sync-merge.test.ts`, `tests/sync-engine.test.ts`: an
+unknown icon is no longer an invalid doc). Helpers: `tests/helpers/string-scan.ts`, `tests/helpers/string-inventory.baseline.json`; the
+fake Firestore applies `set(..., {merge: true})`. Each set's new tests were checked by hand against mutations of a copy of the code:
+data tolerance 7 of 7 caught, starters and skip dialog 7 of 7, test ids 9 of 9, string harness 7 of 7 (a text changed in a screen, an
+alert changed, a prop changed, a move with a changed word, a copy module that imports React Native, a copy module named for no area).
+Merge-write behaviour is verified only against the fake Firestore; Stage B confirms it on the real project (docs/HABITQUEST_DESIGN.md).
+Suite: 1245 tests, 1245 pass, 0 todo (functions: 45 pass).
+
 ### Phase 1b test cases (written with the fixes)
 
 S-1, monotonic stamp, stuck rows and the clock line (done; tests/clock-skew.test.ts unless noted):

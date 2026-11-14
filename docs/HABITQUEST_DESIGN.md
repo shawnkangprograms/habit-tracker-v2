@@ -5,7 +5,7 @@ The detailed CRUD + validation rule tables are in the published doc:
 https://claude.ai/artifact/AupM7DJ3Fcw5b746p54JJc
 
 ## Stack and environment
-- Expo SDK 57 (Expo Go compatible), Expo Router, React Native, TypeScript/JS mix
+- Expo SDK 57, Expo Router, React Native, TypeScript/JS mix. iPhone: Expo Go from the App Store (SDK 57). Android: the preview build (EAS, APK), not Expo Go: expo-notifications cannot load in Expo Go on Android, and the app then runs with reminders marked unavailable (services/notificationsCore.ts)
 - semver ^7.8.5 is a direct dependency only as a workaround for a Metro resolution failure on react-native-reanimated's nested semver (SDK 57); remove when the cause is understood.
 - Local SQLite (expo-sqlite) is the source of truth; Firebase (Auth + Firestore) for backup/sync
 - Dev on Windows/PowerShell/VS Code. Test devices: iPhone 13 Pro (iOS 26), Itel A60s (Android 12 Go, 32-bit)
@@ -42,7 +42,7 @@ Full Figma prototype scope: Sign In/Up, 10-question onboarding, building-profile
 
 ## Build order and testing
 1. Data model + rough UI (with validation) -> 2. sync with last-write-wins -> 3. AI Cloud Function -> 4. polish pass -> charts only if time remains
-- Tests: 3-5 unit tests for the sync conflict-merge function only; everything else manual
+- Tests: the original plan was 3-5 unit tests for the sync conflict-merge function, with everything else manual. Today (end of Stage A, 2026-11-14) the suites under tests/ run on Node's built-in runner (`npm test`): 1245 tests, all passing, plus 45 in functions/. They cover pure logic, sequences over a fake Firestore and real SQLite, odd-state fixtures, and scans of the source; they cannot render a screen, so screens are checked by hand (docs/RELEASE_CHECKLIST.md) until the Maestro flows exist (docs/TEST_STRATEGY.md)
 
 ## Decisions made after the first code audit
 - Naming: keep the existing camelCase in code and SQLite (habitId, habitName, reminderTime). The snake_case names in the validation doc are descriptive only
@@ -108,6 +108,26 @@ An orphan is a Firebase Auth account with no users/{uid} profile (admin Overview
 - (c) Planned, later step (approved, not built): the nightly stats count orphans (Auth accounts with no profile id; load.js already reads every profile id, so no extra reads) as an additive `orphans` field on stats/{day}; the admin Stats screen shows "Accounts without a profile", and Overview's "Total users" becomes "Profiles". A Cloud Functions change: deployed separately, outside the OTA freeze.
 - (d) Planned, later step (approved, not built): functions/scripts/find-orphans.mjs, read-only (uid, creation and last sign-in times, provider, habit and completion counts; no emails). Only empty, never-used accounts are deleted, by hand in the Firebase console.
 - Tests: tests/orphan-profile.test.ts; the sign-up pins in tests/auth-session.test.ts, tests/onboarding-0b.test.ts, tests/onboarding-gate.test.ts and tests/profile-name.test.ts.
+
+## Version 1.1 decisions (locked 2026-11-14)
+Where these meet a line above that says otherwise, this section is the newer decision and the older line stands until the work in this section is built (flagged here so neither is chosen silently).
+- 1.1 is for invite-only testers, not a public store release. Account deletion and the privacy policy are required before any public release.
+- Onboarding stays rules-only: no free text, answers never stored (docs/ONBOARDING_SPEC.md section 2 stands). A separate goal sentence is added later: stored on the phone only, never synced.
+- AI sends aggregates only (no names, no free text), as generateInsight does today. A consent line ships with the first richer AI feature (1.2).
+- Account deletion is built in Stage F: re-sign-in, a server-side delete function, a local wipe. It reverses "Account deletion OUT of scope" (Operations, Scope) and the rule "nothing deletes the user" (the pin in tests/auth-session.test.ts). That test and those lines change only when Stage F is built, not before.
+- Google sign-in is deferred to 1.2. 1.1 is dark-only with a themable palette (Stage C); app.json keeps `userInterfaceStyle: "dark"`, because changing it is a native config change.
+- Design: keep the orange #f2691b and the warm dark base; keep Space Grotesk and Inter; shared Button, Card and Text primitives are built in Stage C and the screens migrate to them one at a time; icons stay inside MaterialCommunityIcons.
+- Working rules for 1.1: OTA only until the one later native build (Expo 58); no package.json, lockfile, app.json or eas.json change; the Android fingerprint stays `d820d50154d72f636213ae4251d04c3f0beb8f8a`; no commits or publishes by the assistant.
+
+### Stage A (hygiene), built 2026-11-14
+- Lean pass: the fonts load one import per registered face (5 files instead of 23, about 5.2 MB less in assets); template components with no importer, the react-logo images and the empty screens/ directory are gone. app/modal.tsx and components/themed-view.tsx stay until the Stage C navigation rework; themed-text, use-theme-color and the legacy `Colors` stay until the shared Text component replaces them in Stage C.
+- Data tolerance, so an older build never erases or hides data a newer build wrote: an icon id this build doesn't know is accepted, kept as stored and drawn with a default glyph (constants/habitGlyphs.ts); an edit that leaves the icon alone keeps it (`validateIcon`'s `keepIcon`; the form and updateHabit); every push is a merge write (`WRITE_OPTIONS` in sync/merge.ts); PARSER_VERSION is 3. The cursor store keeps `initialPullDone` across the bump, so the re-pull gates nothing (no S-4 line, no Home wait).
+  - **Merge-write behaviour is verified only against the fake Firestore.** The first step of Stage B is to widen firestore.rules by one optional habit field (its `hasOnly` list refuses an unknown field today) and confirm on the real project that a phone push keeps unknown fields.
+  - Builds already installed still write whole documents, so this change must reach every tester (open the app twice after the publish: the update applies on the second cold start) before any change that adds habit fields or icon ids.
+  - tests/sync-merge.test.ts and tests/sync-engine.test.ts were changed on purpose: an unknown icon is no longer an invalid doc (tests/data-tolerance.test.ts holds the new rules).
+- Starter picks: the forced sleep habit never takes the first pack's only starter and always ends up last (utils/onboarding/starters.ts). The skip dialog on a retake with habits already says "Your current habits stay as they are." (approved 2026-11-14).
+- Test ids on the demo path and every onboarding control (constants/testIds.ts, tests/test-ids.test.ts), for the Maestro flows.
+- String inventory (docs/STRING_INVENTORY.md, scripts/string-inventory.ts) and the check that text moved into utils/copy/<area>.ts keeps its words (tests/copy-identical.test.ts). Nothing has moved yet: Stage C moves the strings screen by screen, with no wording change and no i18n library.
 
 ## Later (backlog, design notes only, nothing built)
 - Swipe between the main screens (Home, Summary, Profile, Settings) left and right, in addition to the tab buttons, which stay. To settle at design time:

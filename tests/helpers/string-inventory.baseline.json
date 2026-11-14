@@ -1,0 +1,2549 @@
+[
+ {
+  "file": "app/(tabs)/index.tsx",
+  "line": 150,
+  "kind": "text",
+  "area": "home",
+  "partial": true,
+  "text": "Overdue"
+ },
+ {
+  "file": "app/(tabs)/index.tsx",
+  "line": 429,
+  "kind": "alert",
+  "area": "home",
+  "text": "Something went wrong. Please try again."
+ },
+ {
+  "file": "app/(tabs)/index.tsx",
+  "line": 605,
+  "kind": "attr",
+  "attr": "accessibilityHint",
+  "area": "home",
+  "text": "Opens the edit form"
+ },
+ {
+  "file": "app/(tabs)/index.tsx",
+  "line": 687,
+  "kind": "text",
+  "area": "home",
+  "text": "Today."
+ },
+ {
+  "file": "app/(tabs)/index.tsx",
+  "line": 692,
+  "kind": "text",
+  "area": "home",
+  "text": "Checking for your habits..."
+ },
+ {
+  "file": "app/(tabs)/index.tsx",
+  "line": 749,
+  "kind": "text",
+  "area": "home",
+  "text": "Add a habit"
+ },
+ {
+  "file": "app/(tabs)/index.tsx",
+  "line": 759,
+  "kind": "text",
+  "area": "home",
+  "text": "Other days"
+ },
+ {
+  "file": "app/(tabs)/index.tsx",
+  "line": 775,
+  "kind": "attr",
+  "attr": "accessibilityHint",
+  "area": "home",
+  "text": "Opens the edit form"
+ },
+ {
+  "file": "app/(tabs)/index.tsx",
+  "line": 792,
+  "kind": "text",
+  "area": "home",
+  "partial": true,
+  "text": "Next:"
+ },
+ {
+  "file": "app/(tabs)/profile.tsx",
+  "line": 76,
+  "kind": "text",
+  "area": "profile",
+  "text": "Profile."
+ },
+ {
+  "file": "app/(tabs)/profile.tsx",
+  "line": 79,
+  "kind": "text",
+  "area": "profile",
+  "text": "Your stats couldn't be loaded. They'll try again next time you open this tab."
+ },
+ {
+  "file": "app/(tabs)/profile.tsx",
+  "line": 87,
+  "kind": "text",
+  "area": "profile",
+  "partial": true,
+  "text": "Level"
+ },
+ {
+  "file": "app/(tabs)/profile.tsx",
+  "line": 95,
+  "kind": "attr",
+  "attr": "accessibilityLabel",
+  "area": "profile",
+  "text": "Current streak ${…}. Longest ${…}"
+ },
+ {
+  "file": "app/(tabs)/profile.tsx",
+  "line": 98,
+  "kind": "text",
+  "area": "profile",
+  "partial": true,
+  "text": "streak"
+ },
+ {
+  "file": "app/(tabs)/profile.tsx",
+  "line": 99,
+  "kind": "text",
+  "area": "profile",
+  "partial": true,
+  "text": "Longest:"
+ },
+ {
+  "file": "app/(tabs)/profile.tsx",
+  "line": 103,
+  "kind": "text",
+  "area": "profile",
+  "text": "Medals"
+ },
+ {
+  "file": "app/(tabs)/profile.tsx",
+  "line": 116,
+  "kind": "text",
+  "area": "profile",
+  "text": "Lifetime"
+ },
+ {
+  "file": "app/(tabs)/profile.tsx",
+  "line": 118,
+  "kind": "attr",
+  "attr": "label",
+  "area": "profile",
+  "text": "Total XP"
+ },
+ {
+  "file": "app/(tabs)/profile.tsx",
+  "line": 119,
+  "kind": "attr",
+  "attr": "label",
+  "area": "profile",
+  "text": "Longest streak"
+ },
+ {
+  "file": "app/(tabs)/profile.tsx",
+  "line": 120,
+  "kind": "attr",
+  "attr": "label",
+  "area": "profile",
+  "text": "Perfect days"
+ },
+ {
+  "file": "app/(tabs)/settings.tsx",
+  "line": 39,
+  "kind": "alert",
+  "area": "settings",
+  "text": "Couldn't sign out"
+ },
+ {
+  "file": "app/(tabs)/settings.tsx",
+  "line": 39,
+  "kind": "alert",
+  "area": "settings",
+  "text": "Please try again."
+ },
+ {
+  "file": "app/(tabs)/settings.tsx",
+  "line": 46,
+  "kind": "literal",
+  "area": "settings",
+  "text": "Version ${…}${…}"
+ },
+ {
+  "file": "app/(tabs)/settings.tsx",
+  "line": 137,
+  "kind": "text",
+  "area": "settings",
+  "text": "Settings"
+ },
+ {
+  "file": "app/(tabs)/settings.tsx",
+  "line": 143,
+  "kind": "attr",
+  "attr": "label",
+  "area": "settings",
+  "text": "Celebrations and messages"
+ },
+ {
+  "file": "app/(tabs)/settings.tsx",
+  "line": 150,
+  "kind": "attr",
+  "attr": "label",
+  "area": "settings",
+  "text": "Habit reminders"
+ },
+ {
+  "file": "app/(tabs)/settings.tsx",
+  "line": 158,
+  "kind": "attr",
+  "attr": "label",
+  "area": "settings",
+  "text": "Evening nudge"
+ },
+ {
+  "file": "app/(tabs)/settings.tsx",
+  "line": 166,
+  "kind": "attr",
+  "attr": "accessibilityLabel",
+  "area": "settings",
+  "text": "Evening nudge time"
+ },
+ {
+  "file": "app/(tabs)/settings.tsx",
+  "line": 190,
+  "kind": "attr",
+  "attr": "accessibilityLabel",
+  "area": "settings",
+  "text": "Send a test notification"
+ },
+ {
+  "file": "app/(tabs)/settings.tsx",
+  "line": 191,
+  "kind": "attr",
+  "attr": "accessibilityHint",
+  "area": "settings",
+  "text": "Arrives in about 10 seconds"
+ },
+ {
+  "file": "app/(tabs)/settings.tsx",
+  "line": 195,
+  "kind": "text",
+  "area": "settings",
+  "text": "Send a test notification"
+ },
+ {
+  "file": "app/(tabs)/settings.tsx",
+  "line": 199,
+  "kind": "text",
+  "area": "settings",
+  "text": "Sent. It arrives in about 10 seconds. Lock your phone to see it as a lock-screen notification."
+ },
+ {
+  "file": "app/(tabs)/settings.tsx",
+  "line": 199,
+  "kind": "text",
+  "area": "settings",
+  "text": "Couldn't send the test notification."
+ },
+ {
+  "file": "app/(tabs)/settings.tsx",
+  "line": 200,
+  "kind": "literal",
+  "area": "settings",
+  "text": "Sent. It arrives in about 10 seconds. Lock your phone to see it as a lock-screen notification."
+ },
+ {
+  "file": "app/(tabs)/settings.tsx",
+  "line": 201,
+  "kind": "literal",
+  "area": "settings",
+  "text": "Couldn't send the test notification."
+ },
+ {
+  "file": "app/(tabs)/settings.tsx",
+  "line": 207,
+  "kind": "text",
+  "area": "settings",
+  "text": "Reminders aren't available in this version of the app on this phone yet."
+ },
+ {
+  "file": "app/(tabs)/settings.tsx",
+  "line": 213,
+  "kind": "text",
+  "area": "settings",
+  "text": "Notifications are turned off for HabitQuest in your phone settings."
+ },
+ {
+  "file": "app/(tabs)/settings.tsx",
+  "line": 219,
+  "kind": "text",
+  "area": "settings",
+  "text": "Open settings"
+ },
+ {
+  "file": "app/(tabs)/settings.tsx",
+  "line": 270,
+  "kind": "text",
+  "area": "settings",
+  "text": "Admin"
+ },
+ {
+  "file": "app/(tabs)/settings.tsx",
+  "line": 281,
+  "kind": "text",
+  "area": "settings",
+  "text": "Sign Out"
+ },
+ {
+  "file": "app/(tabs)/summary.tsx",
+  "line": 94,
+  "kind": "text",
+  "area": "summary",
+  "text": "Summary."
+ },
+ {
+  "file": "app/(tabs)/summary.tsx",
+  "line": 97,
+  "kind": "text",
+  "area": "summary",
+  "text": "Your summary couldn't be loaded. It'll try again next time you open this tab."
+ },
+ {
+  "file": "app/(tabs)/summary.tsx",
+  "line": 111,
+  "kind": "text",
+  "area": "summary",
+  "text": "Last 7 days"
+ },
+ {
+  "file": "app/(tabs)/summary.tsx",
+  "line": 111,
+  "kind": "text",
+  "area": "summary",
+  "text": "Last 30 days"
+ },
+ {
+  "file": "app/(tabs)/summary.tsx",
+  "line": 122,
+  "kind": "text",
+  "area": "summary",
+  "text": "By habit"
+ },
+ {
+  "file": "app/_layout.tsx",
+  "line": 192,
+  "kind": "text",
+  "area": "common",
+  "text": "Couldn't open local data. Please restart the app."
+ },
+ {
+  "file": "app/admin/audit.tsx",
+  "line": 31,
+  "kind": "text",
+  "area": "admin",
+  "text": "Admin"
+ },
+ {
+  "file": "app/admin/audit.tsx",
+  "line": 34,
+  "kind": "text",
+  "area": "admin",
+  "text": "Audit log"
+ },
+ {
+  "file": "app/admin/audit.tsx",
+  "line": 35,
+  "kind": "text",
+  "area": "admin",
+  "partial": true,
+  "text": "Last"
+ },
+ {
+  "file": "app/admin/audit.tsx",
+  "line": 35,
+  "kind": "text",
+  "area": "admin",
+  "partial": true,
+  "text": "admin changes, newest first."
+ },
+ {
+  "file": "app/admin/audit.tsx",
+  "line": 39,
+  "kind": "text",
+  "area": "admin",
+  "text": "No admin activity yet."
+ },
+ {
+  "file": "app/admin/catalog-form.tsx",
+  "line": 21,
+  "kind": "literal",
+  "area": "admin",
+  "text": "A starter habit with this name already exists."
+ },
+ {
+  "file": "app/admin/catalog-form.tsx",
+  "line": 66,
+  "kind": "alert",
+  "area": "admin",
+  "text": "Item not found"
+ },
+ {
+  "file": "app/admin/catalog-form.tsx",
+  "line": 66,
+  "kind": "alert",
+  "area": "admin",
+  "text": "This starter habit no longer exists."
+ },
+ {
+  "file": "app/admin/catalog-form.tsx",
+  "line": 66,
+  "kind": "alert",
+  "area": "admin",
+  "text": "OK"
+ },
+ {
+  "file": "app/admin/catalog-form.tsx",
+  "line": 103,
+  "kind": "alert",
+  "area": "admin",
+  "text": "OK"
+ },
+ {
+  "file": "app/admin/catalog-form.tsx",
+  "line": 136,
+  "kind": "literal",
+  "area": "admin",
+  "text": "Couldn't save starter habit"
+ },
+ {
+  "file": "app/admin/catalog-form.tsx",
+  "line": 145,
+  "kind": "alert",
+  "area": "admin",
+  "text": "Delete starter habit?"
+ },
+ {
+  "file": "app/admin/catalog-form.tsx",
+  "line": 145,
+  "kind": "alert",
+  "area": "admin",
+  "text": "\"${…}\" will be removed from the catalog. This can't be undone."
+ },
+ {
+  "file": "app/admin/catalog-form.tsx",
+  "line": 146,
+  "kind": "alert",
+  "area": "admin",
+  "text": "Cancel"
+ },
+ {
+  "file": "app/admin/catalog-form.tsx",
+  "line": 148,
+  "kind": "alert",
+  "area": "admin",
+  "text": "Delete"
+ },
+ {
+  "file": "app/admin/catalog-form.tsx",
+  "line": 158,
+  "kind": "literal",
+  "area": "admin",
+  "text": "Couldn't delete starter habit"
+ },
+ {
+  "file": "app/admin/catalog-form.tsx",
+  "line": 176,
+  "kind": "text",
+  "area": "admin",
+  "text": "Catalog"
+ },
+ {
+  "file": "app/admin/catalog-form.tsx",
+  "line": 179,
+  "kind": "text",
+  "area": "admin",
+  "text": "Edit starter habit"
+ },
+ {
+  "file": "app/admin/catalog-form.tsx",
+  "line": 179,
+  "kind": "text",
+  "area": "admin",
+  "text": "New starter habit"
+ },
+ {
+  "file": "app/admin/catalog-form.tsx",
+  "line": 220,
+  "kind": "text",
+  "area": "admin",
+  "text": "Save changes"
+ },
+ {
+  "file": "app/admin/catalog-form.tsx",
+  "line": 220,
+  "kind": "text",
+  "area": "admin",
+  "text": "Save starter habit"
+ },
+ {
+  "file": "app/admin/catalog-form.tsx",
+  "line": 229,
+  "kind": "text",
+  "area": "admin",
+  "text": "Delete starter habit"
+ },
+ {
+  "file": "app/admin/catalog.tsx",
+  "line": 68,
+  "kind": "text",
+  "area": "admin",
+  "text": "Admin"
+ },
+ {
+  "file": "app/admin/catalog.tsx",
+  "line": 71,
+  "kind": "text",
+  "area": "admin",
+  "text": "Catalog"
+ },
+ {
+  "file": "app/admin/catalog.tsx",
+  "line": 72,
+  "kind": "text",
+  "area": "admin",
+  "text": "Starter habits suggested to users."
+ },
+ {
+  "file": "app/admin/catalog.tsx",
+  "line": 84,
+  "kind": "text",
+  "area": "admin",
+  "text": "Add a starter habit"
+ },
+ {
+  "file": "app/admin/catalog.tsx",
+  "line": 86,
+  "kind": "text",
+  "area": "admin",
+  "text": "No starter habits yet."
+ },
+ {
+  "file": "app/admin/catalog.tsx",
+  "line": 87,
+  "kind": "text",
+  "area": "admin",
+  "partial": true,
+  "text": "Showing first"
+ },
+ {
+  "file": "app/admin/overview.tsx",
+  "line": 56,
+  "kind": "text",
+  "area": "admin",
+  "text": "Settings"
+ },
+ {
+  "file": "app/admin/overview.tsx",
+  "line": 59,
+  "kind": "text",
+  "area": "admin",
+  "text": "Admin"
+ },
+ {
+  "file": "app/admin/overview.tsx",
+  "line": 68,
+  "kind": "attr",
+  "attr": "label",
+  "area": "admin",
+  "text": "USER PROFILES"
+ },
+ {
+  "file": "app/admin/overview.tsx",
+  "line": 69,
+  "kind": "attr",
+  "attr": "label",
+  "area": "admin",
+  "text": "DISABLED USERS"
+ },
+ {
+  "file": "app/admin/overview.tsx",
+  "line": 72,
+  "kind": "attr",
+  "attr": "label",
+  "area": "admin",
+  "text": "CATALOG ITEMS"
+ },
+ {
+  "file": "app/admin/overview.tsx",
+  "line": 73,
+  "kind": "attr",
+  "attr": "label",
+  "area": "admin",
+  "text": "AUDIT ENTRIES"
+ },
+ {
+  "file": "app/admin/overview.tsx",
+  "line": 79,
+  "kind": "text",
+  "area": "admin",
+  "text": "QUICK ACTIONS"
+ },
+ {
+  "file": "app/admin/overview.tsx",
+  "line": 95,
+  "kind": "text",
+  "area": "admin",
+  "text": "AGE DISTRIBUTION"
+ },
+ {
+  "file": "app/admin/overview.tsx",
+  "line": 98,
+  "kind": "text",
+  "area": "admin",
+  "text": "No users yet."
+ },
+ {
+  "file": "app/admin/overview.tsx",
+  "line": 105,
+  "kind": "attr",
+  "attr": "label",
+  "area": "admin",
+  "text": "No age recorded"
+ },
+ {
+  "file": "app/admin/overview.tsx",
+  "line": 112,
+  "kind": "text",
+  "area": "admin",
+  "text": "RECENT ACTIVITY"
+ },
+ {
+  "file": "app/admin/overview.tsx",
+  "line": 115,
+  "kind": "text",
+  "area": "admin",
+  "text": "See all"
+ },
+ {
+  "file": "app/admin/overview.tsx",
+  "line": 121,
+  "kind": "text",
+  "area": "admin",
+  "text": "No admin activity yet."
+ },
+ {
+  "file": "app/admin/overview.tsx",
+  "line": 149,
+  "kind": "attr",
+  "attr": "accessibilityLabel",
+  "area": "admin",
+  "text": "${…}: ${…} users, ${…} percent"
+ },
+ {
+  "file": "app/admin/stats.tsx",
+  "line": 69,
+  "kind": "text",
+  "area": "admin",
+  "text": "Admin"
+ },
+ {
+  "file": "app/admin/stats.tsx",
+  "line": 72,
+  "kind": "text",
+  "area": "admin",
+  "text": "Stats"
+ },
+ {
+  "file": "app/admin/stats.tsx",
+  "line": 79,
+  "kind": "attr",
+  "attr": "accessibilityLabel",
+  "area": "admin",
+  "text": "Last ${…} days"
+ },
+ {
+  "file": "app/admin/stats.tsx",
+  "line": 80,
+  "kind": "text",
+  "area": "admin",
+  "partial": true,
+  "text": "days"
+ },
+ {
+  "file": "app/admin/stats.tsx",
+  "line": 86,
+  "kind": "attr",
+  "attr": "label",
+  "area": "admin",
+  "text": "Include test accounts"
+ },
+ {
+  "file": "app/admin/stats.tsx",
+  "line": 95,
+  "kind": "attr",
+  "attr": "accessibilityLabel",
+  "area": "admin",
+  "text": "Refresh today's numbers"
+ },
+ {
+  "file": "app/admin/stats.tsx",
+  "line": 99,
+  "kind": "text",
+  "area": "admin",
+  "text": "Refresh"
+ },
+ {
+  "file": "app/admin/stats.tsx",
+  "line": 103,
+  "kind": "text",
+  "area": "admin",
+  "text": "Refreshing…"
+ },
+ {
+  "file": "app/admin/stats.tsx",
+  "line": 103,
+  "kind": "text",
+  "area": "admin",
+  "text": "Updated ${…}"
+ },
+ {
+  "file": "app/admin/stats.tsx",
+  "line": 107,
+  "kind": "literal",
+  "area": "admin",
+  "text": "Updated ${…}"
+ },
+ {
+  "file": "app/admin/stats.tsx",
+  "line": 124,
+  "kind": "literal",
+  "area": "admin",
+  "text": "Opened the app"
+ },
+ {
+  "file": "app/admin/stats.tsx",
+  "line": 125,
+  "kind": "literal",
+  "area": "admin",
+  "text": "Logged a habit"
+ },
+ {
+  "file": "app/admin/stats.tsx",
+  "line": 136,
+  "kind": "literal",
+  "area": "admin",
+  "text": "Week of ${…}"
+ },
+ {
+  "file": "app/admin/stats.tsx",
+  "line": 149,
+  "kind": "attr",
+  "attr": "title",
+  "area": "admin",
+  "text": "Active users"
+ },
+ {
+  "file": "app/admin/stats.tsx",
+  "line": 151,
+  "kind": "attr",
+  "attr": "label",
+  "area": "admin",
+  "text": "Opened the app"
+ },
+ {
+  "file": "app/admin/stats.tsx",
+  "line": 152,
+  "kind": "attr",
+  "attr": "label",
+  "area": "admin",
+  "text": "Logged a habit"
+ },
+ {
+  "file": "app/admin/stats.tsx",
+  "line": 160,
+  "kind": "attr",
+  "attr": "title",
+  "area": "admin",
+  "text": "Sign-ups per week"
+ },
+ {
+  "file": "app/admin/stats.tsx",
+  "line": 160,
+  "kind": "literal",
+  "area": "admin",
+  "text": "Last 13 weeks"
+ },
+ {
+  "file": "app/admin/stats.tsx",
+  "line": 166,
+  "kind": "attr",
+  "attr": "title",
+  "area": "admin",
+  "text": "Completion rate"
+ },
+ {
+  "file": "app/admin/stats.tsx",
+  "line": 172,
+  "kind": "attr",
+  "attr": "title",
+  "area": "admin",
+  "text": "Habits by area"
+ },
+ {
+  "file": "app/admin/stats.tsx",
+  "line": 172,
+  "kind": "literal",
+  "area": "admin",
+  "text": "By habit icon"
+ },
+ {
+  "file": "app/admin/stats.tsx",
+  "line": 176,
+  "kind": "attr",
+  "attr": "title",
+  "area": "admin",
+  "text": "Habit setup"
+ },
+ {
+  "file": "app/admin/stats.tsx",
+  "line": 179,
+  "kind": "attr",
+  "attr": "title",
+  "area": "admin",
+  "text": "Schedule"
+ },
+ {
+  "file": "app/admin/stats.tsx",
+  "line": 181,
+  "kind": "attr",
+  "attr": "title",
+  "area": "admin",
+  "text": "Reminders"
+ },
+ {
+  "file": "app/admin/stats.tsx",
+  "line": 183,
+  "kind": "attr",
+  "attr": "title",
+  "area": "admin",
+  "text": "Added by"
+ },
+ {
+  "file": "app/admin/stats.tsx",
+  "line": 184,
+  "kind": "literal",
+  "area": "admin",
+  "text": "Added by"
+ },
+ {
+  "file": "app/admin/stats.tsx",
+  "line": 189,
+  "kind": "attr",
+  "attr": "title",
+  "area": "admin",
+  "text": "AI insights per day"
+ },
+ {
+  "file": "app/admin/user.tsx",
+  "line": 53,
+  "kind": "alert",
+  "area": "admin",
+  "text": "Disable this user?"
+ },
+ {
+  "file": "app/admin/user.tsx",
+  "line": 53,
+  "kind": "alert",
+  "area": "admin",
+  "text": "Enable this user?"
+ },
+ {
+  "file": "app/admin/user.tsx",
+  "line": 54,
+  "kind": "alert",
+  "area": "admin",
+  "text": "They'll be signed out the next time they open or return to the app. Their data is kept."
+ },
+ {
+  "file": "app/admin/user.tsx",
+  "line": 54,
+  "kind": "alert",
+  "area": "admin",
+  "text": "They'll be able to sign in again."
+ },
+ {
+  "file": "app/admin/user.tsx",
+  "line": 55,
+  "kind": "literal",
+  "area": "admin",
+  "text": "They'll be signed out the next time they open or return to the app. Their data is kept."
+ },
+ {
+  "file": "app/admin/user.tsx",
+  "line": 56,
+  "kind": "literal",
+  "area": "admin",
+  "text": "They'll be able to sign in again."
+ },
+ {
+  "file": "app/admin/user.tsx",
+  "line": 58,
+  "kind": "alert",
+  "area": "admin",
+  "text": "Cancel"
+ },
+ {
+  "file": "app/admin/user.tsx",
+  "line": 60,
+  "kind": "alert",
+  "area": "admin",
+  "text": "Disable"
+ },
+ {
+  "file": "app/admin/user.tsx",
+  "line": 60,
+  "kind": "alert",
+  "area": "admin",
+  "text": "Enable"
+ },
+ {
+  "file": "app/admin/user.tsx",
+  "line": 76,
+  "kind": "alert",
+  "area": "admin",
+  "text": "Couldn't disable user"
+ },
+ {
+  "file": "app/admin/user.tsx",
+  "line": 76,
+  "kind": "alert",
+  "area": "admin",
+  "text": "Couldn't enable user"
+ },
+ {
+  "file": "app/admin/user.tsx",
+  "line": 90,
+  "kind": "text",
+  "area": "admin",
+  "text": "Users"
+ },
+ {
+  "file": "app/admin/user.tsx",
+  "line": 93,
+  "kind": "text",
+  "area": "admin",
+  "partial": true,
+  "text": "User"
+ },
+ {
+  "file": "app/admin/user.tsx",
+  "line": 97,
+  "kind": "text",
+  "area": "admin",
+  "text": "This user no longer exists."
+ },
+ {
+  "file": "app/admin/user.tsx",
+  "line": 103,
+  "kind": "text",
+  "area": "admin",
+  "text": "USER ID"
+ },
+ {
+  "file": "app/admin/user.tsx",
+  "line": 107,
+  "kind": "text",
+  "area": "admin",
+  "text": "AGE"
+ },
+ {
+  "file": "app/admin/user.tsx",
+  "line": 108,
+  "kind": "text",
+  "area": "admin",
+  "text": "Not recorded"
+ },
+ {
+  "file": "app/admin/user.tsx",
+  "line": 111,
+  "kind": "text",
+  "area": "admin",
+  "text": "STATUS"
+ },
+ {
+  "file": "app/admin/user.tsx",
+  "line": 119,
+  "kind": "text",
+  "area": "admin",
+  "text": "Disabled"
+ },
+ {
+  "file": "app/admin/user.tsx",
+  "line": 119,
+  "kind": "text",
+  "area": "admin",
+  "text": "Active"
+ },
+ {
+  "file": "app/admin/user.tsx",
+  "line": 125,
+  "kind": "text",
+  "area": "admin",
+  "text": "This is your account. You can't change your own status."
+ },
+ {
+  "file": "app/admin/user.tsx",
+  "line": 138,
+  "kind": "text",
+  "area": "admin",
+  "text": "Enable user"
+ },
+ {
+  "file": "app/admin/user.tsx",
+  "line": 142,
+  "kind": "text",
+  "area": "admin",
+  "text": "Disable user"
+ },
+ {
+  "file": "app/admin/users.tsx",
+  "line": 57,
+  "kind": "text",
+  "area": "admin",
+  "text": "Admin"
+ },
+ {
+  "file": "app/admin/users.tsx",
+  "line": 60,
+  "kind": "text",
+  "area": "admin",
+  "text": "Users"
+ },
+ {
+  "file": "app/admin/users.tsx",
+  "line": 73,
+  "kind": "attr",
+  "attr": "placeholder",
+  "area": "admin",
+  "text": "Search by user ID"
+ },
+ {
+  "file": "app/admin/users.tsx",
+  "line": 81,
+  "kind": "attr",
+  "attr": "accessibilityLabel",
+  "area": "admin",
+  "text": "Clear search"
+ },
+ {
+  "file": "app/admin/users.tsx",
+  "line": 104,
+  "kind": "text",
+  "area": "admin",
+  "text": "Showing ${…} of the first ${…} users. Search and filters cover these only."
+ },
+ {
+  "file": "app/admin/users.tsx",
+  "line": 104,
+  "kind": "text",
+  "area": "admin",
+  "text": "Showing ${…} of ${…} users."
+ },
+ {
+  "file": "app/admin/users.tsx",
+  "line": 105,
+  "kind": "literal",
+  "area": "admin",
+  "text": "Showing ${…} of the first ${…} users. Search and filters cover these only."
+ },
+ {
+  "file": "app/admin/users.tsx",
+  "line": 106,
+  "kind": "literal",
+  "area": "admin",
+  "text": "Showing ${…} of ${…} users."
+ },
+ {
+  "file": "app/admin/users.tsx",
+  "line": 108,
+  "kind": "text",
+  "area": "admin",
+  "text": "No users match."
+ },
+ {
+  "file": "app/admin/users.tsx",
+  "line": 131,
+  "kind": "text",
+  "area": "admin",
+  "text": "(you)"
+ },
+ {
+  "file": "app/admin/users.tsx",
+  "line": 136,
+  "kind": "text",
+  "area": "admin",
+  "text": "Disabled"
+ },
+ {
+  "file": "app/auth.tsx",
+  "line": 32,
+  "kind": "literal",
+  "area": "auth",
+  "text": "An account with this email already exists. Try signing in."
+ },
+ {
+  "file": "app/auth.tsx",
+  "line": 36,
+  "kind": "literal",
+  "area": "auth",
+  "text": "Email or password is incorrect."
+ },
+ {
+  "file": "app/auth.tsx",
+  "line": 38,
+  "kind": "literal",
+  "area": "auth",
+  "text": "Please enter a valid email address."
+ },
+ {
+  "file": "app/auth.tsx",
+  "line": 40,
+  "kind": "literal",
+  "area": "auth",
+  "text": "Please choose a stronger password."
+ },
+ {
+  "file": "app/auth.tsx",
+  "line": 42,
+  "kind": "literal",
+  "area": "auth",
+  "text": "Couldn't connect. Check your internet connection and try again."
+ },
+ {
+  "file": "app/auth.tsx",
+  "line": 44,
+  "kind": "literal",
+  "area": "auth",
+  "text": "Too many attempts. Please wait a moment and try again."
+ },
+ {
+  "file": "app/auth.tsx",
+  "line": 46,
+  "kind": "literal",
+  "area": "auth",
+  "text": "Something went wrong. Please try again."
+ },
+ {
+  "file": "app/auth.tsx",
+  "line": 194,
+  "kind": "literal",
+  "area": "auth",
+  "text": "Password can't be empty."
+ },
+ {
+  "file": "app/auth.tsx",
+  "line": 231,
+  "kind": "literal",
+  "area": "auth",
+  "text": "Resend in ${…}s"
+ },
+ {
+  "file": "app/auth.tsx",
+  "line": 231,
+  "kind": "literal",
+  "area": "auth",
+  "text": "Send reset link"
+ },
+ {
+  "file": "app/auth.tsx",
+  "line": 232,
+  "kind": "literal",
+  "area": "auth",
+  "text": "Create Account"
+ },
+ {
+  "file": "app/auth.tsx",
+  "line": 232,
+  "kind": "literal",
+  "area": "auth",
+  "text": "Sign In"
+ },
+ {
+  "file": "app/auth.tsx",
+  "line": 252,
+  "kind": "text",
+  "area": "auth",
+  "text": "HabitQuest"
+ },
+ {
+  "file": "app/auth.tsx",
+  "line": 253,
+  "kind": "text",
+  "area": "auth",
+  "text": "BUILD HABITS. BECOME LEGENDARY."
+ },
+ {
+  "file": "app/auth.tsx",
+  "line": 258,
+  "kind": "text",
+  "area": "auth",
+  "text": "Reset your password"
+ },
+ {
+  "file": "app/auth.tsx",
+  "line": 259,
+  "kind": "text",
+  "area": "auth",
+  "text": "Enter your account email and we'll send you a reset link."
+ },
+ {
+  "file": "app/auth.tsx",
+  "line": 270,
+  "kind": "attr",
+  "attr": "placeholder",
+  "area": "auth",
+  "text": "First name"
+ },
+ {
+  "file": "app/auth.tsx",
+  "line": 282,
+  "kind": "attr",
+  "attr": "placeholder",
+  "area": "auth",
+  "text": "Last name"
+ },
+ {
+  "file": "app/auth.tsx",
+  "line": 295,
+  "kind": "attr",
+  "attr": "placeholder",
+  "area": "auth",
+  "text": "Email address"
+ },
+ {
+  "file": "app/auth.tsx",
+  "line": 308,
+  "kind": "attr",
+  "attr": "placeholder",
+  "area": "auth",
+  "text": "Password"
+ },
+ {
+  "file": "app/auth.tsx",
+  "line": 325,
+  "kind": "text",
+  "area": "auth",
+  "text": "Forgot password?"
+ },
+ {
+  "file": "app/auth.tsx",
+  "line": 334,
+  "kind": "attr",
+  "attr": "placeholder",
+  "area": "auth",
+  "text": "Confirm password"
+ },
+ {
+  "file": "app/auth.tsx",
+  "line": 346,
+  "kind": "attr",
+  "attr": "placeholder",
+  "area": "auth",
+  "text": "Age"
+ },
+ {
+  "file": "app/auth.tsx",
+  "line": 359,
+  "kind": "text",
+  "area": "auth",
+  "text": "If an account exists for that email, we've sent a reset link. Check your spam folder too."
+ },
+ {
+  "file": "app/auth.tsx",
+  "line": 379,
+  "kind": "text",
+  "area": "auth",
+  "text": "Back to sign in"
+ },
+ {
+  "file": "app/auth.tsx",
+  "line": 389,
+  "kind": "text",
+  "area": "auth",
+  "text": "Already have an account?"
+ },
+ {
+  "file": "app/auth.tsx",
+  "line": 389,
+  "kind": "text",
+  "area": "auth",
+  "text": "New to HabitQuest?"
+ },
+ {
+  "file": "app/auth.tsx",
+  "line": 390,
+  "kind": "text",
+  "area": "auth",
+  "text": "Sign in"
+ },
+ {
+  "file": "app/auth.tsx",
+  "line": 390,
+  "kind": "text",
+  "area": "auth",
+  "text": "Create an account"
+ },
+ {
+  "file": "app/habit-form.tsx",
+  "line": 97,
+  "kind": "alert",
+  "area": "habitForm",
+  "text": "Not signed in"
+ },
+ {
+  "file": "app/habit-form.tsx",
+  "line": 97,
+  "kind": "alert",
+  "area": "habitForm",
+  "text": "Please sign in again to manage your habits."
+ },
+ {
+  "file": "app/habit-form.tsx",
+  "line": 97,
+  "kind": "alert",
+  "area": "habitForm",
+  "text": "OK"
+ },
+ {
+  "file": "app/habit-form.tsx",
+  "line": 105,
+  "kind": "alert",
+  "area": "habitForm",
+  "text": "Habit not found"
+ },
+ {
+  "file": "app/habit-form.tsx",
+  "line": 105,
+  "kind": "alert",
+  "area": "habitForm",
+  "text": "This habit no longer exists."
+ },
+ {
+  "file": "app/habit-form.tsx",
+  "line": 105,
+  "kind": "alert",
+  "area": "habitForm",
+  "text": "OK"
+ },
+ {
+  "file": "app/habit-form.tsx",
+  "line": 131,
+  "kind": "alert",
+  "area": "habitForm",
+  "text": "Something went wrong"
+ },
+ {
+  "file": "app/habit-form.tsx",
+  "line": 131,
+  "kind": "alert",
+  "area": "habitForm",
+  "text": "Please try again."
+ },
+ {
+  "file": "app/habit-form.tsx",
+  "line": 131,
+  "kind": "alert",
+  "area": "habitForm",
+  "text": "OK"
+ },
+ {
+  "file": "app/habit-form.tsx",
+  "line": 238,
+  "kind": "alert",
+  "area": "habitForm",
+  "text": "Couldn't save habit"
+ },
+ {
+  "file": "app/habit-form.tsx",
+  "line": 238,
+  "kind": "alert",
+  "area": "habitForm",
+  "text": "Something went wrong. Please try again."
+ },
+ {
+  "file": "app/habit-form.tsx",
+  "line": 245,
+  "kind": "alert",
+  "area": "habitForm",
+  "text": "Delete habit?"
+ },
+ {
+  "file": "app/habit-form.tsx",
+  "line": 245,
+  "kind": "alert",
+  "area": "habitForm",
+  "text": "This habit will be removed from Home."
+ },
+ {
+  "file": "app/habit-form.tsx",
+  "line": 246,
+  "kind": "alert",
+  "area": "habitForm",
+  "text": "Cancel"
+ },
+ {
+  "file": "app/habit-form.tsx",
+  "line": 248,
+  "kind": "alert",
+  "area": "habitForm",
+  "text": "Delete"
+ },
+ {
+  "file": "app/habit-form.tsx",
+  "line": 267,
+  "kind": "alert",
+  "area": "habitForm",
+  "text": "Couldn't delete habit"
+ },
+ {
+  "file": "app/habit-form.tsx",
+  "line": 267,
+  "kind": "alert",
+  "area": "habitForm",
+  "text": "Something went wrong. Please try again."
+ },
+ {
+  "file": "app/habit-form.tsx",
+  "line": 292,
+  "kind": "literal",
+  "area": "habitForm",
+  "text": "Reminders aren't available in this version of the app on this phone yet."
+ },
+ {
+  "file": "app/habit-form.tsx",
+  "line": 293,
+  "kind": "literal",
+  "area": "habitForm",
+  "text": "Habit reminders are off in Settings, so this habit won’t notify you."
+ },
+ {
+  "file": "app/habit-form.tsx",
+  "line": 294,
+  "kind": "literal",
+  "area": "habitForm",
+  "text": "Notifications are off for HabitQuest in your phone settings."
+ },
+ {
+  "file": "app/habit-form.tsx",
+  "line": 313,
+  "kind": "text",
+  "area": "habitForm",
+  "text": "Home"
+ },
+ {
+  "file": "app/habit-form.tsx",
+  "line": 316,
+  "kind": "text",
+  "area": "habitForm",
+  "text": "Edit habit"
+ },
+ {
+  "file": "app/habit-form.tsx",
+  "line": 316,
+  "kind": "text",
+  "area": "habitForm",
+  "text": "New habit"
+ },
+ {
+  "file": "app/habit-form.tsx",
+  "line": 323,
+  "kind": "text",
+  "area": "habitForm",
+  "text": "HABIT NAME"
+ },
+ {
+  "file": "app/habit-form.tsx",
+  "line": 331,
+  "kind": "attr",
+  "attr": "placeholder",
+  "area": "habitForm",
+  "text": "e.g. Read 10 pages"
+ },
+ {
+  "file": "app/habit-form.tsx",
+  "line": 341,
+  "kind": "text",
+  "area": "habitForm",
+  "text": "ICON"
+ },
+ {
+  "file": "app/habit-form.tsx",
+  "line": 364,
+  "kind": "text",
+  "area": "habitForm",
+  "text": "REPEATS"
+ },
+ {
+  "file": "app/habit-form.tsx",
+  "line": 366,
+  "kind": "literal",
+  "area": "habitForm",
+  "text": "Every day"
+ },
+ {
+  "file": "app/habit-form.tsx",
+  "line": 366,
+  "kind": "literal",
+  "area": "habitForm",
+  "text": "Specific days"
+ },
+ {
+  "file": "app/habit-form.tsx",
+  "line": 450,
+  "kind": "text",
+  "area": "habitForm",
+  "text": "REMINDER (OPTIONAL)"
+ },
+ {
+  "file": "app/habit-form.tsx",
+  "line": 451,
+  "kind": "attr",
+  "attr": "label",
+  "area": "habitForm",
+  "text": "Reminder time"
+ },
+ {
+  "file": "app/habit-form.tsx",
+  "line": 469,
+  "kind": "attr",
+  "attr": "accessibilityLabel",
+  "area": "habitForm",
+  "text": "Open Settings"
+ },
+ {
+  "file": "app/habit-form.tsx",
+  "line": 470,
+  "kind": "text",
+  "area": "habitForm",
+  "text": "Open Settings"
+ },
+ {
+  "file": "app/habit-form.tsx",
+  "line": 475,
+  "kind": "text",
+  "area": "habitForm",
+  "text": "HEADS-UP"
+ },
+ {
+  "file": "app/habit-form.tsx",
+  "line": 476,
+  "kind": "attr",
+  "attr": "accessibilityLabel",
+  "area": "habitForm",
+  "text": "Heads-up"
+ },
+ {
+  "file": "app/habit-form.tsx",
+  "line": 495,
+  "kind": "attr",
+  "attr": "label",
+  "area": "habitForm",
+  "text": "Alarm sound"
+ },
+ {
+  "file": "app/habit-form.tsx",
+  "line": 497,
+  "kind": "text",
+  "area": "habitForm",
+  "text": "Plays a sound when it is time. Follows your phone's volume and Do Not Disturb settings."
+ },
+ {
+  "file": "app/habit-form.tsx",
+  "line": 512,
+  "kind": "text",
+  "area": "habitForm",
+  "text": "Save changes"
+ },
+ {
+  "file": "app/habit-form.tsx",
+  "line": 512,
+  "kind": "text",
+  "area": "habitForm",
+  "text": "Save habit"
+ },
+ {
+  "file": "app/habit-form.tsx",
+  "line": 520,
+  "kind": "text",
+  "area": "habitForm",
+  "text": "Delete habit"
+ },
+ {
+  "file": "app/modal.tsx",
+  "line": 10,
+  "kind": "text",
+  "area": "common",
+  "text": "This is a modal"
+ },
+ {
+  "file": "app/modal.tsx",
+  "line": 12,
+  "kind": "text",
+  "area": "common",
+  "text": "Go to home screen"
+ },
+ {
+  "file": "app/packs/choose.tsx",
+  "line": 107,
+  "kind": "text",
+  "area": "packs",
+  "text": "Settings"
+ },
+ {
+  "file": "app/packs/choose.tsx",
+  "line": 107,
+  "kind": "text",
+  "area": "packs",
+  "text": "Home"
+ },
+ {
+  "file": "app/packs/edit.tsx",
+  "line": 46,
+  "kind": "alert",
+  "area": "packs",
+  "text": "OK"
+ },
+ {
+  "file": "app/packs/edit.tsx",
+  "line": 89,
+  "kind": "alert",
+  "area": "packs",
+  "text": "OK"
+ },
+ {
+  "file": "app/packs/edit.tsx",
+  "line": 170,
+  "kind": "text",
+  "area": "packs",
+  "text": "Home"
+ },
+ {
+  "file": "app/profile-name.tsx",
+  "line": 91,
+  "kind": "text",
+  "area": "account",
+  "text": "Settings"
+ },
+ {
+  "file": "app/reflect.tsx",
+  "line": 126,
+  "kind": "alert",
+  "area": "reflections",
+  "text": "OK"
+ },
+ {
+  "file": "app/reflect.tsx",
+  "line": 166,
+  "kind": "attr",
+  "attr": "accessibilityLabel",
+  "area": "reflections",
+  "text": "${…}, ${…} of ${…}"
+ },
+ {
+  "file": "components/admin-stat-card.tsx",
+  "line": 7,
+  "kind": "literal",
+  "area": "home",
+  "text": "No data for this range yet"
+ },
+ {
+  "file": "components/admin-stat-card.tsx",
+  "line": 30,
+  "kind": "attr",
+  "attr": "accessibilityLabel",
+  "area": "home",
+  "text": "About ${…}"
+ },
+ {
+  "file": "components/admin-status.tsx",
+  "line": 29,
+  "kind": "text",
+  "area": "home",
+  "text": "Retry"
+ },
+ {
+  "file": "components/celebration-overlay.tsx",
+  "line": 69,
+  "kind": "text",
+  "area": "home",
+  "text": "Continue"
+ },
+ {
+  "file": "components/charts/bar-chart.tsx",
+  "line": 36,
+  "kind": "literal",
+  "area": "home",
+  "text": "Tap a bar to see its value"
+ },
+ {
+  "file": "components/charts/bar-chart.tsx",
+  "line": 50,
+  "kind": "attr",
+  "attr": "accessibilityHint",
+  "area": "home",
+  "text": "Tap to show a bar's value above the chart"
+ },
+ {
+  "file": "components/charts/donut-chart.tsx",
+  "line": 43,
+  "kind": "attr",
+  "attr": "accessibilityHint",
+  "area": "home",
+  "text": "The legend lists every area; tap a row to highlight it"
+ },
+ {
+  "file": "components/charts/donut-chart.tsx",
+  "line": 73,
+  "kind": "attr",
+  "attr": "accessibilityLabel",
+  "area": "home",
+  "text": "${…}: ${…}, ${…} percent"
+ },
+ {
+  "file": "components/charts/line-chart.tsx",
+  "line": 39,
+  "kind": "literal",
+  "area": "home",
+  "text": "Tap the chart to see a day"
+ },
+ {
+  "file": "components/charts/line-chart.tsx",
+  "line": 50,
+  "kind": "attr",
+  "attr": "accessibilityHint",
+  "area": "home",
+  "text": "Tap to show a day's values above the chart"
+ },
+ {
+  "file": "components/empty-home-card.tsx",
+  "line": 15,
+  "kind": "text",
+  "area": "home",
+  "text": "Start with one small habit"
+ },
+ {
+  "file": "components/empty-home-card.tsx",
+  "line": 16,
+  "kind": "text",
+  "area": "home",
+  "text": "Pick a starter habit and tick it off today. Small steps build streaks."
+ },
+ {
+  "file": "components/empty-home-card.tsx",
+  "line": 21,
+  "kind": "attr",
+  "attr": "accessibilityLabel",
+  "area": "home",
+  "text": "Pick a starter habit"
+ },
+ {
+  "file": "components/empty-home-card.tsx",
+  "line": 23,
+  "kind": "attr",
+  "attr": "accessibilityHint",
+  "area": "home",
+  "text": "Opens the new habit screen with starter ideas"
+ },
+ {
+  "file": "components/empty-home-card.tsx",
+  "line": 24,
+  "kind": "text",
+  "area": "home",
+  "text": "Pick a starter habit"
+ },
+ {
+  "file": "components/encouragement-toast.tsx",
+  "line": 23,
+  "kind": "attr",
+  "attr": "accessibilityHint",
+  "area": "home",
+  "text": "Dismisses the message"
+ },
+ {
+  "file": "components/habit-check.tsx",
+  "line": 33,
+  "kind": "attr",
+  "attr": "accessibilityLabel",
+  "area": "home",
+  "text": "Mark ${…} as ${…}"
+ },
+ {
+  "file": "components/habit-fields.tsx",
+  "line": 18,
+  "kind": "literal",
+  "area": "habitForm",
+  "text": "HABIT NAME"
+ },
+ {
+  "file": "components/habit-fields.tsx",
+  "line": 53,
+  "kind": "text",
+  "area": "habitForm",
+  "text": "ICON"
+ },
+ {
+  "file": "components/habit-fields.tsx",
+  "line": 85,
+  "kind": "text",
+  "area": "habitForm",
+  "text": "REPEATS"
+ },
+ {
+  "file": "components/habit-fields.tsx",
+  "line": 87,
+  "kind": "literal",
+  "area": "habitForm",
+  "text": "Every day"
+ },
+ {
+  "file": "components/habit-fields.tsx",
+  "line": 87,
+  "kind": "literal",
+  "area": "habitForm",
+  "text": "Specific days"
+ },
+ {
+  "file": "components/habit-fields.tsx",
+  "line": 131,
+  "kind": "text",
+  "area": "habitForm",
+  "text": "REMINDER (OPTIONAL)"
+ },
+ {
+  "file": "components/habit-fields.tsx",
+  "line": 138,
+  "kind": "attr",
+  "attr": "placeholder",
+  "area": "habitForm",
+  "text": "HH:MM, e.g. 08:30"
+ },
+ {
+  "file": "components/habit-fields.tsx",
+  "line": 147,
+  "kind": "text",
+  "area": "habitForm",
+  "text": "24-hour time. Leave empty for no reminder."
+ },
+ {
+  "file": "components/insight-card.tsx",
+  "line": 53,
+  "kind": "attr",
+  "attr": "accessibilityLabel",
+  "area": "home",
+  "text": "Insight, ${…}. ${…}"
+ },
+ {
+  "file": "components/insight-card.tsx",
+  "line": 54,
+  "kind": "attr",
+  "attr": "accessibilityHint",
+  "area": "home",
+  "text": "Hides the full insight"
+ },
+ {
+  "file": "components/insight-card.tsx",
+  "line": 54,
+  "kind": "attr",
+  "attr": "accessibilityHint",
+  "area": "home",
+  "text": "Shows the full insight"
+ },
+ {
+  "file": "components/insight-card.tsx",
+  "line": 58,
+  "kind": "text",
+  "area": "home",
+  "partial": true,
+  "text": "Insight ·"
+ },
+ {
+  "file": "components/medal.tsx",
+  "line": 41,
+  "kind": "attr",
+  "attr": "accessibilityLabel",
+  "area": "profile",
+  "text": "${…}-day medal, ${…}"
+ },
+ {
+  "file": "components/medal.tsx",
+  "line": 81,
+  "kind": "text",
+  "area": "profile",
+  "text": "${…} days"
+ },
+ {
+  "file": "components/onboarding/building-profile.tsx",
+  "line": 130,
+  "kind": "attr",
+  "attr": "accessibilityLabel",
+  "area": "onboarding",
+  "text": "${…} percent, ${…}"
+ },
+ {
+  "file": "components/onboarding/step-header.tsx",
+  "line": 31,
+  "kind": "attr",
+  "attr": "accessibilityLabel",
+  "area": "onboarding",
+  "text": "Step ${…} of ${…}"
+ },
+ {
+  "file": "components/perfect-day-banner.tsx",
+  "line": 30,
+  "kind": "attr",
+  "attr": "accessibilityHint",
+  "area": "home",
+  "text": "Dismisses the message"
+ },
+ {
+  "file": "components/reminder-prompt.tsx",
+  "line": 48,
+  "kind": "text",
+  "area": "home",
+  "text": "You can turn this on later in Settings."
+ },
+ {
+  "file": "components/reminder-prompt.tsx",
+  "line": 48,
+  "kind": "text",
+  "area": "home",
+  "text": "Want a gentle evening reminder?"
+ },
+ {
+  "file": "components/reminder-prompt.tsx",
+  "line": 58,
+  "kind": "text",
+  "area": "home",
+  "text": "Not now"
+ },
+ {
+  "file": "components/reminder-prompt.tsx",
+  "line": 65,
+  "kind": "text",
+  "area": "home",
+  "text": "Turn on"
+ },
+ {
+  "file": "components/starter-ideas.tsx",
+  "line": 27,
+  "kind": "text",
+  "area": "home",
+  "text": "STARTER IDEAS"
+ },
+ {
+  "file": "components/starter-ideas.tsx",
+  "line": 43,
+  "kind": "attr",
+  "attr": "accessibilityLabel",
+  "area": "home",
+  "text": "Use starter idea ${…}"
+ },
+ {
+  "file": "components/startup-trace-panel.tsx",
+  "line": 14,
+  "kind": "literal",
+  "area": "dev",
+  "text": "Last limit check: none this run"
+ },
+ {
+  "file": "components/startup-trace-panel.tsx",
+  "line": 14,
+  "kind": "literal",
+  "area": "dev",
+  "text": "Active habits now: ${…}"
+ },
+ {
+  "file": "components/startup-trace-panel.tsx",
+  "line": 16,
+  "kind": "literal",
+  "area": "dev",
+  "text": "Last limit check: ${…} · ${…} · level ${…} · count ${…}"
+ },
+ {
+  "file": "components/startup-trace-panel.tsx",
+  "line": 18,
+  "kind": "literal",
+  "area": "dev",
+  "text": "Active habits now: ${…}"
+ },
+ {
+  "file": "components/startup-trace-panel.tsx",
+  "line": 61,
+  "kind": "text",
+  "area": "dev",
+  "text": "Startup trace"
+ },
+ {
+  "file": "components/startup-trace-panel.tsx",
+  "line": 64,
+  "kind": "text",
+  "area": "dev",
+  "text": "Loading..."
+ },
+ {
+  "file": "components/startup-trace-panel.tsx",
+  "line": 66,
+  "kind": "text",
+  "area": "dev",
+  "text": "No saved launch yet. It is saved 10 to 25 seconds after Home is usable."
+ },
+ {
+  "file": "components/startup-trace-panel.tsx",
+  "line": 72,
+  "kind": "text",
+  "area": "dev",
+  "partial": true,
+  "text": "Launch"
+ },
+ {
+  "file": "components/startup-trace-panel.tsx",
+  "line": 72,
+  "kind": "text",
+  "area": "dev",
+  "partial": true,
+  "text": "· base"
+ },
+ {
+  "file": "components/startup-trace-panel.tsx",
+  "line": 72,
+  "kind": "text",
+  "area": "dev",
+  "partial": true,
+  "text": "· Hermes"
+ },
+ {
+  "file": "components/startup-trace-panel.tsx",
+  "line": 73,
+  "kind": "text",
+  "area": "dev",
+  "text": "· ${…} habits, ${…} rows"
+ },
+ {
+  "file": "components/startup-trace-panel.tsx",
+  "line": 82,
+  "kind": "text",
+  "area": "dev",
+  "text": "n/a"
+ },
+ {
+  "file": "components/startup-trace-panel.tsx",
+  "line": 82,
+  "kind": "text",
+  "area": "dev",
+  "text": "${…} ms"
+ },
+ {
+  "file": "components/startup-trace-panel.tsx",
+  "line": 88,
+  "kind": "text",
+  "area": "dev",
+  "text": "Earlier launches (JS span to usable)"
+ },
+ {
+  "file": "components/startup-trace-panel.tsx",
+  "line": 93,
+  "kind": "text",
+  "area": "dev",
+  "partial": true,
+  "text": "Launch"
+ },
+ {
+  "file": "components/startup-trace-panel.tsx",
+  "line": 94,
+  "kind": "text",
+  "area": "dev",
+  "text": "n/a"
+ },
+ {
+  "file": "components/startup-trace-panel.tsx",
+  "line": 94,
+  "kind": "text",
+  "area": "dev",
+  "text": "${…} ms"
+ },
+ {
+  "file": "components/startup-trace-panel.tsx",
+  "line": 105,
+  "kind": "text",
+  "area": "dev",
+  "text": "Share"
+ },
+ {
+  "file": "components/startup-trace-panel.tsx",
+  "line": 108,
+  "kind": "text",
+  "area": "dev",
+  "text": "Clear"
+ },
+ {
+  "file": "components/stats-card.tsx",
+  "line": 17,
+  "kind": "attr",
+  "attr": "accessibilityLabel",
+  "area": "profile",
+  "text": "Level ${…}"
+ },
+ {
+  "file": "components/stats-card.tsx",
+  "line": 38,
+  "kind": "text",
+  "area": "profile",
+  "partial": true,
+  "text": "XP"
+ },
+ {
+  "file": "components/stats-card.tsx",
+  "line": 69,
+  "kind": "text",
+  "area": "profile",
+  "partial": true,
+  "text": "Level"
+ },
+ {
+  "file": "components/stats-card.tsx",
+  "line": 70,
+  "kind": "attr",
+  "attr": "accessibilityLabel",
+  "area": "profile",
+  "text": "Current streak ${…}"
+ },
+ {
+  "file": "components/stats-card.tsx",
+  "line": 78,
+  "kind": "attr",
+  "attr": "accessibilityLabel",
+  "area": "profile",
+  "text": "Rest day"
+ },
+ {
+  "file": "components/stats-card.tsx",
+  "line": 78,
+  "kind": "attr",
+  "attr": "accessibilityLabel",
+  "area": "profile",
+  "text": "${…} of ${…} habits done today"
+ },
+ {
+  "file": "components/stats-card.tsx",
+  "line": 85,
+  "kind": "text",
+  "area": "profile",
+  "text": "Rest day"
+ },
+ {
+  "file": "components/summary-empty-card.tsx",
+  "line": 7,
+  "kind": "literal",
+  "area": "summary",
+  "text": "Your progress will show up here"
+ },
+ {
+  "file": "components/summary-empty-card.tsx",
+  "line": 8,
+  "kind": "literal",
+  "area": "summary",
+  "text": "Add a habit and tick it off. Each day you finish fills in this page."
+ },
+ {
+  "file": "components/summary-empty-card.tsx",
+  "line": 11,
+  "kind": "literal",
+  "area": "summary",
+  "text": "Nothing was scheduled in this range yet"
+ },
+ {
+  "file": "components/summary-empty-card.tsx",
+  "line": 12,
+  "kind": "literal",
+  "area": "summary",
+  "text": "Your habits are due on other days. Try the other range, or add a habit for these days."
+ },
+ {
+  "file": "components/summary-empty-card.tsx",
+  "line": 31,
+  "kind": "attr",
+  "attr": "accessibilityLabel",
+  "area": "summary",
+  "text": "Create a habit"
+ },
+ {
+  "file": "components/summary-empty-card.tsx",
+  "line": 32,
+  "kind": "attr",
+  "attr": "accessibilityHint",
+  "area": "summary",
+  "text": "Opens the new habit screen"
+ },
+ {
+  "file": "components/summary-empty-card.tsx",
+  "line": 33,
+  "kind": "text",
+  "area": "summary",
+  "text": "Create a habit"
+ },
+ {
+  "file": "components/summary-habit-list.tsx",
+  "line": 29,
+  "kind": "text",
+  "area": "summary",
+  "text": "Best this range"
+ },
+ {
+  "file": "components/summary-heat-strip.tsx",
+  "line": 59,
+  "kind": "text",
+  "area": "summary",
+  "text": "Nothing scheduled"
+ },
+ {
+  "file": "components/summary-heat-strip.tsx",
+  "line": 63,
+  "kind": "text",
+  "area": "summary",
+  "text": "None done"
+ },
+ {
+  "file": "components/summary-heat-strip.tsx",
+  "line": 66,
+  "kind": "text",
+  "area": "summary",
+  "text": "Some"
+ },
+ {
+  "file": "components/summary-heat-strip.tsx",
+  "line": 68,
+  "kind": "text",
+  "area": "summary",
+  "text": "All done"
+ },
+ {
+  "file": "components/summary-range-toggle.tsx",
+  "line": 7,
+  "kind": "literal",
+  "area": "summary",
+  "text": "Week, last 7 days"
+ },
+ {
+  "file": "components/summary-range-toggle.tsx",
+  "line": 8,
+  "kind": "literal",
+  "area": "summary",
+  "text": "Month, last 30 days"
+ },
+ {
+  "file": "components/summary-stats.tsx",
+  "line": 17,
+  "kind": "attr",
+  "attr": "label",
+  "area": "summary",
+  "text": "Check-ins done"
+ },
+ {
+  "file": "components/summary-stats.tsx",
+  "line": 18,
+  "kind": "attr",
+  "attr": "label",
+  "area": "summary",
+  "text": "Completion rate"
+ },
+ {
+  "file": "components/summary-stats.tsx",
+  "line": 19,
+  "kind": "literal",
+  "area": "summary",
+  "text": "Completion rate: nothing finished yet"
+ },
+ {
+  "file": "components/summary-stats.tsx",
+  "line": 19,
+  "kind": "literal",
+  "area": "summary",
+  "text": "Completion rate ${…} ${…}"
+ },
+ {
+  "file": "components/summary-stats.tsx",
+  "line": 20,
+  "kind": "attr",
+  "attr": "label",
+  "area": "summary",
+  "text": "Perfect days"
+ },
+ {
+  "file": "components/summary-stats.tsx",
+  "line": 22,
+  "kind": "attr",
+  "attr": "label",
+  "area": "summary",
+  "text": "Day streak"
+ },
+ {
+  "file": "components/summary-stats.tsx",
+  "line": 22,
+  "kind": "literal",
+  "area": "summary",
+  "text": "Current streak ${…}"
+ },
+ {
+  "file": "components/time-field.tsx",
+  "line": 52,
+  "kind": "attr",
+  "attr": "placeholder",
+  "area": "habitForm",
+  "text": "HH:MM, e.g. 08:30"
+ },
+ {
+  "file": "components/time-field.tsx",
+  "line": 57,
+  "kind": "attr",
+  "attr": "accessibilityLabel",
+  "area": "habitForm",
+  "text": "Reminder time, 24-hour, like 08:30"
+ },
+ {
+  "file": "components/time-field.tsx",
+  "line": 82,
+  "kind": "attr",
+  "attr": "accessibilityLabel",
+  "area": "habitForm",
+  "text": "Reminder time, ${…}"
+ },
+ {
+  "file": "components/time-field.tsx",
+  "line": 83,
+  "kind": "attr",
+  "attr": "accessibilityHint",
+  "area": "habitForm",
+  "text": "Opens the time picker"
+ },
+ {
+  "file": "components/time-field.tsx",
+  "line": 87,
+  "kind": "text",
+  "area": "habitForm",
+  "text": "Change"
+ },
+ {
+  "file": "components/time-field.tsx",
+  "line": 96,
+  "kind": "text",
+  "area": "habitForm",
+  "text": "Time"
+ },
+ {
+  "file": "components/time-field.tsx",
+  "line": 105,
+  "kind": "attr",
+  "attr": "accessibilityLabel",
+  "area": "habitForm",
+  "text": "Reminder time"
+ },
+ {
+  "file": "components/xp-float.tsx",
+  "line": 36,
+  "kind": "text",
+  "area": "home",
+  "partial": true,
+  "text": "XP"
+ },
+ {
+  "file": "services/admin.js",
+  "line": 28,
+  "kind": "literal",
+  "area": "admin",
+  "text": "Request timed out"
+ },
+ {
+  "file": "services/admin.js",
+  "line": 116,
+  "kind": "literal",
+  "area": "admin",
+  "text": "Not signed in"
+ },
+ {
+  "file": "services/admin.js",
+  "line": 117,
+  "kind": "literal",
+  "area": "admin",
+  "text": "Admins can't change their own status"
+ },
+ {
+  "file": "services/admin.js",
+  "line": 121,
+  "kind": "literal",
+  "area": "admin",
+  "text": "User not found"
+ },
+ {
+  "file": "services/admin.js",
+  "line": 143,
+  "kind": "literal",
+  "area": "admin",
+  "text": "Couldn't confirm the change. It will finish when you're back online."
+ },
+ {
+  "file": "services/admin.js",
+  "line": 144,
+  "kind": "literal",
+  "area": "admin",
+  "text": "You're offline. Changes need an internet connection."
+ },
+ {
+  "file": "services/admin.js",
+  "line": 145,
+  "kind": "literal",
+  "area": "admin",
+  "text": "You don't have permission to change this user."
+ },
+ {
+  "file": "services/admin.js",
+  "line": 146,
+  "kind": "literal",
+  "area": "admin",
+  "text": "This user no longer exists."
+ },
+ {
+  "file": "services/admin.js",
+  "line": 147,
+  "kind": "literal",
+  "area": "admin",
+  "text": "Something went wrong. Please try again."
+ },
+ {
+  "file": "services/admin.js",
+  "line": 154,
+  "kind": "literal",
+  "area": "admin",
+  "text": "You're offline. Admin tools need an internet connection."
+ },
+ {
+  "file": "services/admin.js",
+  "line": 157,
+  "kind": "literal",
+  "area": "admin",
+  "text": "You don't have access to admin data."
+ },
+ {
+  "file": "services/admin.js",
+  "line": 159,
+  "kind": "literal",
+  "area": "admin",
+  "text": "Something went wrong loading admin data."
+ },
+ {
+  "file": "services/adminCatalog.js",
+  "line": 33,
+  "kind": "literal",
+  "area": "admin",
+  "text": "Not signed in"
+ },
+ {
+  "file": "services/adminCatalog.js",
+  "line": 41,
+  "kind": "literal",
+  "area": "admin",
+  "text": "Catalog item not found"
+ },
+ {
+  "file": "services/adminCatalog.js",
+  "line": 110,
+  "kind": "literal",
+  "area": "admin",
+  "text": "Couldn't confirm the save. It will finish when you're back online."
+ },
+ {
+  "file": "services/adminCatalog.js",
+  "line": 111,
+  "kind": "literal",
+  "area": "admin",
+  "text": "You're offline. Changes need an internet connection."
+ },
+ {
+  "file": "services/adminCatalog.js",
+  "line": 112,
+  "kind": "literal",
+  "area": "admin",
+  "text": "You don't have permission to change the catalog."
+ },
+ {
+  "file": "services/adminCatalog.js",
+  "line": 113,
+  "kind": "literal",
+  "area": "admin",
+  "text": "This item no longer exists."
+ },
+ {
+  "file": "services/adminCatalog.js",
+  "line": 114,
+  "kind": "literal",
+  "area": "admin",
+  "text": "Something went wrong. Please try again."
+ },
+ {
+  "file": "services/authActions.js",
+  "line": 65,
+  "kind": "literal",
+  "area": "auth",
+  "text": "Not signed in"
+ },
+ {
+  "file": "services/authActions.js",
+  "line": 69,
+  "kind": "literal",
+  "area": "auth",
+  "text": "Profile not found"
+ },
+ {
+  "file": "services/notificationScheduler.ts",
+  "line": 88,
+  "kind": "literal",
+  "area": "common",
+  "text": "${…} planned (${…} due, ${…} early, ${…} alarm, ${…} nudge):"
+ },
+ {
+  "file": "services/notificationsCore.ts",
+  "line": 88,
+  "kind": "literal",
+  "area": "common",
+  "text": "Habit alarms"
+ },
+ {
+  "file": "services/notificationsCore.ts",
+  "line": 182,
+  "kind": "literal",
+  "area": "common",
+  "text": "This is what a reminder looks like."
+ },
+ {
+  "file": "services/profileCompletion.ts",
+  "line": 16,
+  "kind": "literal",
+  "area": "common",
+  "text": "Profile write timed out"
+ },
+ {
+  "file": "services/useDisabledCheck.ts",
+  "line": 47,
+  "kind": "alert",
+  "area": "common",
+  "text": "Account disabled"
+ },
+ {
+  "file": "services/useDisabledCheck.ts",
+  "line": 47,
+  "kind": "alert",
+  "area": "common",
+  "text": "This account has been disabled. Please contact the HabitQuest team."
+ }
+]
