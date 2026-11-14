@@ -198,6 +198,7 @@ Titles, labels and messages on the screens after Q11, keyed by their constant na
 | ROUTINE_OTHER_GROUP    | Other habits                                                                          |
 | SKIP_TITLE             | Skip setup?                                                                           |
 | SKIP_BODY              | We won't be able to generate habits for you.                                          |
+| SKIP_BODY_HAS_HABITS   | Your current habits stay as they are.                                                 |
 | SKIP_YES               | Yes, skip                                                                             |
 | SKIP_NO                | No, continue                                                                          |
 | LEAVE_TITLE            | Leave setup?                                                                          |

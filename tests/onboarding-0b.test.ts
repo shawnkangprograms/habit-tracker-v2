@@ -155,7 +155,36 @@ describe('Skip setup on a retake from Settings (decided 2026-11-14)', () => {
   test('the screen picks the wording by how it was opened', () => {
     const screen = source('../app/onboarding.tsx');
     assert.match(screen, /const entry = entryFromParam\(params\.entry\);/);
-    assert.match(screen, /<SkipDialog state=\{skipState\} copy=\{skipCopy\(anyCreated, entry\)\}/);
+    assert.match(screen, /<SkipDialog state=\{skipState\} copy=\{skipCopy\(anyCreated, entry, context\.existing\.length > 0\)\}/);
+  });
+
+  test('(b) a skip when habits already exist says they stay; no habit anywhere keeps the old line (decided 2026-11-14)', () => {
+    assert.equal(c.SKIP_BODY_HAS_HABITS, 'Your current habits stay as they are.');
+    assert.equal(c.SKIP_BODY, "We won't be able to generate habits for you.");
+    for (const entry of ['auto', 'settings'] as const) {
+      const withHabits = sd.skipCopy(false, entry, true);
+      assert.equal(withHabits.body, c.SKIP_BODY_HAS_HABITS, entry);
+      // title, buttons and the leaving notice are unchanged
+      assert.deepEqual({...withHabits, body: ''}, {...sd.skipCopy(false, entry, false), body: ''}, entry);
+      assert.equal(sd.skipCopy(false, entry, false).body, c.SKIP_BODY, entry);
+      assert.equal(sd.skipCopy(false, entry).body, c.SKIP_BODY, entry); // the flag defaults to false
+    }
+  });
+
+  test('(b) once a habit was made in this run the Leave wording wins, with or without older habits', () => {
+    for (const existing of [false, true]) {
+      for (const entry of ['auto', 'settings'] as const) {
+        const copy = sd.skipCopy(true, entry, existing);
+        assert.equal(copy.title, c.LEAVE_TITLE);
+        assert.equal(copy.body, c.LEAVE_BODY);
+      }
+    }
+  });
+
+  test('(b) the screen passes whether the account already had habits when the plan was built', () => {
+    const screen = source('../app/onboarding.tsx');
+    assert.match(screen, /skipCopy\(anyCreated, entry, context\.existing\.length > 0\)/);
+    assert.match(screen, /const \[context, setContext\] = useState<RunContext>\(\{packs: NO_PACKS, existing: \[\]\}\);/);
   });
 
   test('where Skip setup navigates: back to whichever screen opened it (Home for the first run, Settings for a retake)', () => {

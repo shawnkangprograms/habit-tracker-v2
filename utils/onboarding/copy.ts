@@ -359,6 +359,8 @@ export function routineSubtitle(packA: string, packB: string): string {
 // The "Skip setup" confirmation (utils/onboarding/skipDialog.ts): Skip before any habit exists, Leave after
 export const SKIP_TITLE = 'Skip setup?';
 export const SKIP_BODY = "We won't be able to generate habits for you.";
+// Skipping when habits already exist (a retake): nothing is lost, so the dialog says so (approved 2026-11-14)
+export const SKIP_BODY_HAS_HABITS = 'Your current habits stay as they are.';
 export const SKIP_YES = 'Yes, skip';
 export const SKIP_NO = 'No, continue';
 export const LEAVE_TITLE = 'Leave setup?';

@@ -8,7 +8,7 @@
 
 import {
   BACK_TO_SETTINGS, GO_HOME, LEAVE_BODY, LEAVE_NO, LEAVE_TITLE, LEAVE_YES, LEAVING_NOTICE, RETAKE_LEAVING_NOTICE, SKIP_BODY,
-  SKIP_NO, SKIP_TITLE, SKIP_YES,
+  SKIP_BODY_HAS_HABITS, SKIP_NO, SKIP_TITLE, SKIP_YES,
 } from '@/utils/onboarding/copy';
 import type {OnboardingEntry} from '@/utils/onboarding/gate';
 
@@ -36,10 +36,13 @@ export type SkipCopy = {title: string; body: string; yes: string; no: string; no
 // Once this run has created a habit (a card or the user's own), the dialog says "Leave" and that they are saved.
 // The notice and its button say where the flow goes: the first run returns to Home, a retake started from Settings
 // returns to Settings (app/onboarding.tsx closeFlow goes back to whichever opened it).
-export function skipCopy(createdAny: boolean, entry: OnboardingEntry = 'auto'): SkipCopy {
+// A skip before any habit was made in this run says "We won't be able to generate habits" only when the account has
+// no habits; with habits already (a retake), it says they stay (hasExistingHabits: the active habits read when the
+// plan was built).
+export function skipCopy(createdAny: boolean, entry: OnboardingEntry = 'auto', hasExistingHabits = false): SkipCopy {
   const words = createdAny
     ? {title: LEAVE_TITLE, body: LEAVE_BODY, yes: LEAVE_YES, no: LEAVE_NO}
-    : {title: SKIP_TITLE, body: SKIP_BODY, yes: SKIP_YES, no: SKIP_NO};
+    : {title: SKIP_TITLE, body: hasExistingHabits ? SKIP_BODY_HAS_HABITS : SKIP_BODY, yes: SKIP_YES, no: SKIP_NO};
   return entry === 'settings'
     ? {...words, notice: RETAKE_LEAVING_NOTICE, goHome: BACK_TO_SETTINGS}
     : {...words, notice: LEAVING_NOTICE, goHome: GO_HOME};

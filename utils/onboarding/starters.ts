@@ -6,7 +6,8 @@
 // pack's first, the second pack's first, the focus pack's second, and so on. Only when every template left in
 // both packs is already picked (a retake) does the rest of the catalog fill in, by area rank. Sleep struggle or
 // irregular forces one sleep template, from Calm Mind even when that pack wasn't chosen: it takes a free slot, or
-// the last one. Retake passes the catalog ids already added and the names of the user's active habits: a template
+// the last pick that is not the first pack's only starter (the first pack, the focus axis's, never loses its one
+// starter to the sleep pick; the sleep pick always ends up last). Retake passes the catalog ids already added and the names of the user's active habits: a template
 // in either is left out before picking (a template habit made by "Add the rest", the packs picker or by hand is
 // not in addedTemplateIds), and a replace habit with one of those names is left out, since Q10 is never stored.
 // Names are compared with normaliseHabitName (trimmed, inner spaces collapsed, case ignored).
@@ -152,6 +153,7 @@ export function pickStarters(
   const caps = BUDGET_CAPS[answers.timeBudget ?? SKIPPED_TIME_BUDGET];
 
   const picked: Template[] = [];
+  let firstPackTemplates: readonly string[] = [];// the focus pack's templates; empty when no pack is chosen
   const total = () => picked.reduce((sum, t) => sum + t.minutes, 0);
   const fits = (t: Template) => t.minutes <= caps.single && total() + t.minutes <= caps.total;
   const take = (list: readonly Template[]) => {
@@ -166,6 +168,7 @@ export function pickStarters(
     take(BALANCED_TEMPLATE_IDS.flatMap((id) => pool.filter((t) => t.id === id)));
   } else {
     const [first, second] = chooseOnboardingPacks(scores, answers.focus).map((id) => builtinPack(id).templates);
+    firstPackTemplates = first;
     const inTurn = first.flatMap((id, i) => [id, second[i]]).flatMap((id) => pool.filter((t) => t.id === id));
     take(inTurn);
     if (inTurn.every((t) => picked.includes(t))) {
@@ -180,7 +183,15 @@ export function pickStarters(
     const sleep = SLEEP_TEMPLATE_IDS.map((id) => pool.find((t) => t.id === id)).find((t) => t !== undefined);
     if (sleep) {
       if (picked.length < base && fits(sleep)) picked.push(sleep);
-      else picked[picked.length - 1] = sleep;
+      else {
+        // the last pick makes room, unless it is the only pick from the first pack (then the one before it);
+        // with no other pick to give up, the last one as before
+        const inFirst = picked.filter((t) => firstPackTemplates.includes(t.id));
+        const sole = inFirst.length === 1 ? inFirst[0] : null;
+        const giveUp = picked.map((t, i) => (t === sole ? -1 : i)).filter((i) => i >= 0);
+        picked.splice(giveUp.length > 0 ? giveUp[giveUp.length - 1] : picked.length - 1, 1);
+        picked.push(sleep);
+      }
     }
   }
 

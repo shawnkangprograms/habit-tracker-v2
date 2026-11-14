@@ -124,6 +124,75 @@ describe('sleep force-pick', () => {
   });
 });
 
+describe('sleep force-pick keeps the first pack\'s only starter (set 2, fix a)', () => {
+  // Found on a device: Health first, Mind second, a struggling sleep, a 15-minute budget, confidence 1 (2 habits).
+  // walk20 (20 min) doesn't fit the budget, so Steady Energy's only starter is stretch10, picked LAST; the forced
+  // sleep pick used to take that slot, leaving the first-ranked pack with nothing.
+  const device: CompleteAnswers = {
+    ...BASE, focus: ['health', 'mental'], timeBudget: 'min15', confidence: 1, sleep: 'struggle',
+  };
+  const isSleep = (id: string) => (st.SLEEP_TEMPLATE_IDS as readonly string[]).includes(id);
+  const catalogIds = (answers: CompleteAnswers) => st.pickStarters(answers).filter((p) => p.kind === 'catalog').map((p) => p.id as string);
+
+  test('the device case: stretch10 stays, the second pack\'s pick makes room, the sleep pick is last', () => {
+    assert.deepEqual(chooseOnboardingPacks(scoreAxes(device), device.focus), ['steady_energy', 'calm_mind']);
+    assert.deepEqual(ids(st.pickStarters({...device, sleep: 'good'})), ['breathe5', 'stretch10']);// before the force
+    assert.deepEqual(ids(st.pickStarters(device)), ['stretch10', 'lights_out']);
+    assert.deepEqual(ids(st.pickStarters({...device, sleep: 'irregular'})), ['stretch10', 'lights_out']);
+  });
+
+  test('with two starters from the first pack, the last one still makes room (the old behaviour)', () => {
+    const a: CompleteAnswers = {...BASE, focus: ['health', 'mental'], confidence: 8, sleep: 'struggle'};
+    assert.deepEqual(ids(st.pickStarters(a)), ['walk20', 'breathe5', 'stretch10', 'lights_out']);
+  });
+
+  test('for every answer set: a first pack that had a starter keeps one; the count never grows past the base and the sleep pick is last', () => {
+    let forced = 0;
+    let protectedCases = 0;
+    const areas = t.FOCUS_AREAS;
+    const focuses = areas.flatMap((a) => [[a], ...areas.filter((b) => b !== a).map((b) => [a, b])]);
+    for (const focus of focuses) {
+      for (const sleep of ['struggle', 'irregular'] as const) {
+        for (const timeBudget of t.TIME_BUDGETS) {
+          for (let confidence = 1; confidence <= 10; confidence++) {
+            for (const badHabit of [null, 'gaming'] as const) {
+              const a: CompleteAnswers = {...BASE, focus: focus as CompleteAnswers['focus'], sleep, timeBudget, confidence, badHabit};
+              const label = JSON.stringify({focus, sleep, timeBudget, confidence, badHabit});
+              const packs = chooseOnboardingPacks(scoreAxes(a), a.focus);
+              const firstTemplates = builtinPack(packs[0]).templates as readonly string[];
+              const picks = catalogIds(a);
+              // the same answers without the force (a sleep of "okay"), when that leaves the two packs as they were
+              const b = {...a, sleep: 'okay' as const};
+              const samePacks = chooseOnboardingPacks(scoreAxes(b), b.focus).join() === packs.join();
+              const unforced = catalogIds(b);
+              forced++;
+              assert.ok(picks.some(isSleep), label);
+              if (samePacks) {
+                // a free slot (the time caps can leave one) takes the sleep pick as an extra; a full list swaps one
+                const extra = picks.length - unforced.length;
+                assert.ok(extra === 0 || (extra === 1 && picks.length <= st.baseStarterCount(a.confidence)), label);
+                assert.ok(isSleep(picks[picks.length - 1]) || unforced.some(isSleep), label); // last, unless picked anyway
+                if (unforced.some((id) => firstTemplates.includes(id))) {
+                  protectedCases++;
+                  assert.ok(picks.some((id) => firstTemplates.includes(id)), label);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    assert.ok(forced > 5000 && protectedCases > 1000, `${forced} / ${protectedCases}`);
+  });
+
+  test('a retake that left the first pack nothing new still replaces the last pick, as before', () => {
+    const exclude = builtinPack('steady_energy').templates as readonly string[];
+    const picks = ids(st.pickStarters({...device, timeBudget: 'min60', confidence: 8}, {excludeIds: [...exclude]}));
+    assert.equal(picks.length, 4);
+    assert.ok(picks.some(isSleep));
+  });
+});
+
 describe('Q10 replace habit', () => {
   test('each answer adds its generic name last; the id never carries the answer', () => {
     for (const answer of t.REPLACE_ANSWERS) {
