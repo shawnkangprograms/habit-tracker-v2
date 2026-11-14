@@ -1,8 +1,7 @@
 import {useCallback, useRef, useState} from 'react';
 import {router, useFocusEffect} from 'expo-router';
 import Constants from 'expo-constants';
-import {SafeAreaView} from 'react-native-safe-area-context';
-import {Alert, AppState, Linking, Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
+import {Alert, AppState, Linking, Pressable, StyleSheet, View} from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import {signOut} from '@/services/authActions';
 import {useIsAdmin} from '@/services/adminContext';
@@ -15,9 +14,14 @@ import {
 } from '@/services/notifications';
 import {NUDGE_TIMES, reminderSwitchValue} from '@/utils/notificationPrefs';
 import {devSeedEarlyPraise} from '@/db/devSeed';// null outside __DEV__
-import {colors, fonts, radii, spacing} from '@/constants/theme';
+import {colors, radii, spacing} from '@/constants/theme';
 import {TEST_IDS, nudgeTimeId} from '@/constants/testIds';
 import {SwitchRow} from '@/components/switch-row';
+import {AppText} from '@/components/ui/app-text';
+import {Button} from '@/components/ui/button';
+import {Card} from '@/components/ui/card';
+import {Pill} from '@/components/ui/pill';
+import {Screen} from '@/components/ui/screen';
 import {TRACE_ON} from '@/utils/startupTrace';
 import {firstPullFor} from '@/sync/syncEngine';// S-4: read-only
 import {RESTORING_LINE} from '@/utils/firstPull';
@@ -132,10 +136,9 @@ export default function SettingsScreen (){
     };
 
     return(
-        <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']} testID={TEST_IDS.settings.screen}>
-            <ScrollView contentContainerStyle={styles.content}>
-              <Text style={styles.title} onLongPress={onTitleLongPress}>Settings</Text>
-              {syncMessages.map((line) => <Text key={line} style={styles.clockLine}>{line}</Text>)}
+        <Screen testID={TEST_IDS.settings.screen} padding={spacing.lg} gap={spacing.lg} contentStyle={styles.content}>
+              <AppText variant="title" style={styles.title} onLongPress={onTitleLongPress}>Settings</AppText>
+              {syncMessages.map((line) => <AppText key={line} variant="small" color="muted" style={styles.clockLine}>{line}</AppText>)}
 
               <View style={styles.list}>
                 <SwitchRow
@@ -167,16 +170,15 @@ export default function SettingsScreen (){
                     {NUDGE_TIMES.map((time) => {
                       const selected = notificationPrefs.nudgeTime === time;
                       return (
-                        <Pressable
+                        <Pill
                           key={time}
-                          style={[styles.chip, selected ? styles.chipSelected : styles.chipUnselected]}
+                          label={time}
+                          selected={selected}
                           onPress={() => setNotificationPrefs({nudgeTime: time})}
-                          accessibilityRole="radio"
+                          gap={spacing.sm}
                           accessibilityLabel={time}
-                          accessibilityState={{selected}}
-                          testID={nudgeTimeId(time)}>
-                          <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{time}</Text>
-                        </Pressable>
+                          testID={nudgeTimeId(time)}
+                        />
                       );
                     })}
                   </View>
@@ -192,33 +194,33 @@ export default function SettingsScreen (){
                   testID={TEST_IDS.settings.testNotification}
                   accessibilityState={{disabled: !available || sendingTest}}>
                   <MaterialCommunityIcons name="send-outline" size={22} color={colors.accent} />
-                  <Text style={styles.rowText}>Send a test notification</Text>
+                  <AppText variant="bodyLg" weight="semiBold" style={styles.rowText}>Send a test notification</AppText>
                 </Pressable>
                 {testStatus && (
-                  <Text style={styles.testLine} accessibilityLiveRegion="polite">
+                  <AppText variant="caption" color="muted" style={styles.testLine} accessibilityLiveRegion="polite">
                     {testStatus === 'sent'
                       ? 'Sent. It arrives in about 10 seconds. Lock your phone to see it as a lock-screen notification.'
                       : "Couldn't send the test notification."}
-                  </Text>
+                  </AppText>
                 )}
 
                 {!available && (
-                  <View style={styles.notice}>
-                    <Text style={styles.noticeText}>Reminders aren&apos;t available in this version of the app on this phone yet.</Text>
-                  </View>
+                  <Card gap={spacing.sm} padding={spacing.lg}>
+                    <AppText variant="body" color="muted">Reminders aren&apos;t available in this version of the app on this phone yet.</AppText>
+                  </Card>
                 )}
 
                 {available && permission === 'denied' && (
-                  <View style={styles.notice}>
-                    <Text style={styles.noticeText}>Notifications are turned off for HabitQuest in your phone settings.</Text>
-                    <Pressable
-                      style={({pressed}) => [styles.noticeButton, pressed && styles.pressed]}
+                  <Card gap={spacing.sm} padding={spacing.lg}>
+                    <AppText variant="body" color="muted">Notifications are turned off for HabitQuest in your phone settings.</AppText>
+                    <Button
+                      label="Open settings"
+                      size="sm"
                       onPress={() => { Linking.openSettings().catch(() => {}); }}
-                      accessibilityRole="button"
-                      testID={TEST_IDS.settings.openPhoneSettings}>
-                      <Text style={styles.noticeButtonText}>Open settings</Text>
-                    </Pressable>
-                  </View>
+                      style={styles.noticeButton}
+                      testID={TEST_IDS.settings.openPhoneSettings}
+                    />
+                  </Card>
                 )}
 
                 {/* first and last name, for the greeting on Home */}
@@ -228,7 +230,7 @@ export default function SettingsScreen (){
                   accessibilityRole="button"
                   testID={TEST_IDS.settings.nameRow}>
                   <MaterialCommunityIcons name="account-edit-outline" size={22} color={colors.accent} />
-                  <Text style={styles.rowText}>{NAME_ROW}</Text>
+                  <AppText variant="bodyLg" weight="semiBold" style={styles.rowText}>{NAME_ROW}</AppText>
                   <MaterialCommunityIcons name="chevron-right" size={22} color={colors.muted} />
                 </Pressable>
 
@@ -239,7 +241,7 @@ export default function SettingsScreen (){
                   accessibilityRole="button"
                   testID={TEST_IDS.settings.packsRow}>
                   <MaterialCommunityIcons name="view-grid-outline" size={22} color={colors.accent} />
-                  <Text style={styles.rowText}>{SETTINGS_PACKS_ROW}</Text>
+                  <AppText variant="bodyLg" weight="semiBold" style={styles.rowText}>{SETTINGS_PACKS_ROW}</AppText>
                   <MaterialCommunityIcons name="chevron-right" size={22} color={colors.muted} />
                 </Pressable>
 
@@ -251,13 +253,13 @@ export default function SettingsScreen (){
                   accessibilityRole="button"
                   testID={TEST_IDS.settings.planRow}>
                   <MaterialCommunityIcons name="compass-outline" size={22} color={colors.accent} />
-                  <Text style={styles.rowText}>{SETTINGS_ROW}</Text>
+                  <AppText variant="bodyLg" weight="semiBold" style={styles.rowText}>{SETTINGS_ROW}</AppText>
                   <MaterialCommunityIcons name="chevron-right" size={22} color={colors.muted} />
                 </Pressable>
                 {planNotice ? (
-                  <View style={styles.notice}>
-                    <Text style={styles.noticeText} accessibilityLiveRegion="polite">{planNotice}</Text>
-                  </View>
+                  <Card gap={spacing.sm} padding={spacing.lg}>
+                    <AppText variant="body" color="muted" accessibilityLiveRegion="polite">{planNotice}</AppText>
+                  </Card>
                 ) : null}
 
                 {isAdmin && (
@@ -267,7 +269,7 @@ export default function SettingsScreen (){
                     accessibilityRole="button"
                     testID={TEST_IDS.settings.adminRow}>
                     <MaterialCommunityIcons name="shield-account-outline" size={22} color={colors.accent} />
-                    <Text style={styles.rowText}>Admin</Text>
+                    <AppText variant="bodyLg" weight="semiBold" style={styles.rowText}>Admin</AppText>
                     <MaterialCommunityIcons name="chevron-right" size={22} color={colors.muted} />
                   </Pressable>
                 )}
@@ -278,26 +280,26 @@ export default function SettingsScreen (){
                   accessibilityRole="button"
                   testID={TEST_IDS.settings.signOut}>
                   <MaterialCommunityIcons name="logout" size={22} color={colors.error} />
-                  <Text style={[styles.rowText, styles.signOutText]}>Sign Out</Text>
+                  <AppText variant="bodyLg" weight="semiBold" color="error" style={styles.rowText}>Sign Out</AppText>
                 </Pressable>
               </View>
 
-              <Text
+              <AppText
+                variant="caption"
+                color="muted"
                 style={styles.version}
                 onLongPress={StartupTracePanel ? () => setShowTrace((shown) => !shown) : undefined}>
                 {VERSION_LINE}
-              </Text>
+              </AppText>
               {StartupTracePanel && showTrace && <StartupTracePanel />}
-            </ScrollView>
-        </SafeAreaView>
+        </Screen>
     )
 }
 
 const styles = StyleSheet.create({
-  safe: {flex: 1, backgroundColor: colors.background},
-  content: {paddingHorizontal: spacing.lg, paddingBottom: 18, gap: spacing.lg},
-  title: {fontFamily: fonts.title, fontSize: 26, color: colors.text, paddingTop: 5},
-  list: {gap: 7},
+  content: {paddingBottom: spacing.s18},
+  title: {paddingTop: spacing.s5},
+  list: {gap: spacing.s7},
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -310,36 +312,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  rowText: {flex: 1, fontFamily: fonts.semiBold, fontSize: 15, color: colors.text},
+  rowText: {flex: 1},
   disabledRow: {opacity: 0.5},
-  testLine: {fontFamily: fonts.regular, fontSize: 12, color: colors.muted, paddingHorizontal: spacing.xs},
-  clockLine: {fontFamily: fonts.regular, fontSize: 13, color: colors.muted, marginTop: -spacing.sm},// S-1; wraps freely
+  testLine: {paddingHorizontal: spacing.xs},
+  clockLine: {marginTop: -spacing.sm},// S-1; wraps freely
   chips: {flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, paddingHorizontal: spacing.xs},
-  chip: {height: 34, paddingHorizontal: 14, borderRadius: radii.pill, alignItems: 'center', justifyContent: 'center'},
-  chipSelected: {backgroundColor: colors.accent},
-  chipUnselected: {backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border},
-  chipText: {fontFamily: fonts.semiBold, fontSize: 13, color: colors.muted},
-  chipTextSelected: {color: colors.white},
-  notice: {
-    gap: spacing.sm,
-    padding: spacing.lg,
-    borderRadius: radii.habitCard,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  noticeText: {fontFamily: fonts.regular, fontSize: 14, color: colors.muted},
-  noticeButton: {
-    alignSelf: 'flex-start',
-    height: 40,
-    paddingHorizontal: spacing.lg,
-    borderRadius: radii.pill,
-    backgroundColor: colors.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  noticeButtonText: {fontFamily: fonts.title, fontSize: 14, color: colors.white},
-  signOutText: {color: colors.error},
-  version: {fontFamily: fonts.regular, fontSize: 12, color: colors.muted, textAlign: 'center'},
+  noticeButton: {alignSelf: 'flex-start'},
+  version: {textAlign: 'center'},
   pressed: {opacity: 0.85},
 });

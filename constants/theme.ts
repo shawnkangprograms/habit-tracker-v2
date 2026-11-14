@@ -37,6 +37,10 @@ export const radii = {
   habitCard: 14,
   iconBadge: 11,
   largeCard: 18,
+  // C1: the small shapes in use (bars, swatches, dots); values used 3+ times, the one-offs stay literal
+  xxs: 2,
+  xs: 3,
+  sm: 4,
 } as const;
 
 // Font family names as registered by useFonts in app/_layout.tsx
@@ -55,6 +59,28 @@ export const spacing = {
   lg: 16,
   xl: 22,
   xxl: 28,
+  // C1: values the screens write as literals 4 or more times (named by value, so a reader sees the number)
+  s2: 2,
+  s5: 5,
+  s6: 6,
+  s7: 7,
+  s10: 10,
+  s14: 14,
+  s18: 18,
+  s20: 20,
+} as const;
+
+// C1: the onboarding primary button's glow, the one elevation in the app (iOS shadow; Android draws the
+// elevation shadow in the same colour on API 28+). `glowOff` is its disabled state.
+export const shadows = {
+  glow: {
+    shadowColor: colors.accent,
+    shadowOpacity: 0.45,
+    shadowRadius: 14,
+    shadowOffset: {width: 0, height: 4},
+    elevation: 6,
+  },
+  glowOff: {shadowOpacity: 0, elevation: 0},
 } as const;
 
 export const ICON_COLORS: Record<IconId, string> = {

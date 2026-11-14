@@ -48,6 +48,6 @@ describe('the cursor line (R-1)', () => {
     assert.deepEqual(syncLines({clockSuspectCycles: 2, cursorReadFailures: 3}), [CLOCK_LINE, CURSOR_LINE]);
     assert.deepEqual(syncLines({cursorReadFailures: 3}), [CURSOR_LINE]);
     assert.deepEqual(syncLines(null), []);
-    assert.match(readFileSync(join(ROOT, 'app/(tabs)/settings.tsx'), 'utf8'), /syncMessages\.map\(\(line\) => <Text key=\{line\} style=\{styles\.clockLine\}>\{line\}<\/Text>\)/);
+    assert.match(readFileSync(join(ROOT, 'app/(tabs)/settings.tsx'), 'utf8'), /syncMessages\.map\(\(line\) => <AppText key=\{line\} variant="small" color="muted" style=\{styles\.clockLine\}>\{line\}<\/AppText>\)/);
   });
 });

@@ -127,7 +127,7 @@ describe('every control on the demo path and in onboarding has an id', () => {
     let checked = 0;
     for (const file of WITH_IDS) {
       const source = read(file);
-      for (const name of ['Pressable', 'TextInput']) {
+      for (const name of ['Pressable', 'TextInput', 'Button', 'Pill']) {// C1: the shared controls count too
         for (const tag of openingTags(source, name)) {
           checked++;
           assert.match(tag, /testID=\{/, `${file}: ${tag.slice(0, 90).replace(/\s+/g, ' ')}`);
@@ -181,7 +181,7 @@ describe('accessibility labels on the same controls', () => {
     const submit = openingTags(auth, 'Pressable').find((tag) => tag.includes('TEST_IDS.auth.submit'))!;
     assert.match(submit, /accessibilityLabel=\{buttonLabel\}/);
     const settings = read('app/(tabs)/settings.tsx');
-    const chip = openingTags(settings, 'Pressable').find((tag) => tag.includes('nudgeTimeId(time)'))!;
+    const chip = openingTags(settings, 'Pill').find((tag) => tag.includes('nudgeTimeId(time)'))!;
     assert.match(chip, /accessibilityLabel=\{time\}/);
   });
 

@@ -42,7 +42,7 @@ Full Figma prototype scope: Sign In/Up, 10-question onboarding, building-profile
 
 ## Build order and testing
 1. Data model + rough UI (with validation) -> 2. sync with last-write-wins -> 3. AI Cloud Function -> 4. polish pass -> charts only if time remains
-- Tests: the original plan was 3-5 unit tests for the sync conflict-merge function, with everything else manual. Today (end of Stage A, 2026-11-14) the suites under tests/ run on Node's built-in runner (`npm test`): 1245 tests, all passing, plus 45 in functions/. They cover pure logic, sequences over a fake Firestore and real SQLite, odd-state fixtures, and scans of the source; they cannot render a screen, so screens are checked by hand (docs/RELEASE_CHECKLIST.md) until the Maestro flows exist (docs/TEST_STRATEGY.md)
+- Tests: the original plan was 3-5 unit tests for the sync conflict-merge function, with everything else manual. Today (end of Stage A, 2026-11-14) the suites under tests/ run on Node's built-in runner (`npm test`): 1245 tests at the end of Stage A, 1276 after C1, all passing, plus 45 in functions/. They cover pure logic, sequences over a fake Firestore and real SQLite, odd-state fixtures, and scans of the source; they cannot render a screen, so screens are checked by hand (docs/RELEASE_CHECKLIST.md) until the Maestro flows exist (docs/TEST_STRATEGY.md)
 
 ## Decisions made after the first code audit
 - Naming: keep the existing camelCase in code and SQLite (habitId, habitName, reminderTime). The snake_case names in the validation doc are descriptive only
@@ -128,6 +128,33 @@ Where these meet a line above that says otherwise, this section is the newer dec
 - Starter picks: the forced sleep habit never takes the first pack's only starter and always ends up last (utils/onboarding/starters.ts). The skip dialog on a retake with habits already says "Your current habits stay as they are." (approved 2026-11-14).
 - Test ids on the demo path and every onboarding control (constants/testIds.ts, tests/test-ids.test.ts), for the Maestro flows.
 - String inventory (docs/STRING_INVENTORY.md, scripts/string-inventory.ts) and the check that text moved into utils/copy/<area>.ts keeps its words (tests/copy-identical.test.ts). Nothing has moved yet: Stage C moves the strings screen by screen, with no wording change and no i18n library.
+
+### Stage C1 (design tokens and shared components), built 2026-11-14
+C1 changes nothing visible: no colour, size, spacing, string, test id or accessibility label is different on a screen. It adds tokens and five shared components, and migrates one screen (Settings) as the pilot.
+- Type scale (constants/typography.ts): eight steps, each a size already in use: micro 11, caption 12, small 13, body 14, bodyLg 15, base 16, title 26, display 32, plus a `label` variant (11 bold, letter spacing 0.9). **The scale codifies the sizes in use; it is not the final 1.1 scale.** It gains a heading step when the screens migrate (C5). Of the 298 `fontSize` literals counted on 2026-11-14, 265 are exactly a step, 10 are a 10 or a 17 (recorded as snaps of 1 px to micro and base, applied to no screen yet) and 23 stay literals (8, 9, 18, 20, 21, 22, 28, 30, 40, 64). A ratchet in tests/ui-tokens.test.ts lets the hand-written count only go down. No lineHeight in the scale: the existing pairs disagree per size, so a per-size token would move text; a screen passes one when it has one. Faces: the five registered ones; fontWeight is never used (a custom font on Android ignores it).
+- Spacing gains s2, s5, s6, s7, s10, s14, s18, s20 (values written 4 or more times); radii gain xxs 2, xs 3, sm 4; `shadows.glow` is the onboarding primary button's glow (onboarding still writes its own copy until it migrates). **Motion tokens are deferred until a screen adopts them.**
+- Components (components/ui/): AppText, Button (primary, secondary, ghost, danger; sm 40, md 52, lg 56; loading keeps its label as the accessible name and its space), Card, Pill, Screen. testID and every accessibility prop pass straight through. Cards are plain Views; a tappable card is a Pressable that carries the role, label and id. The Settings rows stay Pressables (a Row component is for C2).
+- Touch targets: the nudge-time chips (34 dp) and "Open settings" (40 dp) were under 48 dp before C1. C1 adds `hitSlop` (4 dp a side, the chips capped at half their 8 dp gap, so they reach 42 dp) and no visible change. **The real 48 dp is C2.**
+- Pilot: Settings only. The version line's long press (the way into the startup trace panel) is unchanged and pinned in tests/ui-components.test.ts. tests/sync-status-line.test.ts and tests/test-ids.test.ts were edited on purpose: the first pins the new tag for the clock line, the second now counts Button and Pill beside Pressable and TextInput.
+- Palette: **nothing applied in C1; application is a separate later step, C1b.** Finding: white on the accent `#f2691b` is **3.08:1**. Every primary button and the selected chip use it with 13 to 16 px text, which is not large text (18.66 px bold), so it misses 4.5. Dark text (`#1a1815`) on the accent is 5.75; white would need an accent near `#c2500f` (4.72), off-brand. Proposed values, ratios computed from relative luminance against the usual background:
+
+| role | current | proposed | contrast now | contrast proposed |
+|---|---|---|---|---|
+| background | `#1a1815` | same | n/a | n/a |
+| surface | `#1e1b17` | `#221f1a` | 1.03 vs background | 1.08 vs background |
+| raised (new) | none | `#2a2620` | n/a | 1.09 vs surface |
+| border | `#332e28` | same | 1.28 vs surface | same |
+| input border (new) | uses border | `#756a5c` | 1.28 vs surface | 3.11 vs surface (3:1 for a field's edge) |
+| text | `#f5f1e8` | same | 15.22 on surface | 14.83 on new surface |
+| muted | `#a39c8f` | `#b0a99b` | 6.30 on surface | 7.03 on new surface |
+| accent | `#f2691b` | same | 5.56 on surface | 5.33 on new surface |
+| button label on accent | `#ffffff` | `#1a1815` | **3.08** | 5.75 |
+| success | `#1d9e75` | `#2bb584` | 5.06 on surface | 6.29 on new surface |
+| warning | `#ef9f27` | same | 7.89 | 8.22 on new surface |
+| danger | `#ff6b6b` | `#ff7a7a` | 6.18 | 6.50 on new surface |
+| pink (icon tint only) | `#d4537e` | `#e0658f` | 4.36 | 5.03 on new surface |
+
+  Blue (`#378add`, 4.77) and purple (`#7f77dd`, 4.56) already pass 4.5 on the current surface. Text and muted on the proposed raised surface: 13.34 and 6.44.
 
 ## Later (backlog, design notes only, nothing built)
 - Swipe between the main screens (Home, Summary, Profile, Settings) left and right, in addition to the tab buttons, which stay. To settle at design time:
