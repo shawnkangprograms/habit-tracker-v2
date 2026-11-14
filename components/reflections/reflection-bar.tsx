@@ -1,35 +1,52 @@
-import {useEffect} from 'react';
+import {useEffect, useState} from 'react';
 import {AccessibilityInfo, Pressable, StyleSheet, Text, View} from 'react-native';
 import Animated, {FadeIn, FadeInDown, FadeOut, ReduceMotion} from 'react-native-reanimated';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import {colors, fonts, radii, spacing} from '@/constants/theme';
 import {barDuration, type ReflectionBar as Bar} from '@/utils/reflections/bar';
+import {createBarTimer} from '@/utils/reflections/barTimer';
 import {BAR_BUTTON, BAR_HINT, BAR_REWARD, barAnnouncement, barLabel, barText} from '@/utils/reflections/copy';
 
 // The reflection offer after a tick (docs/PACKS_REPORTS_SPEC.md, section 16). Home docks it below its scroll view,
 // above the tab bar, so it shrinks the list's viewport and never covers a row. One button: tapping anywhere
-// opens the reflection. Gone after 8 s (20 s with a screen reader on); keyed by bar id, so the next tick's bar
-// mounts fresh with its own timer and announcement. Slides up, or only fades under reduce motion.
-export function ReflectionBar({bar, reduceMotion, onOpen, onExpire}: {
+// opens the reflection. Gone after 8 s (20 s with a screen reader on), counted only while `covered` is false (a
+// level-up or streak overlay hides it; R-3): uncovered, it gets its full time again, and its announcement waits until
+// it is first uncovered (utils/reflections/barTimer.ts). Keyed by bar id, so the next tick's bar mounts fresh with its
+// own timer and announcement. Slides up, or only fades under reduce motion.
+export function ReflectionBar({bar, covered, reduceMotion, onOpen, onExpire}: {
   bar: Bar;
+  covered: boolean;
   reduceMotion: boolean;
   onOpen: (bar: Bar) => void;
   onExpire: (id: number) => void;
 }) {
+  // made once per bar: the bar is keyed by its id (so id and name never change for this mount) and Home's onExpire
+  // is a stable callback
+  const [timer] = useState(() => createBarTimer({
+    setTimeout: (fn: () => void, ms: number) => setTimeout(fn, ms),
+    clearTimeout: (handle: ReturnType<typeof setTimeout>) => clearTimeout(handle),
+    onExpire: () => onExpire(bar.id),
+    announce: () => AccessibilityInfo.announceForAccessibility(barAnnouncement(bar.habitName)),
+  }));
+
+  // 8 s, or 20 s with a screen reader: unknown (nothing runs) until the check answers
+  const [durationMs, setDurationMs] = useState<number | null>(null);
   useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | undefined;
     let cancelled = false;
-    AccessibilityInfo.announceForAccessibility(barAnnouncement(bar.habitName));
     AccessibilityInfo.isScreenReaderEnabled()
       .catch(() => false)
       .then((screenReader) => {
-        if (!cancelled) timer = setTimeout(() => onExpire(bar.id), barDuration(screenReader));
+        if (!cancelled) setDurationMs(barDuration(screenReader));
       });
     return () => {
       cancelled = true;
-      if (timer) clearTimeout(timer);
     };
-  }, [bar.id, bar.habitName, onExpire]);
+  }, []);
+
+  useEffect(() => {
+    timer.update({covered, durationMs});
+  }, [timer, covered, durationMs]);
+  useEffect(() => () => timer.dispose(), [timer]);
 
   const entering = (reduceMotion ? FadeIn : FadeInDown).duration(200).reduceMotion(ReduceMotion.System);
   return (

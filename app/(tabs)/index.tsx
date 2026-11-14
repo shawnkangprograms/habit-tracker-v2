@@ -27,6 +27,7 @@ import {HabitCheck} from '@/components/habit-check';
 import {XpFloat} from '@/components/xp-float';
 import {useReduceMotion} from '@/hooks/use-reduce-motion';
 import {useCelebrations, type TickStats} from '@/hooks/use-celebrations';// overlays, banner and toasts after a tick
+import {coversBar} from '@/utils/celebrations';// R-3: an overlay pauses the reflection bar
 import {CelebrationLayer} from '@/components/celebration-layer';
 import {RadarCard, RadarCardPlaceholder} from '@/components/radar/radar-card';// the live radar, below the lists
 import {setRadarWindow, useRadarWindow} from '@/hooks/use-radar-window';
@@ -802,11 +803,13 @@ export default function HomeScreen() {// default export, becomes the "index" tab
         <CelebrationLayer item={celebration.current} reduceMotion={reduceMotion} onDismiss={celebration.dismiss} />
       </View>
 
-      {/* docked below the list, above the tab bar: it shrinks the list's viewport and never covers a row */}
+      {/* docked below the list, above the tab bar: it shrinks the list's viewport and never covers a row. Its time
+          counts only while no level-up or streak overlay covers it (R-3) */}
       {reflection.bar && (
         <ReflectionBar
           key={reflection.bar.id}
           bar={reflection.bar}
+          covered={coversBar(celebration.current)}
           reduceMotion={reduceMotion}
           onOpen={reflection.open}
           onExpire={reflection.expire}

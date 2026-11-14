@@ -26,7 +26,7 @@ added for tests; new test files are picked up by the existing `tests/*.test.ts` 
 | V-1 | The current schedule is applied to past days (accepted limitation), pinned by a test. | PACKS_REPORTS_SPEC.md §13, §17 |
 | V-2 | When Vitality is starting and the account has completion history, the copy is "Restarts after your first full day." | PACKS_REPORTS_SPEC.md §13, §17 |
 | R-2 | A completing tick always gets its reflection offer, celebrations and toast, even when a newer list load overtakes its own; the newest tap wins; an offer resolving after Home lost focus or after midnight is dropped. | PACKS_REPORTS_SPEC.md §16, BUG_LOG.md |
-| R-3 | The reflection bar's 8 s (20 s with a screen reader) count only while no level-up or streak overlay covers it; it gets a full 8 s once uncovered, and its announcement waits until then. Planned, built after R-2. | PACKS_REPORTS_SPEC.md §16, BUG_LOG.md |
+| R-3 | The reflection bar's 8 s (20 s with a screen reader) count only while no level-up or streak overlay covers it; it gets a full 8 s once uncovered, and its announcement waits until then. | PACKS_REPORTS_SPEC.md §16, BUG_LOG.md |
 | R-1 | Area-map entries of habits known deleted are pruned at the next area write; storage that couldn't be read is never written over (every store; exempt list with reasons in the spec). | PACKS_REPORTS_SPEC.md §11, §17 |
 
 Open, not decided: S-5 (Firestore read cost of restoring a large account; measure in the emulator first) and the
@@ -51,7 +51,7 @@ keyboard).
 | S-7 | Local date everywhere | Travelling east skips a local date; west repeats one | partial | Keep, document |
 | P-1 | One pack per habit | A record listing an id twice | packs-record | Keep |
 | R-2 | The list reload after a tick returns that tick's rows | A newer load (another tick, focus, sync pull, refresh) overtakes it: the offer, celebrations and toast are dropped | tests/r2-offers.test.ts | Built (1b) |
-| R-3 | The bar is visible for its whole 8 s | A level-up or streak overlay covers it while its timer runs | R-3 build | Decided |
+| R-3 | The bar is visible for its whole 8 s | A level-up or streak overlay covers it while its timer runs | tests/r3-bar-timer.test.ts | Built (1b) |
 | P-2 | Template present by name | A renamed (or deleted) pack habit makes "Add the rest" re-create the template | tests/p2-rename-delete.test.ts, fixture renamedPackHabit (pinned) | Built (1b) |
 | P-3 | Adoption by name | Two same-named habits; one already packed | packs-membership, mutation-killers (M08) | Keep |
 | P-4 | Retake limits | ONBOARDING §11 contradicted PACKS §2b | packs-manage | Reworded |
@@ -326,6 +326,13 @@ offer that resolves after Home lost focus or after midnight is dropped. New: `te
 and the toast order). Two mutations were checked by hand (tap order ignored: fails 2; the focus rule dropped: fails
 1). R-3 is the next build. Suite: 1182 tests, 1182 pass, 0 todo.
 
+**Phase 1b, R-3 (2026-11-14).** Built: `coversBar` (utils/celebrations.ts: only the level-up and streak overlay) and
+`createBarTimer` (utils/reflections/barTimer.ts, with injected timers); Home passes `covered`, and the bar's timer runs
+only while uncovered, starting a full 8 s (20 s with a screen reader) each time it is uncovered, with its announcement
+deferred until then. New: `tests/r3-bar-timer.test.ts` (R3-1 to R3-9 and the duration-unknown case, on a fake clock).
+Two mutations were checked by hand ("covered" ignored: fails 5; announced while covered: fails 2). Suite: 1192 tests,
+1192 pass, 0 todo.
+
 ### Phase 1b test cases (written with the fixes)
 
 S-1, monotonic stamp, stuck rows and the clock line (done; tests/clock-skew.test.ts unless noted):
@@ -414,6 +421,19 @@ R-2, every tick keeps its offer, celebrations and toast (built 2026-11-14, tests
 - R2-8: a tap just before midnight: offered if it resolves the same day, dropped if the day is over.
 - R2-9: only a reflection that would still pay is offered.
 - Toasts: the newest tap keeps its toast whatever order ticks arrive in; a saved reflection drops the toasts before it.
+
+R-3, the bar's time counts only while uncovered (built 2026-11-14, tests/r3-bar-timer.test.ts):
+- R3-1: uncovered from the start: announced at once, gone after 8 s.
+- R3-2: an overlay that outlasts the timer: shown at 2 s, dismissed at 30 s; the bar goes 8 s after Continue (38 s),
+  announced once.
+- R3-3: already covered at mount: no timer and no announcement until uncovered.
+- R3-4: two overlays back to back (a level-up, then a streak): paused across both.
+- R3-5: a newer bar replaces a paused one: the old timer never fires.
+- R3-6: an un-tick, Home losing focus or the day changing while paused remove the bar; no expiry after.
+- R3-7: only the level-up and streak overlay pause it; a toast or the perfect-day banner doesn't.
+- R3-8: celebrations off, or held by S-4: no overlay, so no pause.
+- R3-9: with a screen reader: 20 s, and a full 20 s again after an overlay.
+- Also: nothing runs until the screen-reader check answers; the announcement comes from the timer, not at mount.
 
 V-2, "Restarts after your first full day.":
 - V2-1: Vitality starting and any completed row before today (deleted habits included): "Restarts after your first

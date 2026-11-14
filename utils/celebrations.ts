@@ -141,6 +141,12 @@ export function celebrationsOrHeld(
   return {...celebrationsFor(diff, today, celebrated), held: false};
 }
 
+// R-3: does the item showing now cover Home's reflection bar? Only the level-up and streak overlay (a full-screen
+// Modal) does; a toast sits above the bar and the perfect-day banner at the top, so neither pauses it.
+export function coversBar(item: QueueItem | null): boolean {
+  return item?.kind === 'levelUp' || item?.kind === 'streak';
+}
+
 // R-2: which tick keeps its toast. Each tick carries the number of its tap (app/(tabs)/index.tsx), and the newest
 // tap handed over wins, whatever order the ticks arrive in (a list load overtaken by a newer one can make an older
 // tap arrive last). A saved reflection's feedback drops the toasts of every tap before it. Celebrations themselves
