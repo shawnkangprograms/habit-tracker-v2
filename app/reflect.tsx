@@ -13,7 +13,7 @@ import {useReduceMotion} from '@/hooks/use-reduce-motion';
 import {reflectionsStore} from '@/services/reflectionsStore';
 import {useSessionUid} from '@/services/session';
 import {markStale} from '@/services/statsStore';
-import {colors, fonts, radii, spacing} from '@/constants/theme';
+import {colors, fonts, radii, spacing, pressedOpacity} from '@/constants/theme';
 import {getLocalDateString} from '@/utils/dates';
 import {
   ALREADY_BODY, ALREADY_TITLE, DISCARD_BODY, DISCARD_CANCEL, DISCARD_CONFIRM, DISCARD_TITLE, NO_REWARD_LINE,
@@ -198,7 +198,7 @@ export default function ReflectScreen() {
           {/* inside the scroll view, so the keyboard can never hide it */}
           <Text style={styles.reward}>{pays === false ? NO_REWARD_LINE : REWARD_LINE}</Text>
           <Pressable
-            style={({pressed}) => [styles.primaryButton, (!canSave || pressed) && styles.saveOff]}
+            style={({pressed}) => [styles.primaryButton, !canSave ? styles.saveOff : pressed && styles.pressedAccent]}
             onPress={save}
             disabled={!canSave}
             accessibilityRole="button"
@@ -236,7 +236,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.habitCard,
     backgroundColor: colors.inputFill,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.inputBorder,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
     paddingBottom: spacing.md,
@@ -256,5 +256,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   saveOff: {opacity: 0.5},
+  pressedAccent: {opacity: pressedOpacity.accent},// a filled accent control (constants/theme.ts)
   primaryText: {fontFamily: fonts.title, fontSize: 16, color: colors.white},
 });

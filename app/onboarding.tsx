@@ -13,7 +13,7 @@ import {useSessionUid} from '@/services/session';
 import {onboardingStore} from '@/services/onboardingStore';
 import {askForReminderPermission} from '@/services/reminderPermission';
 import {useReduceMotion} from '@/hooks/use-reduce-motion';
-import {colors, fonts, radii, spacing} from '@/constants/theme';
+import {colors, fonts, radii, shadows, spacing} from '@/constants/theme';
 import {TEST_IDS, optionId, routineCardId} from '@/constants/testIds';
 import {timePickerAvailable} from '@/components/time-field';
 import {OptionButton} from '@/components/onboarding/option-button';
@@ -663,14 +663,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
-    // soft orange glow (iOS shadow; Android draws the elevation shadow in the same colour on API 28+)
-    shadowColor: colors.accent,
-    shadowOpacity: 0.45,
-    shadowRadius: 14,
-    shadowOffset: {width: 0, height: 4},
-    elevation: 6,
+    ...shadows.glow,// soft orange glow (constants/theme.ts)
   },
-  primaryOff: {opacity: 0.4, shadowOpacity: 0, elevation: 0},
+  primaryOff: {opacity: 0.4, ...shadows.glowOff},
   primaryText: {fontFamily: fonts.title, fontSize: 16, color: colors.white},
   secondary: {
     height: 52,

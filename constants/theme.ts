@@ -2,23 +2,36 @@
 
 import type { IconId } from '@/constants/habits';
 
+// Palette B (C1b, docs/HABITQUEST_DESIGN.md): the warm dark base and the orange stay; the ratios are pinned in
+// tests/palette.test.ts. Every colour here is #rrggbb (a screen may add two hex digits of alpha to one, e.g.
+// colors.error + '14'), except the two scrims, which are whole rgba() values and never get a suffix.
 export const colors = {
   background: '#1a1815',
-  surface: '#1e1b17', // cards
+  surface: '#221f1a', // cards, the tab bar
+  raised: '#2a2620', // dialogs and floating cards: the celebration overlay, skip dialog, toast, perfect-day banner, reflection bar
   inputFill: '#1a1815',
-  border: '#332e28',
+  border: '#332e28', // card borders (decorative)
+  inputBorder: '#756a5c', // text fields and the time field: 3:1 against their fill and the surface
   track: '#161411', // progress ring / bar background
   text: '#f5f1e8',
-  muted: '#a39c8f',
+  muted: '#b0a99b',
   accent: '#f2691b', // orange
-  error: '#ff6b6b',
-  green: '#1d9e75',
+  onAccent: '#1a1815', // text and marks on a solid accent fill (5.75:1); white there is only 3.08:1
+  error: '#ff7a7a',
+  success: '#2bb584', // status: done, on time, saved, perfect day, vitality
+  green: '#1d9e75', // a category colour (habit icons, charts), not a status
   blue: '#378add',
-  pink: '#d4537e',
+  pink: '#e0658f',
   amber: '#ef9f27',
   purple: '#7f77dd',
-  white: '#ffffff', // primary button text
+  white: '#ffffff', // the switch thumb, the slider thumb and the medal numbers (never text on the accent)
+  scrim: 'rgba(0, 0, 0, 0.6)', // behind the onboarding skip dialog
+  scrimStrong: 'rgba(10, 9, 8, 0.82)', // behind the celebration overlay
 } as const;
+
+// Pressed feedback: a control filled with the accent presses to 0.9, so its dark label keeps 4.5:1 (4.87 over the page;
+// 0.85 gives 4.49); every other pressable (rows, outlined and ghost buttons, cards) stays at 0.85
+export const pressedOpacity = {default: 0.85, accent: 0.9} as const;
 
 // Streak medal materials (Profile shelf): light/base/dark make the body gradient, dark is also the ribbon.
 // Locked medals use `locked`, with colors.muted for the lock and text.

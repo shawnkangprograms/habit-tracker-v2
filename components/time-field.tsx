@@ -117,7 +117,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
     backgroundColor: colors.inputFill,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.inputBorder,
     paddingHorizontal: 20,
   },
   fieldError: {borderColor: colors.error},

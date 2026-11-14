@@ -22,9 +22,10 @@ const strip = (source: string) => source.replace(/\/\/.*$/gm, '');// code only
 
 // BEFORE (C1 and earlier): the `row`, `rowText`, `switchBox` and `pressed` styles of components/switch-row.tsx, which
 // were the same numbers as the Pressable rows in app/(tabs)/you.tsx (was settings.tsx). Written out here as plain values.
+// One change since, on purpose: palette B (C1b) moved the surface from #1e1b17 to #221f1a; every other number is the old one.
 const BEFORE_ROW = {
   flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 56, paddingHorizontal: 16, paddingVertical: 8,
-  borderRadius: 14, backgroundColor: '#1e1b17', borderWidth: 1, borderColor: '#332e28',
+  borderRadius: 14, backgroundColor: '#221f1a', borderWidth: 1, borderColor: '#332e28',
 } as const;
 const BEFORE_ROW_TEXT = {flex: 1, fontFamily: 'Inter_600SemiBold', fontSize: 15, color: '#f5f1e8'} as const;
 const BEFORE_SWITCH_BOX = {width: 52, height: 32, alignItems: 'center', justifyContent: 'center'} as const;

@@ -6,7 +6,7 @@ import {getSessionUid} from '@/services/session';
 import {clearTraces, loadTraces} from '@/services/startupTraceStore';
 import {otaLine, summarise, traceToText, type TraceRecord} from '@/utils/startupTrace';
 import type {LimitCheckTrace} from '@/utils/packs/limits';
-import {colors, fonts, radii, spacing} from '@/constants/theme';
+import {colors, fonts, radii, spacing, pressedOpacity} from '@/constants/theme';
 
 // Diagnostic (Job B): the last limit check of this app run (memory only, numbers only) beside a fresh count
 function limitLines(check: LimitCheckTrace | null, activeNow: number | null | undefined): string[] {
@@ -101,7 +101,7 @@ export function StartupTracePanel() {
       )}
 
       <View style={styles.buttons}>
-        <Pressable style={({pressed}) => [styles.button, pressed && styles.pressed]} onPress={share} accessibilityRole="button">
+        <Pressable style={({pressed}) => [styles.button, pressed && styles.pressedAccent]} onPress={share} accessibilityRole="button">
           <Text style={styles.buttonText}>Share</Text>
         </Pressable>
         <Pressable style={({pressed}) => [styles.button, styles.secondary, pressed && styles.pressed]} onPress={clear} accessibilityRole="button">
@@ -139,5 +139,6 @@ const styles = StyleSheet.create({
   secondary: {backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border},
   buttonText: {fontFamily: fonts.title, fontSize: 14, color: colors.white},
   secondaryText: {color: colors.text},
-  pressed: {opacity: 0.85},
+  pressed: {opacity: pressedOpacity.default},
+  pressedAccent: {opacity: pressedOpacity.accent},// a filled accent control (constants/theme.ts)
 });

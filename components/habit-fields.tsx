@@ -159,7 +159,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
     backgroundColor: colors.inputFill,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.inputBorder,
     paddingHorizontal: 20,
     fontFamily: fonts.regular,
     fontSize: 14,

@@ -1,6 +1,6 @@
 // C1: the pure parts of Button, Pill and Card: sizes, variants and the touch-target rule. Kept free of React so
 // tests/ui-components.test.ts can check them under Node (a screen can't be rendered there).
-import {colors, radii, spacing} from '@/constants/theme';
+import {colors, pressedOpacity, radii, spacing} from '@/constants/theme';
 import {typeScale, type TypeStep, type Weight, type ColorKey} from '@/constants/typography';
 
 export const MIN_TARGET = 48;// dp
@@ -26,7 +26,7 @@ export const BUTTON_SIZES: Record<ButtonSize, {height: number; step: TypeStep}> 
 export const BUTTON_VARIANTS: Record<ButtonVariant, {
   backgroundColor: string; borderColor?: string; textColor: ColorKey; weight: Weight;
 }> = {
-  primary: {backgroundColor: colors.accent, textColor: 'white', weight: 'title'},
+  primary: {backgroundColor: colors.accent, textColor: 'onAccent', weight: 'title'},// dark label: 5.75:1
   secondary: {backgroundColor: 'transparent', borderColor: colors.accent, textColor: 'accent', weight: 'semiBold'},
   ghost: {backgroundColor: 'transparent', textColor: 'muted', weight: 'semiBold'},
   danger: {backgroundColor: 'transparent', borderColor: colors.error, textColor: 'error', weight: 'semiBold'},
@@ -35,6 +35,7 @@ export const BUTTON_VARIANTS: Record<ButtonVariant, {
 export type ButtonSpec = {
   height: number; paddingHorizontal: number; borderRadius: number; backgroundColor: string;
   borderWidth?: number; borderColor?: string; step: TypeStep; fontSize: number; textColor: ColorKey; weight: Weight;
+  pressedOpacity: number;// 0.9 for the accent fill (its label keeps 4.5:1 while pressed), 0.85 otherwise
 };
 
 export function buttonSpec(variant: ButtonVariant, size: ButtonSize): ButtonSpec {
@@ -50,6 +51,7 @@ export function buttonSpec(variant: ButtonVariant, size: ButtonSize): ButtonSpec
     fontSize: typeScale[s.step],
     textColor: v.textColor,
     weight: v.weight,
+    pressedOpacity: variant === 'primary' ? pressedOpacity.accent : pressedOpacity.default,
   };
 }
 
@@ -76,7 +78,7 @@ export const ROW = {
   borderRadius: radii.habitCard,
   borderWidth: 1,
   iconSize: 22,
-  pressedOpacity: 0.85,
+  pressedOpacity: pressedOpacity.default,
   dimmedOpacity: 0.5,
 } as const;
 

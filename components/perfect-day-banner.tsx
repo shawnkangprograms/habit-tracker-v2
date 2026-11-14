@@ -46,7 +46,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.habitCard,
     borderWidth: 1,
     borderColor: colors.green + '80',
-    backgroundColor: colors.surface,
+    backgroundColor: colors.raised,
   },
   text: {flex: 1, fontFamily: fonts.semiBold, fontSize: 14, color: colors.text},
 });

@@ -36,7 +36,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.raised,
   },
   text: {fontFamily: fonts.medium, fontSize: 13, color: colors.text, textAlign: 'center'},
 });

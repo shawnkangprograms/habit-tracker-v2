@@ -4,7 +4,7 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import Animated, {FadeIn, FadeOut, ReduceMotion} from 'react-native-reanimated';
 import {setNotificationPrefs} from '@/services/notificationPrefs';
 import {requestNotificationPermission} from '@/services/notifications';
-import {colors, fonts, radii, spacing} from '@/constants/theme';
+import {colors, fonts, radii, spacing, pressedOpacity} from '@/constants/theme';
 
 const LATER_MS = 2500;
 
@@ -58,7 +58,7 @@ export function ReminderPrompt({onClose}: {onClose: () => void}) {
             <Text style={styles.secondaryText}>Not now</Text>
           </Pressable>
           <Pressable
-            style={({pressed}) => [styles.primary, pressed && styles.pressed]}
+            style={({pressed}) => [styles.primary, pressed && styles.pressedAccent]}
             onPress={turnOn}
             disabled={state === 'busy'}
             accessibilityRole="button">
@@ -93,5 +93,6 @@ const styles = StyleSheet.create({
   primaryText: {fontFamily: fonts.title, fontSize: 14, color: colors.white},
   secondary: {height: 38, paddingHorizontal: spacing.lg, borderRadius: radii.pill, alignItems: 'center', justifyContent: 'center'},
   secondaryText: {fontFamily: fonts.semiBold, fontSize: 14, color: colors.muted},
-  pressed: {opacity: 0.85},
+  pressed: {opacity: pressedOpacity.default},
+  pressedAccent: {opacity: pressedOpacity.accent},// a filled accent control (constants/theme.ts)
 });

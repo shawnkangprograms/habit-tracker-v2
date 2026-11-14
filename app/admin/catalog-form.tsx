@@ -13,7 +13,7 @@ import {
 import {AdminStatus} from '@/components/admin-status';
 import {FrequencyPicker, IconGrid, NameField, ReminderField} from '@/components/habit-fields';
 import {ICON_IDS, type Frequency, type IconId, type WeekdayKey} from '@/constants/habits';
-import {colors, fonts, radii, spacing} from '@/constants/theme';
+import {colors, fonts, radii, spacing, pressedOpacity} from '@/constants/theme';
 import {
   validateFrequency, validateHabitInput, validateHabitName, validateIcon, validateReminderTime,
 } from '@/validation/validators';
@@ -211,7 +211,7 @@ export default function CatalogFormScreen() {
         {load.status === 'ready' && (
           <View style={styles.footer}>
             <Pressable
-              style={({pressed}) => [styles.primaryButton, (pressed || saving) && styles.pressed]}
+              style={({pressed}) => [styles.primaryButton, (pressed || saving) && styles.pressedAccent]}
               onPress={handleSave}
               disabled={saving}
               accessibilityRole="button">
@@ -265,5 +265,6 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   deleteText: {fontFamily: fonts.semiBold, fontSize: 15, color: colors.error},
-  pressed: {opacity: 0.85},
+  pressed: {opacity: pressedOpacity.default},
+  pressedAccent: {opacity: pressedOpacity.accent},// a filled accent control (constants/theme.ts)
 });

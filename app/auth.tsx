@@ -7,7 +7,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
 import {resetPassword, signUp, signIn} from '@/services/authActions';
-import {colors, fonts, radii, spacing} from '@/constants/theme';
+import {colors, fonts, radii, spacing, pressedOpacity} from '@/constants/theme';
 import {TEST_IDS} from '@/constants/testIds';
 import {
   validateAge, validateConfirmPassword, validateEmail, validatePassword, validatePersonName,
@@ -362,7 +362,7 @@ export default function AuthScreen() {
           {submitError ? <Text style={styles.submitError}>{submitError}</Text> : null}
 
           <Pressable
-            style={({pressed}) => [styles.primaryButton, (pressed || buttonDisabled) && styles.pressed]}
+            style={({pressed}) => [styles.primaryButton, (pressed || buttonDisabled) && styles.pressedAccent]}
             onPress={isReset ? handleReset : handleSubmit}
             disabled={buttonDisabled}
             accessibilityRole="button"
@@ -420,7 +420,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
     backgroundColor: colors.inputFill,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.inputBorder,
     paddingHorizontal: 20,
     flexDirection: 'row',
     alignItems: 'center',
@@ -445,7 +445,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
   },
   primaryText: {fontFamily: fonts.title, fontSize: 16, color: colors.white},
-  pressed: {opacity: 0.85},
+  pressedAccent: {opacity: pressedOpacity.accent},// a filled accent control (constants/theme.ts)
   switchRow: {alignSelf: 'center', marginTop: spacing.lg},
   switchText: {fontFamily: fonts.regular, fontSize: 13, color: colors.muted},
   switchAction: {fontFamily: fonts.medium, color: colors.text},

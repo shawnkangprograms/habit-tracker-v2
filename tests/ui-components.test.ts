@@ -35,7 +35,7 @@ describe('hitSlop and the 48 dp target', () => {
 });
 
 describe('Button', () => {
-  test('primary small is the old "Open settings" button: 40 high, 16 across, pill, accent, Space Grotesk 14 white', () => {
+  test('primary small is the "Open settings" button: 40 high, 16 across, pill, accent, Space Grotesk 14 in the dark ink (C1b)', () => {
     const spec = ui.buttonSpec('primary', 'sm');
     assert.equal(spec.height, 40);
     assert.equal(spec.paddingHorizontal, spacing.lg);
@@ -43,8 +43,14 @@ describe('Button', () => {
     assert.equal(spec.backgroundColor, colors.accent);
     assert.equal(spec.fontSize, 14);
     assert.equal(spec.weight, 'title');
-    assert.equal(spec.textColor, 'white');
+    assert.equal(spec.textColor, 'onAccent');
     assert.equal(spec.borderColor, undefined);
+  });
+
+  test('pressed: the accent-filled primary presses to 0.9, every other variant to 0.85 (C1b, D5)', () => {
+    assert.equal(ui.buttonSpec('primary', 'md').pressedOpacity, 0.9);
+    for (const v of ['secondary', 'ghost', 'danger'] as const) assert.equal(ui.buttonSpec(v, 'md').pressedOpacity, 0.85);
+    assert.match(read('components/ui/button.tsx'), /pressed && !off && \{opacity: spec\.pressedOpacity\}/);
   });
 
   test('the four variants: primary is filled; secondary, danger are outlined; ghost has no fill or border', () => {
@@ -89,7 +95,7 @@ describe('Pill, Card, Screen, AppText', () => {
     assert.match(src, /accessibilityState=\{\{selected\}\}/);
     assert.match(src, /testID=\{testID\}/);
     assert.match(src, /hitSlop=\{hitSlopFor\(PILL\.height, gap\)\}/);
-    assert.match(src, /selected \? 'white' : 'muted'/);
+    assert.match(src, /selected \? 'onAccent' : 'muted'/);
   });
 
   test('Card passes every View prop through and adds no role; Screen keeps the safe-area edges and the testID', () => {
@@ -119,9 +125,9 @@ describe('Pill, Card, Screen, AppText', () => {
     same('caption', undefined, 'muted', [fonts.regular, 12, colors.muted]);       // testLine, version
     same('small', undefined, 'muted', [fonts.regular, 13, colors.muted]);         // clockLine
     same('small', 'semiBold', 'muted', [fonts.semiBold, 13, colors.muted]);       // chipText
-    same('small', 'semiBold', 'white', [fonts.semiBold, 13, colors.white]);       // chipTextSelected
+    same('small', 'semiBold', 'onAccent', [fonts.semiBold, 13, colors.onAccent]); // the selected chip's label (C1b)
     same('body', undefined, 'muted', [fonts.regular, 14, colors.muted]);          // noticeText
-    same('body', 'title', 'white', [fonts.title, 14, colors.white]);              // noticeButtonText
+    same('body', 'title', 'onAccent', [fonts.title, 14, colors.onAccent]);        // the Open settings label (C1b)
   });
 });
 

@@ -11,7 +11,7 @@ import {profileCompletion, profileSetupScreen} from '@/services/profileCompletio
 import {profileNameStore} from '@/services/profileName';
 import {useSessionUid} from '@/services/session';
 import {useKeyboardScroll} from '@/hooks/use-keyboard-scroll';
-import {colors, fonts, radii, spacing} from '@/constants/theme';
+import {colors, fonts, radii, spacing, pressedOpacity} from '@/constants/theme';
 import {FIRST_NAME_LABEL, LAST_NAME_LABEL, visibleError} from '@/utils/profileName';
 import {
   SETUP_AGE_LABEL, SETUP_BODY, SETUP_FAILED, SETUP_SAVE, SETUP_TITLE, setupAgeOutcome,
@@ -147,7 +147,7 @@ export default function ProfileSetupScreen() {
           {status === 'failed' && <Text style={styles.failed} accessibilityLiveRegion="polite">{SETUP_FAILED}</Text>}
 
           <Pressable
-            style={({pressed}) => [styles.save, (!canSave || pressed) && styles.saveOff]}
+            style={({pressed}) => [styles.save, !canSave ? styles.saveOff : pressed && styles.pressedAccent]}
             onPress={save}
             disabled={!canSave}
             accessibilityRole="button"
@@ -214,7 +214,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
     backgroundColor: colors.inputFill,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.inputBorder,
     paddingHorizontal: 20,
     fontFamily: fonts.regular,
     fontSize: 14,
@@ -232,5 +232,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   saveOff: {opacity: 0.5},
+  pressedAccent: {opacity: pressedOpacity.accent},// a filled accent control (constants/theme.ts)
   saveText: {fontFamily: fonts.title, fontSize: 16, color: colors.white},
 });

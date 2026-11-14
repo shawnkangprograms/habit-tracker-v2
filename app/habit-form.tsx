@@ -12,7 +12,7 @@ import {
   ICON_IDS, REMIND_BEFORE_OPTIONS, isKnownIcon, type Frequency, type IconId, type RemindBeforeMin, type WeekdayKey,
 } from '@/constants/habits';
 import {HabitIcon} from '@/constants/habitIcons';
-import {colors, fonts, radii, spacing, ICON_COLORS} from '@/constants/theme';
+import {colors, fonts, radii, spacing, ICON_COLORS, pressedOpacity} from '@/constants/theme';
 import {
   validateFrequency, validateHabitInput, validateHabitName, validateIcon, validateReminderTime,
 } from '@/validation/validators';
@@ -506,7 +506,7 @@ export default function HabitFormScreen() {
         <View style={styles.footer}>
           {limitMessage && <Text style={styles.limit} accessibilityLiveRegion="polite">{limitMessage}</Text>}
           <Pressable
-            style={({pressed}) => [styles.primaryButton, pressed && styles.pressed]}
+            style={({pressed}) => [styles.primaryButton, pressed && styles.pressedAccent]}
             onPress={handleSave}
             accessibilityRole="button">
             <Text style={styles.primaryText}>{isEdit ? 'Save changes' : 'Save habit'}</Text>
@@ -544,7 +544,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
     backgroundColor: colors.inputFill,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.inputBorder,
     paddingHorizontal: 20,
     fontFamily: fonts.regular,
     fontSize: 14,
@@ -613,5 +613,6 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   deleteText: {fontFamily: fonts.semiBold, fontSize: 15, color: colors.error},
-  pressed: {opacity: 0.85},
+  pressed: {opacity: pressedOpacity.default},
+  pressedAccent: {opacity: pressedOpacity.accent},// a filled accent control (constants/theme.ts)
 });

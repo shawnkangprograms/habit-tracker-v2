@@ -81,11 +81,12 @@ const styles = StyleSheet.create({
     borderRadius: radii.habitCard,
     borderWidth: 1,
     borderColor: `${colors.accent}73`,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.raised,
   },
   pressed: {opacity: 0.85},
   text: {flex: 1, fontFamily: fonts.medium, fontSize: 13, color: colors.text},
   reward: {paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: radii.pill, backgroundColor: `${colors.accent}26`},
-  rewardText: {fontFamily: fonts.semiBold, fontSize: 12, color: colors.accent},
+  // the amount in text ink on the orange tint (10.84:1 on raised); orange on it would be 3.96:1 (tests/palette.test.ts)
+  rewardText: {fontFamily: fonts.semiBold, fontSize: 12, color: colors.text},
   button: {fontFamily: fonts.title, fontSize: 14, color: colors.accent},
 });

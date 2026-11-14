@@ -14,7 +14,7 @@ import {checkAddFor} from '@/services/packLimits';
 import {useSessionUid} from '@/services/session';
 import type {IconId} from '@/constants/habits';
 import {HabitIcon} from '@/constants/habitIcons';
-import {colors, fonts, radii, spacing, ICON_COLORS} from '@/constants/theme';
+import {colors, fonts, radii, spacing, ICON_COLORS, pressedOpacity} from '@/constants/theme';
 import type {ActiveHabit} from '@/utils/homeSections';
 import {
   AREA_LABEL, AREA_LOCKED_NOTE, CANCEL, CREATE_PACK_SAVE, DELETE_PACK, DELETE_PACK_BODY, DELETE_PACK_FAILED,
@@ -267,7 +267,7 @@ export default function EditPackScreen() {
         <View style={styles.footer}>
           {limitMessage && <Text style={styles.limit} accessibilityLiveRegion="polite">{limitMessage}</Text>}
           <Pressable
-            style={({pressed}) => [styles.primaryButton, (!canSave || pressed) && styles.saveOff]}
+            style={({pressed}) => [styles.primaryButton, !canSave ? styles.saveOff : pressed && styles.pressedAccent]}
             onPress={save}
             disabled={!canSave}
             accessibilityRole="button"
@@ -311,7 +311,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
     backgroundColor: colors.inputFill,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.inputBorder,
     paddingHorizontal: 20,
     fontFamily: fonts.regular,
     fontSize: 14,
@@ -345,7 +345,7 @@ const styles = StyleSheet.create({
   habitText: {flex: 1, gap: 1},
   habitName: {fontFamily: fonts.semiBold, fontSize: 14, color: colors.text},
   habitPack: {fontFamily: fonts.regular, fontSize: 11, color: colors.muted},
-  pressed: {opacity: 0.85},
+  pressed: {opacity: pressedOpacity.default},
   footer: {paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.lg, gap: spacing.md},
   limit: {fontFamily: fonts.medium, fontSize: 13, color: colors.error, textAlign: 'center'},
   primaryButton: {
@@ -356,6 +356,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   saveOff: {opacity: 0.5},
+  pressedAccent: {opacity: pressedOpacity.accent},// a filled accent control (constants/theme.ts)
   primaryText: {fontFamily: fonts.title, fontSize: 16, color: colors.white},
   deleteButton: {
     height: 52,

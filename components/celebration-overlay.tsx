@@ -6,7 +6,7 @@ import {Burst} from '@/components/burst';
 import {LevelBadge} from '@/components/stats-card';
 import {Medal} from '@/components/medal';
 import {successHaptic} from '@/services/haptics';
-import {colors, fonts, medalTiers, radii, spacing} from '@/constants/theme';
+import {colors, fonts, medalTiers, radii, spacing, pressedOpacity} from '@/constants/theme';
 import type {MedalTier} from '@/utils/medals';
 
 export type OverlayItem =
@@ -63,7 +63,7 @@ export function CelebrationOverlay({item, reduceMotion, onContinue}: {
           <Text style={styles.title} accessibilityRole="header">{item.title}</Text>
           <Text style={styles.body}>{item.body}</Text>
           <Pressable
-            style={({pressed}) => [styles.button, pressed && styles.pressed]}
+            style={({pressed}) => [styles.button, pressed && styles.pressedAccent]}
             onPress={onContinue}
             accessibilityRole="button">
             <Text style={styles.buttonText}>Continue</Text>
@@ -86,7 +86,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.largeCard,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.raised,
   },
   hero: {minHeight: 150, alignItems: 'center', justifyContent: 'center'},
   title: {fontFamily: fonts.title, fontSize: 26, color: colors.text, textAlign: 'center'},
@@ -101,5 +101,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   buttonText: {fontFamily: fonts.title, fontSize: 16, color: colors.white},
-  pressed: {opacity: 0.85},
+  pressedAccent: {opacity: pressedOpacity.accent},// a filled accent control (constants/theme.ts)
 });

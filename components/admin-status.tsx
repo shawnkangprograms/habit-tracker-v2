@@ -1,6 +1,6 @@
 import {ActivityIndicator, Pressable, StyleSheet, Text, View} from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import {colors, fonts, radii, spacing} from '@/constants/theme';
+import {colors, fonts, radii, spacing, pressedOpacity} from '@/constants/theme';
 
 type Props =
   | {kind: 'loading'}
@@ -23,7 +23,7 @@ export function AdminStatus(props: Props) {
       <MaterialCommunityIcons name={ICONS[props.kind]} size={28} color={colors.muted} />
       <Text style={styles.message}>{props.message}</Text>
       <Pressable
-        style={({pressed}) => [styles.retry, pressed && styles.pressed]}
+        style={({pressed}) => [styles.retry, pressed && styles.pressedAccent]}
         onPress={props.onRetry}
         accessibilityRole="button">
         <Text style={styles.retryText}>Retry</Text>
@@ -53,5 +53,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   retryText: {fontFamily: fonts.title, fontSize: 15, color: colors.white},
-  pressed: {opacity: 0.85},
+  pressedAccent: {opacity: pressedOpacity.accent},// a filled accent control (constants/theme.ts)
 });

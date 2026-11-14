@@ -6,7 +6,7 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import {describeAdminError, describeUserWriteError, getAdminUser, setUserDisabled} from '@/services/admin';
 import {getFirebaseAuth} from '@/services/authInit';
 import {AdminStatus} from '@/components/admin-status';
-import {colors, fonts, radii, spacing} from '@/constants/theme';
+import {colors, fonts, radii, spacing, pressedOpacity} from '@/constants/theme';
 
 type AdminUser = {uid: string; age: number | null; disabled: boolean};
 
@@ -127,7 +127,7 @@ export default function AdminUserScreen() {
               <Pressable
                 style={({pressed}) => [
                   load.user.disabled ? styles.primaryButton : styles.dangerButton,
-                  (pressed || saving) && styles.pressed,
+                  (pressed || saving) && (load.user.disabled ? styles.pressedAccent : styles.pressed),
                 ]}
                 onPress={() => load.status === 'ready' && confirmToggle(load.user)}
                 disabled={saving}
@@ -191,5 +191,6 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   dangerText: {fontFamily: fonts.semiBold, fontSize: 15, color: colors.error},
-  pressed: {opacity: 0.85},
+  pressed: {opacity: pressedOpacity.default},
+  pressedAccent: {opacity: pressedOpacity.accent},// a filled accent control (constants/theme.ts)
 });

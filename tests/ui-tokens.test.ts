@@ -116,20 +116,23 @@ describe('token uniqueness', () => {
     assert.deepEqual([theme.radii.xxs, theme.radii.xs, theme.radii.sm], [2, 3, 4]);
   });
 
-  test('colours: the only repeated value is the input fill, which is the background today (C1 changes no colour)', () => {
-    assert.deepEqual(dupes(theme.colors), ['background=inputFill']);
+  test('colours: the only repeated values are the input fill and the ink on the accent, both the background today', () => {
+    // separate names on purpose: the fill of a field and the label on an orange fill can change apart from the page
+    assert.deepEqual(dupes(theme.colors), ['background=inputFill', 'background=onAccent']);
     assert.equal(theme.colors.accent, '#f2691b');
-    assert.equal(theme.colors.surface, '#1e1b17');
+    assert.equal(theme.colors.surface, '#221f1a');// palette B (C1b); tests/palette.test.ts pins the rest
     assert.equal(theme.colors.border, '#332e28');
   });
 
-  test('the glow is the onboarding primary button\'s shadow, and is where onboarding still writes it', () => {
+  test('the glow is the onboarding primary button\'s shadow, and onboarding takes it from the token (C1b: no second copy)', () => {
     assert.deepEqual(theme.shadows.glow, {
       shadowColor: theme.colors.accent, shadowOpacity: 0.45, shadowRadius: 14, shadowOffset: {width: 0, height: 4}, elevation: 6,
     });
     assert.deepEqual(theme.shadows.glowOff, {shadowOpacity: 0, elevation: 0});
     const onboarding = read('app/onboarding.tsx');
-    assert.match(onboarding, /shadowOpacity: 0\.45,\s*shadowRadius: 14,\s*shadowOffset: \{width: 0, height: 4\},\s*elevation: 6,/);
+    assert.match(onboarding, /\.\.\.shadows\.glow,/);
+    assert.match(onboarding, /primaryOff: \{opacity: 0\.4, \.\.\.shadows\.glowOff\}/);
+    assert.doesNotMatch(onboarding, /shadowOpacity|shadowRadius|shadowOffset|elevation:/);
   });
 
   test('no motion tokens yet (deferred until a screen adopts them)', () => {

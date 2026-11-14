@@ -1,6 +1,6 @@
 import {useEffect, useRef} from 'react';
 import {AccessibilityInfo, Modal, Pressable, StyleSheet, Text, View} from 'react-native';
-import {colors, fonts, radii, spacing} from '@/constants/theme';
+import {colors, fonts, radii, spacing, pressedOpacity} from '@/constants/theme';
 import {TEST_IDS} from '@/constants/testIds';
 import type {SkipCopy, SkipDialogEvent, SkipDialogState} from '@/utils/onboarding/skipDialog';
 
@@ -65,7 +65,7 @@ function DialogButton({label, primary = false, testID, onPress}: {label: string;
       accessibilityRole="button"
       accessibilityLabel={label}
       testID={testID}
-      style={({pressed}) => [primary ? styles.primary : styles.secondary, pressed && styles.pressed]}>
+      style={({pressed}) => [primary ? styles.primary : styles.secondary, pressed && (primary ? styles.pressedAccent : styles.pressed)]}>
       <Text style={primary ? styles.primaryText : styles.secondaryText}>{label}</Text>
     </Pressable>
   );
@@ -77,7 +77,7 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     padding: spacing.xl,
     borderRadius: radii.largeCard,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.raised,
     borderWidth: 1,
     borderColor: colors.border,
   },
@@ -91,5 +91,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center', paddingHorizontal: spacing.lg,
   },
   secondaryText: {fontFamily: fonts.semiBold, fontSize: 15, color: colors.accent},
-  pressed: {opacity: 0.85},
+  pressed: {opacity: pressedOpacity.default},
+  pressedAccent: {opacity: pressedOpacity.accent},// a filled accent control (constants/theme.ts)
 });

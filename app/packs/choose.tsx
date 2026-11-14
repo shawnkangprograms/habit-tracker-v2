@@ -9,7 +9,7 @@ import {usePacks} from '@/hooks/use-packs';
 import {currentLevel} from '@/services/packLimits';
 import {onPacksUpdate, packsStore} from '@/services/packsStore';
 import {useSessionUid} from '@/services/session';
-import {colors, fonts, radii, spacing} from '@/constants/theme';
+import {colors, fonts, radii, spacing, pressedOpacity} from '@/constants/theme';
 import {BUILTIN_PACKS, type BuiltinPackId} from '@/utils/packs/builtin';
 import {
   CHOOSE_ADOPT_NOTE, CREATE_OWN_PACK, PACK_NAMES, SAVE_PACK_FAILED, SAVE_PACKS, TRY_AGAIN, chooseTitle, habitCount,
@@ -161,7 +161,7 @@ export default function ChoosePacksScreen() {
         )}
 
         <Pressable
-          style={({pressed}) => [styles.save, (!canSave || pressed) && styles.saveOff]}
+          style={({pressed}) => [styles.save, !canSave ? styles.saveOff : pressed && styles.pressedAccent]}
           onPress={save}
           disabled={!canSave}
           accessibilityRole="button"
@@ -196,7 +196,7 @@ const styles = StyleSheet.create({
   packName: {fontFamily: fonts.title, fontSize: 16, color: colors.text},
   packCount: {fontFamily: fonts.regular, fontSize: 11, color: colors.muted},
   habit: {fontFamily: fonts.regular, fontSize: 13, color: colors.text},
-  pressed: {opacity: 0.85},
+  pressed: {opacity: pressedOpacity.default},
   createRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -220,5 +220,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   saveOff: {opacity: 0.5},
+  pressedAccent: {opacity: pressedOpacity.accent},// a filled accent control (constants/theme.ts)
   saveText: {fontFamily: fonts.title, fontSize: 16, color: colors.white},
 });

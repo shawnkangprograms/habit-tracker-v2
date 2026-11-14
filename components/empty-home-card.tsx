@@ -2,7 +2,7 @@ import {Pressable, StyleSheet, Text, View} from 'react-native';
 import {TEST_IDS} from '@/constants/testIds';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import Animated, {FadeIn} from 'react-native-reanimated';
-import {colors, fonts, radii, spacing} from '@/constants/theme';
+import {colors, fonts, radii, spacing, pressedOpacity} from '@/constants/theme';
 
 // Home's first-run card for a user with no active habits: one clear action, to the New habit screen and its
 // starter ideas. Fades in only when Reduce Motion is off.
@@ -15,7 +15,7 @@ export function EmptyHomeCard({reduceMotion, onPick}: {reduceMotion: boolean; on
       <Text style={styles.title} accessibilityRole="header">Start with one small habit</Text>
       <Text style={styles.body}>Pick a starter habit and tick it off today. Small steps build streaks.</Text>
       <Pressable
-        style={({pressed}) => [styles.button, pressed && styles.pressed]}
+        style={({pressed}) => [styles.button, pressed && styles.pressedAccent]}
         onPress={onPick}
         accessibilityRole="button"
         accessibilityLabel="Pick a starter habit"
@@ -60,5 +60,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   buttonText: {fontFamily: fonts.title, fontSize: 16, color: colors.white, textAlign: 'center'},
-  pressed: {opacity: 0.85},
+  pressedAccent: {opacity: pressedOpacity.accent},// a filled accent control (constants/theme.ts)
 });

@@ -1,6 +1,6 @@
 import {Pressable, StyleSheet, Text, View} from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import {colors, fonts, radii, spacing} from '@/constants/theme';
+import {colors, fonts, radii, spacing, pressedOpacity} from '@/constants/theme';
 import {CHOOSE_CARD_BUTTON, CHOOSE_CARD_LATER, CHOOSE_CARD_TITLE, chooseCardBody} from '@/utils/packs/copy';
 
 // Home's "Choose your habit packs" card (docs/PACKS_REPORTS_SPEC.md, section 3) for users with habits and no
@@ -18,7 +18,7 @@ export function ChoosePacksCard(props: {limit: number; onChoose: () => void; onL
       </View>
       <View style={styles.buttons}>
         <Pressable
-          style={({pressed}) => [styles.primary, pressed && styles.pressed]}
+          style={({pressed}) => [styles.primary, pressed && styles.pressedAccent]}
           onPress={props.onChoose}
           accessibilityRole="button">
           <Text style={styles.primaryText}>{CHOOSE_CARD_BUTTON}</Text>
@@ -67,5 +67,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   secondaryText: {fontFamily: fonts.semiBold, fontSize: 14, color: colors.muted},
-  pressed: {opacity: 0.85},
+  pressed: {opacity: pressedOpacity.default},
+  pressedAccent: {opacity: pressedOpacity.accent},// a filled accent control (constants/theme.ts)
 });

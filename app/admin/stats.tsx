@@ -11,7 +11,7 @@ import {EMPTY_TEXT, SplitBar, StatCard} from '@/components/admin-stat-card';
 import {LineChart, type LineSeries} from '@/components/charts/line-chart';
 import {BarChart} from '@/components/charts/bar-chart';
 import {DonutChart, type DonutSlice} from '@/components/charts/donut-chart';
-import {colors, fonts, radii, spacing} from '@/constants/theme';
+import {colors, fonts, radii, spacing, pressedOpacity} from '@/constants/theme';
 import {
   COMPLETION_SUBTITLE, DEFAULT_RANGE, RANGES, REFRESH_MESSAGES, STATS_INFO as INFO, TODAY_CAPTION, activeUsersLabel,
   aiLabel, areasLabel, buildStatsView, clockTime, completionLabel, dayLabel, hasValues, niceMax, refreshOutcomeOf,
@@ -89,7 +89,7 @@ export default function AdminStatsScreen() {
           <Pressable
             onPress={onRefresh}
             disabled={refresh.kind === 'running' || load.status !== 'ready'}
-            style={({pressed}) => [styles.refreshButton, pressed && styles.pressed,
+            style={({pressed}) => [styles.refreshButton, pressed && styles.pressedAccent,
               (refresh.kind === 'running' || load.status !== 'ready') && styles.disabled]}
             accessibilityRole="button"
             accessibilityLabel="Refresh today's numbers">
@@ -238,7 +238,7 @@ const styles = StyleSheet.create({
   refreshText: {fontFamily: fonts.title, fontSize: 15, color: colors.white},
   refreshStatus: {flex: 1, fontFamily: fonts.regular, fontSize: 13, color: colors.muted},
   refreshFailed: {color: colors.text},
-  pressed: {opacity: 0.85},
+  pressedAccent: {opacity: pressedOpacity.accent},// a filled accent control (constants/theme.ts)
   disabled: {opacity: 0.6},
   cards: {gap: spacing.md, marginTop: spacing.sm},
   tiles: {flexDirection: 'row', gap: spacing.md},

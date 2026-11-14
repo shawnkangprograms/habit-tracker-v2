@@ -1,6 +1,6 @@
 import {Pressable, StyleSheet, Text, View} from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import {colors, fonts, radii, spacing} from '@/constants/theme';
+import {colors, fonts, radii, spacing, pressedOpacity} from '@/constants/theme';
 
 const COPY = {
   noHabits: {
@@ -25,7 +25,7 @@ export function SummaryEmptyCard({kind, onCreate}: {kind: keyof typeof COPY; onC
       <Text style={styles.title} accessibilityRole="header">{copy.title}</Text>
       <Text style={styles.body}>{copy.body}</Text>
       <Pressable
-        style={({pressed}) => [styles.button, pressed && styles.pressed]}
+        style={({pressed}) => [styles.button, pressed && styles.pressedAccent]}
         onPress={onCreate}
         accessibilityRole="button"
         accessibilityLabel="Create a habit"
@@ -68,6 +68,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  pressed: {opacity: 0.85},
+  pressedAccent: {opacity: pressedOpacity.accent},// a filled accent control (constants/theme.ts)
   buttonText: {fontFamily: fonts.title, fontSize: 16, color: colors.white, textAlign: 'center'},
 });

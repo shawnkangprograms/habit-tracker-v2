@@ -164,7 +164,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
     backgroundColor: colors.inputFill,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.inputBorder,
   },
   searchInput: {flex: 1, height: '100%', fontFamily: fonts.regular, fontSize: 14, color: colors.text},
   chips: {flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm},

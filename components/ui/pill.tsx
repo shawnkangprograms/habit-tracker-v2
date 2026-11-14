@@ -25,7 +25,7 @@ export function Pill({label, selected, onPress, role = 'radio', gap, testID, acc
       accessibilityLabel={accessibilityLabel ?? label}
       accessibilityState={{selected}}
       testID={testID}>
-      <AppText variant="small" weight="semiBold" color={selected ? 'white' : 'muted'}>{label}</AppText>
+      <AppText variant="small" weight="semiBold" color={selected ? 'onAccent' : 'muted'}>{label}</AppText>
     </Pressable>
   );
 }

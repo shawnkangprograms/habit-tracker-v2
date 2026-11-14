@@ -5,8 +5,8 @@ import {buttonA11y, buttonSpec, hitSlopFor, type ButtonSize, type ButtonVariant}
 import {AppText} from '@/components/ui/app-text';
 
 // A pill button. While `loading` the visible label is replaced by a spinner but keeps its space (the button doesn't
-// resize) and stays the accessible name. Pressed = opacity 0.85 (not animated, so nothing to switch off for "reduce
-// motion"); disabled = opacity 0.4. A control shorter than 48 dp gets hitSlop up to 48 (the visible size changes in C2).
+// resize) and stays the accessible name. Pressed = opacity 0.9 for primary (the accent fill), 0.85 for the others (not
+// animated, so nothing to switch off for "reduce motion"); disabled = opacity 0.4. A control shorter than 48 dp gets hitSlop up to 48 (the visible size changes in C2).
 export function Button({label, onPress, variant = 'primary', size = 'md', loading = false, disabled = false, style, testID,
   accessibilityLabel, accessibilityHint, hitSlop}: {
   label: string;
@@ -34,7 +34,7 @@ export function Button({label, onPress, variant = 'primary', size = 'md', loadin
         },
         style,
         disabled && styles.disabled,
-        pressed && !off && styles.pressed,
+        pressed && !off && {opacity: spec.pressedOpacity},
       ]}
       onPress={onPress}
       disabled={off}
@@ -61,7 +61,6 @@ export function Button({label, onPress, variant = 'primary', size = 'md', loadin
 const styles = StyleSheet.create({
   base: {alignItems: 'center', justifyContent: 'center'},
   disabled: {opacity: 0.4},
-  pressed: {opacity: 0.85},
   hidden: {opacity: 0},
   spinner: {position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, alignItems: 'center', justifyContent: 'center'},
 });
