@@ -141,6 +141,26 @@ export function celebrationsOrHeld(
   return {...celebrationsFor(diff, today, celebrated), held: false};
 }
 
+// R-2: which tick keeps its toast. Each tick carries the number of its tap (app/(tabs)/index.tsx), and the newest
+// tap handed over wins, whatever order the ticks arrive in (a list load overtaken by a newer one can make an older
+// tap arrive last). A saved reflection's feedback drops the toasts of every tap before it. Celebrations themselves
+// are never dropped by this, only the toast.
+export function createTickOrder() {
+  let newest = 0;
+  let droppedUpTo = 0;
+  return {
+    start(tap: number): void {
+      newest = Math.max(newest, tap);
+    },
+    isLatest(tap: number): boolean {
+      return tap === newest && tap > droppedUpTo;
+    },
+    reflection(): void {
+      droppedUpTo = newest;
+    },
+  };
+}
+
 // ---------- Encouragement (toast) ----------
 
 export type Situation =

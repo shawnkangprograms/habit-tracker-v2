@@ -25,6 +25,8 @@ added for tests; new test files are picked up by the existing `tests/*.test.ts` 
 | F-1 | Reflections are split per year (`reflections:v2:<uid>:<yyyy>`, marker `reflections:migrated:v2:<uid>`, v1 read but never written); a failed read never lowers XP or level (the last numbers stay; with none, Home's placeholder; limit checks never name an unknown level). | PACKS_REPORTS_SPEC.md §12, §17 |
 | V-1 | The current schedule is applied to past days (accepted limitation), pinned by a test. | PACKS_REPORTS_SPEC.md §13, §17 |
 | V-2 | When Vitality is starting and the account has completion history, the copy is "Restarts after your first full day." | PACKS_REPORTS_SPEC.md §13, §17 |
+| R-2 | A completing tick always gets its reflection offer, celebrations and toast, even when a newer list load overtakes its own; the newest tap wins; an offer resolving after Home lost focus or after midnight is dropped. | PACKS_REPORTS_SPEC.md §16, BUG_LOG.md |
+| R-3 | The reflection bar's 8 s (20 s with a screen reader) count only while no level-up or streak overlay covers it; it gets a full 8 s once uncovered, and its announcement waits until then. Planned, built after R-2. | PACKS_REPORTS_SPEC.md §16, BUG_LOG.md |
 | R-1 | Area-map entries of habits known deleted are pruned at the next area write; storage that couldn't be read is never written over (every store; exempt list with reasons in the spec). | PACKS_REPORTS_SPEC.md §11, §17 |
 
 Open, not decided: S-5 (Firestore read cost of restoring a large account; measure in the emulator first) and the
@@ -48,6 +50,8 @@ keyboard).
 | S-6 | Per-user data | Notification and celebration prefs are device-wide | tests/decided-rules.test.ts (pin) | Decided: device settings |
 | S-7 | Local date everywhere | Travelling east skips a local date; west repeats one | partial | Keep, document |
 | P-1 | One pack per habit | A record listing an id twice | packs-record | Keep |
+| R-2 | The list reload after a tick returns that tick's rows | A newer load (another tick, focus, sync pull, refresh) overtakes it: the offer, celebrations and toast are dropped | tests/r2-offers.test.ts | Built (1b) |
+| R-3 | The bar is visible for its whole 8 s | A level-up or streak overlay covers it while its timer runs | R-3 build | Decided |
 | P-2 | Template present by name | A renamed (or deleted) pack habit makes "Add the rest" re-create the template | tests/p2-rename-delete.test.ts, fixture renamedPackHabit (pinned) | Built (1b) |
 | P-3 | Adoption by name | Two same-named habits; one already packed | packs-membership, mutation-killers (M08) | Keep |
 | P-4 | Retake limits | ONBOARDING §11 contradicted PACKS §2b | packs-manage | Reworded |
@@ -315,6 +319,13 @@ profile-name. Three mutations were checked by hand (recovery on an unknown profi
 first: each fails 1 test; the admin guard removed: fails 3). (c) the stats orphan count and (d) find-orphans.mjs are
 later steps. Suite: 1171 tests, 1171 pass, 0 todo.
 
+**Phase 1b, R-2 (2026-11-14).** Built: `loadHabits` returns its rows when a newer load overtakes it (the screen still
+shows only the newest); every tap is numbered, and the offer queue (`utils/reflections/offers.ts`) and the toast order
+(`createTickOrder`, utils/celebrations.ts) follow tap order; the same fix restores the tick's celebrations and toast; an
+offer that resolves after Home lost focus or after midnight is dropped. New: `tests/r2-offers.test.ts` (R2-1 to R2-9
+and the toast order). Two mutations were checked by hand (tap order ignored: fails 2; the focus rule dropped: fails
+1). R-3 is the next build. Suite: 1182 tests, 1182 pass, 0 todo.
+
 ### Phase 1b test cases (written with the fixes)
 
 S-1, monotonic stamp, stuck rows and the clock line (done; tests/clock-skew.test.ts unless noted):
@@ -390,6 +401,19 @@ R-1, storage that couldn't be read is never written over (built 2026-11-13, test
 - Sync cursors: the cycle ends before any network call, no cursor write, `initialPullDone` unchanged; the count reaches
   3 and Settings' line shows; the next good read clears it; sign-out and sign-in reset it; never an automatic reset.
 - Startup trace, and pins for reflections and the notification settings.
+
+R-2, every tick keeps its offer, celebrations and toast (built 2026-11-14, tests/r2-offers.test.ts):
+- R2-1: a tick whose list load was overtaken still offers (loadHabits returns its rows; Home passes them).
+- R2-2: its celebrations and toast are no longer lost either (onTick gets the rows and the tap number).
+- R2-3: two quick ticks: the newest tap's bar wins when the older tap's offer starts last, and when its read finishes
+  last.
+- R2-4: an un-tick drops that habit's offer, while it reads or before it starts; another habit's offer stays.
+- R2-5 (F-1): reflections that can't be read: no bar, and an older bar is cleared.
+- R2-6: a reflection save racing a list load: the save counts toward the 3-a-day cap; the saved habit is never offered.
+- R2-7: an offer that resolves after Home lost focus is dropped.
+- R2-8: a tap just before midnight: offered if it resolves the same day, dropped if the day is over.
+- R2-9: only a reflection that would still pay is offered.
+- Toasts: the newest tap keeps its toast whatever order ticks arrive in; a saved reflection drops the toasts before it.
 
 V-2, "Restarts after your first full day.":
 - V2-1: Vitality starting and any completed row before today (deleted habits included): "Restarts after your first

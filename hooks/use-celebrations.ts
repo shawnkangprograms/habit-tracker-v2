@@ -6,7 +6,7 @@ import {createCelebratedStore} from '@/services/celebratedStore';
 import {getCelebrationsEnabled, useCelebrationsEnabled} from '@/services/celebrationPrefs';
 import type {PublishResult} from '@/services/statsStore';
 import {
-  celebrationsOrHeld, createMessagePicker, diffTick, dismissItem, dropToasts, earlyKey, enqueue, messageVars,
+  celebrationsOrHeld, createMessagePicker, createTickOrder, diffTick, dismissItem, dropToasts, earlyKey, enqueue, messageVars,
   pickSituation, tickItems, type QueueItem,
 } from '@/utils/celebrations';
 import {isEarlierThanUsual, sameDaySamples} from '@/utils/completionTime';
@@ -24,6 +24,7 @@ export type TickArgs = {
   tickedAt: number;// Date.now() at the tap
   rows: {completed: number}[];// the rows loadHabits just loaded: today's scheduled habits
   stats: Promise<TickStats | null>;
+  tap: number;// the tap's number (R-2): the newest tap keeps its toast, whatever order ticks arrive in
 };
 
 // "Earlier than usual" for this habit. One indexed read, after the screen has updated. Never throws.
@@ -47,16 +48,17 @@ export function tickLog(message: string) {
 // is on. Leaving Home drops waiting toasts; celebrations wait.
 //
 // Ticks are handled concurrently, not one after another, so a new tick never waits behind an older one.
-// Once a newer tick has started, an older tick still queues its celebrations (and marks them) but drops its
-// toast. Two ticks can't celebrate the same thing: each one diffs against the entry the previous publish
-// replaced, so their changes don't overlap.
+// Once a newer tap's tick has started, an older tap's tick still queues its celebrations (and marks them) but drops
+// its toast; "newer" is by tap number, not arrival order (R-2, utils/celebrations.ts createTickOrder). Two ticks
+// can't celebrate the same thing: each one diffs against the entry the previous publish replaced, so their changes
+// don't overlap.
 export function useCelebrations(userId: string | undefined) {
   const enabled = useCelebrationsEnabled();
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [focused, setFocused] = useState(false);
   const [picker] = useState(createMessagePicker);
   const lastId = useRef(0);
-  const latestTick = useRef(0);// sequence number of the newest tick handed to onTick
+  const [order] = useState(createTickOrder);// which tap keeps its toast (R-2)
 
   useFocusEffect(useCallback(() => {
     setFocused(true);
@@ -66,9 +68,9 @@ export function useCelebrations(userId: string | undefined) {
     };
   }, []));
 
-  const handleTick = useCallback(async (tick: TickArgs, seq: number) => {
+  const handleTick = useCallback(async (tick: TickArgs) => {
     if (!userId || !getCelebrationsEnabled()) return;
-    const isLatest = () => seq === latestTick.current;
+    const isLatest = () => order.isLatest(tick.tap);
     const handedOverMs = Date.now() - tick.tickedAt;
     const result = await tick.stats;
     const statsMs = Date.now() - tick.tickedAt;
@@ -114,12 +116,12 @@ export function useCelebrations(userId: string | undefined) {
       setQueue((q) => enqueue(q, items));
     }
     await celebratedStore.mark(userId, keys, today);// at enqueue time
-  }, [userId, picker]);
+  }, [userId, picker, order]);
 
   const onTick = useCallback((tick: TickArgs) => {
-    const seq = ++latestTick.current;
-    handleTick(tick, seq).catch((err: unknown) => console.log('Tick feedback failed', err));
-  }, [handleTick]);
+    order.start(tick.tap);
+    handleTick(tick).catch((err: unknown) => console.log('Tick feedback failed', err));
+  }, [handleTick, order]);
 
   // A saved reflection: the level-up overlay if its XP reached a new level, otherwise a short toast ("+20 XP" only
   // when the reflection XP really went up). Completions didn't change, so nothing else can be celebrated.
@@ -147,9 +149,9 @@ export function useCelebrations(userId: string | undefined) {
   }, [userId, picker]);
 
   const onReflection = useCallback((stats: Promise<TickStats | null>) => {
-    ++latestTick.current;// an older tick still waiting drops its toast
+    order.reflection();// an older tick still waiting drops its toast
     handleReflection(stats).catch((err: unknown) => console.log('Reflection feedback failed', err));
-  }, [handleReflection]);
+  }, [handleReflection, order]);
 
   const dismiss = useCallback((id: number) => setQueue((q) => dismissItem(q, id)), []);
 

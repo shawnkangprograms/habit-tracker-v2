@@ -232,7 +232,9 @@ export default function HomeScreen() {// default export, becomes the "index" tab
   const focusedAt = useRef(0);// dev timing: when Home last gained focus
 
   // useCallback keeps the same fxn between renders, so the focus effect below doesn't rerun on every render
-  // Resolves to today's rows it loaded, or null if there is no user or a newer load replaced it
+  // Resolves to today's rows it loaded, or null if there is no user. A load that a newer one overtook doesn't change
+  // the screen, but still returns its rows (R-2): they were read after the caller's own write, so a tick's offer and
+  // celebrations can use them
   const loadHabits = useCallback(async (reason: LoadReason = 'focus'): Promise<Habit[] | null> => {
       if (!userId) return null;// no signed-in user: nothing to load
       const request = ++habitsRequest.current;
@@ -248,7 +250,7 @@ export default function HomeScreen() {// default export, becomes the "index" tab
       ]);
       mark('home:queriesEnd');// first load only (later marks are no-ops)
 
-      if (request !== habitsRequest.current) return null;// a newer load started meanwhile (e.g. several pulled pages)
+      if (request !== habitsRequest.current) return rows;// a newer load started meanwhile: it shows the list, not this one
       const next: HomeList = {date, today: rows, all};
       const unchanged = isDeepEqual(shownList.current, next);
       if (!unchanged) {
@@ -268,6 +270,7 @@ export default function HomeScreen() {// default export, becomes the "index" tab
   const statsSettled = useRef(0);// id of the newest load that has finished
   const [firstStatsSettled, setFirstStatsSettled] = useState(false);// a stats load has finished (either way): ends the placeholder
   const inFlight = useRef(new Set<string>());// habitIds whose toggle is still running
+  const tapCount = useRef(0);// R-2: numbers every tap, in the order they happen
   const [floats, setFloats] = useState<Record<string, Float>>({});// "+N XP" labels by habitId
   const reduceMotion = useReduceMotion();
   const celebration = useCelebrations(userId);
@@ -409,6 +412,8 @@ export default function HomeScreen() {// default export, becomes the "index" tab
   const handleToggle = async (habit: Habit) => {
     if (!userId || inFlight.current.has(habit.habitId)) return;// ignore a second tap while this habit's toggle runs
     inFlight.current.add(habit.habitId);
+    // R-2: the tap's number, so the newest tap's offer and toast win whatever order their loads finish in
+    const tap = ++tapCount.current;
     const completing = habit.completed === 0;
     const tickedAt = tapTime();// for "earlier than usual"
     // "before" only counts if no stats load was still running at tap time
@@ -424,7 +429,7 @@ export default function HomeScreen() {// default export, becomes the "index" tab
       let statsDone: Promise<TickStats | null> | null = null;
       if (saved) {
         if (completing) completionHaptic();
-        else reflectionUntick(habit.habitId);// its offer goes; its XP (and any reflection's) goes with the derived stats
+        else reflectionUntick(habit.habitId, tap);// its offer goes; its XP (and any reflection's) goes with the derived stats
         // soft prompt: the first completing tick after this shipped, if never answered and the nudge is off
         // (never when this app binary has no notifications module)
         if (completing && notificationPrefsLoaded() && shouldShowSoftPrompt(getNotificationPrefs()) && notificationsAvailable()) {
@@ -439,13 +444,15 @@ export default function HomeScreen() {// default export, becomes the "index" tab
           if (gained > 0) setFloats((f) => ({...f, [habit.habitId]: {key: Date.now(), amount: gained}}));
         });
       }
+      // rows even if a newer load overtook this one (R-2): read after this tap's save, so right for it
       const rows = await loadHabits('toggle');
       // Celebrations and messages: only for the user's own completing tick, after the list has updated.
       // They reuse the stats load above and the rows just loaded; nothing else is read except the early check.
-      if (completing && statsDone && rows) onTick({habitId: habit.habitId, tickedAt, rows, stats: statsDone});
-      // The reflection offer, from the same rows, only while that reflection would still earn XP today
+      if (completing && statsDone && rows) onTick({habitId: habit.habitId, tickedAt, rows, stats: statsDone, tap});
+      // The reflection offer, from the same rows, only while that reflection would still earn XP today (the queue
+      // drops it if the day is over, Home lost focus, or a newer tap or an un-tick came first)
       const tapDay = getLocalDateString(new Date(tickedAt));
-      if (completing && saved && rows && tapDay === getLocalDateString()) offerReflection(habit, tapDay, rows);
+      if (completing && saved && rows) void offerReflection(habit, tapDay, rows, tap);
     } finally {
       inFlight.current.delete(habit.habitId);
     }
