@@ -192,7 +192,7 @@ describe('Skip setup on a retake from Settings (decided 2026-11-14)', () => {
     assert.match(screen, /function closeFlow\(\) \{\s*if \(router\.canGoBack\(\)\) router\.back\(\);\s*else router\.replace\('\/'\);\s*\}/);
     assert.match(screen, /if \(skipState === 'done'\) closeFlow\(\);/);
     // the retake is pushed from Settings with entry 'settings', so back returns to Settings
-    assert.match(source('../app/(tabs)/settings.tsx'), /router\.push\(\{pathname: '\/onboarding', params: \{entry: 'settings'\}\}\);/);
+    assert.match(source('../app/(tabs)/you.tsx'), /router\.push\(\{pathname: '\/onboarding', params: \{entry: 'settings'\}\}\);/);
     // the first run is pushed from Home (sign-up launch or the gate) with no entry, so it is 'auto' and back returns Home
     assert.match(source('../app/(tabs)/index.tsx'), /router\.push\('\/onboarding'\);/);
     assert.match(source('../hooks/use-onboarding-gate.ts'), /router\.push\('\/onboarding'\);/);

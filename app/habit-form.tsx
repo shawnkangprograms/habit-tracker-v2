@@ -463,7 +463,7 @@ export default function HabitFormScreen() {
                   <View style={styles.note}>
                     <Text style={styles.noteText}>{notifyNote}</Text>
                     <Pressable
-                      onPress={() => router.navigate('/settings')}
+                      onPress={() => router.navigate('/you')}
                       hitSlop={12}
                       accessibilityRole="link"
                       accessibilityLabel="Open Settings">

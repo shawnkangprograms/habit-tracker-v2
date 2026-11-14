@@ -39,19 +39,19 @@ describe('files and routes removed in the same change as the new screen', () => 
     assert.ok(exists('app/(tabs)/progress.tsx'));
   });
 
-  test('the tab layout declares exactly index, progress and settings, and each has a file (SDK 57 adds a tab for any file)', () => {
+  test('the tab layout declares exactly index, progress and you, and each has a file (SDK 57 adds a tab for any file)', () => {
     const layout = read('app/(tabs)/_layout.tsx');
     const names = [...layout.matchAll(/<Tabs\.Screen\s+name="(\w+)"/g)].map((m) => m[1]);
-    assert.deepEqual(names, ['index', 'progress', 'settings']);
+    assert.deepEqual(names, ['index', 'progress', 'you']);
     const files = readdirSync(join(ROOT, 'app/(tabs)')).filter((f) => f !== '_layout.tsx').map((f) => f.replace(/\.tsx$/, '')).sort();
-    assert.deepEqual(files, ['index', 'progress', 'settings']);
+    assert.deepEqual(files, ['index', 'progress', 'you']);
   });
 
   test('Progress is the tab with the streak flame and its count; its test id replaces tab-summary and tab-profile', () => {
     const layout = read('app/(tabs)/_layout.tsx');
     assert.match(layout, /name="progress"\s+options=\{\{\s+title: 'Progress',\s+tabBarButtonTestID: TEST_IDS\.tabs\.progress,[\s\S]*?<StreakTabIcon color=\{color\} \/>/);
     assert.equal((layout.match(/StreakTabIcon/g) ?? []).length, 2);// the import and the one use
-    assert.deepEqual(ids.TEST_IDS.tabs, {home: 'tab-home', progress: 'tab-progress', settings: 'tab-settings'});
+    assert.deepEqual(ids.TEST_IDS.tabs, {today: 'tab-today', progress: 'tab-progress', you: 'tab-you'});
   });
 
   test('nothing navigates to /summary or /profile any more, and the notification tap still opens Home', () => {

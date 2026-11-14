@@ -26,7 +26,7 @@ const BACK_AFTER_SAVE_MS = 1000;
 
 function goBack() {
   if (router.canGoBack()) router.back();
-  else router.replace('/settings');
+  else router.replace('/you');
 }
 
 export default function ProfileNameScreen() {

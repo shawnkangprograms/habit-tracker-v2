@@ -16,7 +16,7 @@ const {colors, fonts, radii, spacing} = await import('../constants/theme.ts');
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const read = (path: string) => readFileSync(join(ROOT, path), 'utf8');
-const SETTINGS = 'app/(tabs)/settings.tsx';
+const SETTINGS = 'app/(tabs)/you.tsx';
 
 describe('hitSlop and the 48 dp target', () => {
   test('a control under 48 dp gets slop to 48; at 48 or more it gets none', () => {
@@ -144,7 +144,7 @@ describe('the Settings pilot', () => {
   });
 
   test('the title keeps its dev-only long press, and the screen keeps its test id', () => {
-    assert.match(src, /<AppText variant="title" style=\{styles\.title\} onLongPress=\{onTitleLongPress\}>\{SETTINGS_TITLE\}<\/AppText>/);
+    assert.match(src, /<AppText variant="title" style=\{styles\.title\} onLongPress=\{onTitleLongPress\}>\{YOU_TITLE\}<\/AppText>/);
     assert.match(src, /<Screen testID=\{TEST_IDS\.settings\.screen\}/);
   });
 

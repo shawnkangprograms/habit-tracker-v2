@@ -109,7 +109,7 @@ describe('use', () => {
 
   test('the three tabs carry their ids', () => {
     const layout = read('app/(tabs)/_layout.tsx');
-    for (const tab of ['home', 'progress', 'settings']) {
+    for (const tab of ['today', 'progress', 'you']) {
       assert.match(layout, new RegExp(`tabBarButtonTestID: TEST_IDS\\.tabs\\.${tab},`), tab);
     }
   });
@@ -137,7 +137,7 @@ describe('the shared controls are derived from components/ui/', () => {
 
 describe('every control on the demo path and in onboarding has an id', () => {
   const WITH_IDS = [
-    'app/auth.tsx', 'app/(tabs)/index.tsx', 'app/(tabs)/settings.tsx', 'app/onboarding.tsx',
+    'app/auth.tsx', 'app/(tabs)/index.tsx', 'app/(tabs)/you.tsx', 'app/onboarding.tsx',
     'components/switch-row.tsx', 'components/habit-check.tsx', 'components/insight-card.tsx', 'components/empty-home-card.tsx',
     'components/reflections/reflection-bar.tsx', 'components/onboarding/step-header.tsx', 'components/onboarding/option-button.tsx',
     'components/onboarding/routine-card.tsx', 'components/onboarding/routine-reminder.tsx', 'components/onboarding/skip-dialog.tsx',
@@ -200,7 +200,7 @@ describe('accessibility labels on the same controls', () => {
     const auth = read('app/auth.tsx');
     const submit = openingTags(auth, 'Pressable').find((tag) => tag.includes('TEST_IDS.auth.submit'))!;
     assert.match(submit, /accessibilityLabel=\{buttonLabel\}/);
-    const settings = read('app/(tabs)/settings.tsx');
+    const settings = read('app/(tabs)/you.tsx');
     const chip = openingTags(settings, 'Pill').find((tag) => tag.includes('nudgeTimeId(time)'))!;
     assert.match(chip, /accessibilityLabel=\{time\}/);
   });

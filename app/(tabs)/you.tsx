@@ -25,7 +25,7 @@ import {Screen} from '@/components/ui/screen';
 import {
     ADMIN_ROW, CELEBRATIONS_ROW, EVENING_NUDGE_ROW, HABIT_REMINDERS_ROW, NUDGE_TIME_GROUP_LABEL, OPEN_PHONE_SETTINGS_BUTTON,
     PHONE_NOTIFICATIONS_OFF_NOTICE, REMINDERS_UNAVAILABLE_NOTICE, SECTION_ACCOUNT, SECTION_PLAN, SECTION_REMINDERS,
-    SETTINGS_TITLE, SIGN_OUT_FAILED_MESSAGE, SIGN_OUT_FAILED_TITLE, SIGN_OUT_ROW, TEST_FAILED_LINE, TEST_NOTIFICATION_HINT,
+    YOU_TITLE, SIGN_OUT_FAILED_MESSAGE, SIGN_OUT_FAILED_TITLE, SIGN_OUT_ROW, TEST_FAILED_LINE, TEST_NOTIFICATION_HINT,
     TEST_NOTIFICATION_ROW, TEST_SENT_LINE,
 } from '@/utils/copy/settings';
 import {TRACE_ON} from '@/utils/startupTrace';
@@ -59,7 +59,7 @@ const VERSION_LINE = `Version ${appConfig?.version ?? '?'}${buildNumber != null 
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- loaded only in a trace build
 const StartupTracePanel = TRACE_ON ? (require('@/components/startup-trace-panel') as typeof import('@/components/startup-trace-panel')).StartupTracePanel : null;
 
-export default function SettingsScreen (){
+export default function YouScreen (){
     const {isAdmin, recheckIfFailed} = useIsAdmin();
     const celebrationsOn = useCelebrationsEnabled();
     const notificationPrefs = useNotificationPrefs();
@@ -143,7 +143,7 @@ export default function SettingsScreen (){
 
     return(
         <Screen testID={TEST_IDS.settings.screen} padding={spacing.lg} gap={spacing.lg} contentStyle={styles.content}>
-              <AppText variant="title" style={styles.title} onLongPress={onTitleLongPress}>{SETTINGS_TITLE}</AppText>
+              <AppText variant="title" style={styles.title} onLongPress={onTitleLongPress}>{YOU_TITLE}</AppText>
               {syncMessages.map((line) => <AppText key={line} variant="small" color="muted" style={styles.clockLine}>{line}</AppText>)}
 
               <Section title={SECTION_REMINDERS}>

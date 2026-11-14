@@ -172,35 +172,28 @@
   "text": "By habit"
  },
  {
-  "file": "app/(tabs)/settings.tsx",
+  "file": "app/(tabs)/you.tsx",
   "line": 39,
   "kind": "alert",
   "area": "settings",
   "text": "Couldn't sign out"
  },
  {
-  "file": "app/(tabs)/settings.tsx",
+  "file": "app/(tabs)/you.tsx",
   "line": 39,
   "kind": "alert",
   "area": "settings",
   "text": "Please try again."
  },
  {
-  "file": "app/(tabs)/settings.tsx",
+  "file": "app/(tabs)/you.tsx",
   "line": 46,
   "kind": "literal",
   "area": "settings",
   "text": "Version ${…}${…}"
  },
  {
-  "file": "app/(tabs)/settings.tsx",
-  "line": 137,
-  "kind": "text",
-  "area": "settings",
-  "text": "Settings"
- },
- {
-  "file": "app/(tabs)/settings.tsx",
+  "file": "app/(tabs)/you.tsx",
   "line": 143,
   "kind": "attr",
   "attr": "label",
@@ -208,7 +201,7 @@
   "text": "Celebrations and messages"
  },
  {
-  "file": "app/(tabs)/settings.tsx",
+  "file": "app/(tabs)/you.tsx",
   "line": 150,
   "kind": "attr",
   "attr": "label",
@@ -216,7 +209,7 @@
   "text": "Habit reminders"
  },
  {
-  "file": "app/(tabs)/settings.tsx",
+  "file": "app/(tabs)/you.tsx",
   "line": 158,
   "kind": "attr",
   "attr": "label",
@@ -224,7 +217,7 @@
   "text": "Evening nudge"
  },
  {
-  "file": "app/(tabs)/settings.tsx",
+  "file": "app/(tabs)/you.tsx",
   "line": 166,
   "kind": "attr",
   "attr": "accessibilityLabel",
@@ -232,7 +225,7 @@
   "text": "Evening nudge time"
  },
  {
-  "file": "app/(tabs)/settings.tsx",
+  "file": "app/(tabs)/you.tsx",
   "line": 190,
   "kind": "attr",
   "attr": "accessibilityLabel",
@@ -240,7 +233,7 @@
   "text": "Send a test notification"
  },
  {
-  "file": "app/(tabs)/settings.tsx",
+  "file": "app/(tabs)/you.tsx",
   "line": 191,
   "kind": "attr",
   "attr": "accessibilityHint",
@@ -248,70 +241,70 @@
   "text": "Arrives in about 10 seconds"
  },
  {
-  "file": "app/(tabs)/settings.tsx",
+  "file": "app/(tabs)/you.tsx",
   "line": 195,
   "kind": "text",
   "area": "settings",
   "text": "Send a test notification"
  },
  {
-  "file": "app/(tabs)/settings.tsx",
+  "file": "app/(tabs)/you.tsx",
   "line": 199,
   "kind": "text",
   "area": "settings",
   "text": "Sent. It arrives in about 10 seconds. Lock your phone to see it as a lock-screen notification."
  },
  {
-  "file": "app/(tabs)/settings.tsx",
+  "file": "app/(tabs)/you.tsx",
   "line": 199,
   "kind": "text",
   "area": "settings",
   "text": "Couldn't send the test notification."
  },
  {
-  "file": "app/(tabs)/settings.tsx",
+  "file": "app/(tabs)/you.tsx",
   "line": 200,
   "kind": "literal",
   "area": "settings",
   "text": "Sent. It arrives in about 10 seconds. Lock your phone to see it as a lock-screen notification."
  },
  {
-  "file": "app/(tabs)/settings.tsx",
+  "file": "app/(tabs)/you.tsx",
   "line": 201,
   "kind": "literal",
   "area": "settings",
   "text": "Couldn't send the test notification."
  },
  {
-  "file": "app/(tabs)/settings.tsx",
+  "file": "app/(tabs)/you.tsx",
   "line": 207,
   "kind": "text",
   "area": "settings",
   "text": "Reminders aren't available in this version of the app on this phone yet."
  },
  {
-  "file": "app/(tabs)/settings.tsx",
+  "file": "app/(tabs)/you.tsx",
   "line": 213,
   "kind": "text",
   "area": "settings",
   "text": "Notifications are turned off for HabitQuest in your phone settings."
  },
  {
-  "file": "app/(tabs)/settings.tsx",
+  "file": "app/(tabs)/you.tsx",
   "line": 219,
   "kind": "text",
   "area": "settings",
   "text": "Open settings"
  },
  {
-  "file": "app/(tabs)/settings.tsx",
+  "file": "app/(tabs)/you.tsx",
   "line": 270,
   "kind": "text",
   "area": "settings",
   "text": "Admin"
  },
  {
-  "file": "app/(tabs)/settings.tsx",
+  "file": "app/(tabs)/you.tsx",
   "line": 281,
   "kind": "text",
   "area": "settings",
@@ -1565,20 +1558,6 @@
   "kind": "text",
   "area": "habitForm",
   "text": "Delete habit"
- },
- {
-  "file": "app/modal.tsx",
-  "line": 10,
-  "kind": "text",
-  "area": "common",
-  "text": "This is a modal"
- },
- {
-  "file": "app/modal.tsx",
-  "line": 12,
-  "kind": "text",
-  "area": "common",
-  "text": "Go to home screen"
  },
  {
   "file": "app/packs/choose.tsx",

@@ -32,7 +32,7 @@ describe('the clock line', () => {
     for (const dir of ['app', 'components', 'hooks', 'services', 'utils', 'sync', 'db']) walk(join(ROOT, dir));
     const users = files.filter((f) => /clockLine|use-clock-line|useClockLine|useSyncLines|clockSuspect|cursorReadFailures|cursorLine|syncStatusLine/.test(readFileSync(join(ROOT, f), 'utf8'))).sort();
     // sync/syncEngine.js: only the R-1 log (its threshold), never a screen
-    assert.deepEqual(users, ['app/(tabs)/settings.tsx', 'hooks/use-clock-line.ts', 'sync/engineCore.ts', 'sync/syncEngine.js', 'utils/syncStatusLine.ts']);
+    assert.deepEqual(users, ['app/(tabs)/you.tsx', 'hooks/use-clock-line.ts', 'sync/engineCore.ts', 'sync/syncEngine.js', 'utils/syncStatusLine.ts']);
   });
 });
 
@@ -48,6 +48,6 @@ describe('the cursor line (R-1)', () => {
     assert.deepEqual(syncLines({clockSuspectCycles: 2, cursorReadFailures: 3}), [CLOCK_LINE, CURSOR_LINE]);
     assert.deepEqual(syncLines({cursorReadFailures: 3}), [CURSOR_LINE]);
     assert.deepEqual(syncLines(null), []);
-    assert.match(readFileSync(join(ROOT, 'app/(tabs)/settings.tsx'), 'utf8'), /syncMessages\.map\(\(line\) => <AppText key=\{line\} variant="small" color="muted" style=\{styles\.clockLine\}>\{line\}<\/AppText>\)/);
+    assert.match(readFileSync(join(ROOT, 'app/(tabs)/you.tsx'), 'utf8'), /syncMessages\.map\(\(line\) => <AppText key=\{line\} variant="small" color="muted" style=\{styles\.clockLine\}>\{line\}<\/AppText>\)/);
   });
 });

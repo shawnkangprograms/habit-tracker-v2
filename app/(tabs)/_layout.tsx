@@ -52,8 +52,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
-          tabBarButtonTestID: TEST_IDS.tabs.home,
+          title: 'Today',
+          tabBarButtonTestID: TEST_IDS.tabs.today,
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
         }}
       />
@@ -67,11 +67,11 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="settings"
+        name="you"
         options={{
-          title: 'Settings',
-          tabBarButtonTestID: TEST_IDS.tabs.settings,
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="gearshape.fill" color={color} />,
+          title: 'You',
+          tabBarButtonTestID: TEST_IDS.tabs.you,
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.fill" color={color} />,
         }}
       />
     </Tabs>

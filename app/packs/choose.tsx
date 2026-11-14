@@ -30,7 +30,7 @@ function clockNow(): number {
 
 function goBack(from: string | undefined) {
   if (router.canGoBack()) router.back();
-  else router.replace(from === 'settings' ? '/settings' : '/');
+  else router.replace(from === 'settings' ? '/you' : '/');
 }
 
 export default function ChoosePacksScreen() {

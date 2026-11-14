@@ -21,6 +21,7 @@ const MAPPING = {
   'chevron.right': 'chevron-right',
   'chart.bar.fill': 'bar-chart',
   'gearshape.fill': 'settings',
+  'person.fill': 'person',
   'trash.fill': 'delete',
   'flame.fill': 'local-fire-department',
 } as IconMapping;

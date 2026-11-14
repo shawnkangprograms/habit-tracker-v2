@@ -40,7 +40,7 @@ const QUICK_ACTIONS: {label: string; icon: GlyphName; href: Href}[] = [
 
 function goBackToSettings() {
   if (router.canGoBack()) router.back();
-  else router.replace('/settings');
+  else router.replace('/you');
 }
 
 export default function AdminOverviewScreen() {

@@ -1,9 +1,9 @@
-// The words on the Settings screen (the You tab from C2 Set 3). Moved here from app/(tabs)/settings.tsx with no
+// The words on the You screen (the old Settings screen, the You tab from C2 Set 3). Moved here from app/(tabs)/you.tsx with no
 // wording change (tests/copy-identical.test.ts); the three section headers are new in C2. Pure: no imports.
 // Row texts that already live in another copy module stay there: SETTINGS_ROW (utils/onboarding/copy.ts),
 // NAME_ROW (utils/profileName.ts), SETTINGS_PACKS_ROW (utils/packs/copy.ts), RESTORING_LINE (utils/firstPull.ts).
 
-export const SETTINGS_TITLE = 'Settings';
+export const YOU_TITLE = 'You.';// was 'Settings' before the You tab (C2 Set 3)
 
 // section headers (new in C2)
 export const SECTION_REMINDERS = 'Reminders';

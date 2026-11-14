@@ -21,7 +21,7 @@ const read = (path: string) => readFileSync(join(ROOT, path), 'utf8');
 const strip = (source: string) => source.replace(/\/\/.*$/gm, '');// code only
 
 // BEFORE (C1 and earlier): the `row`, `rowText`, `switchBox` and `pressed` styles of components/switch-row.tsx, which
-// were the same numbers as the Pressable rows in app/(tabs)/settings.tsx. Written out here as plain values.
+// were the same numbers as the Pressable rows in app/(tabs)/you.tsx (was settings.tsx). Written out here as plain values.
 const BEFORE_ROW = {
   flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 56, paddingHorizontal: 16, paddingVertical: 8,
   borderRadius: 14, backgroundColor: '#1e1b17', borderWidth: 1, borderColor: '#332e28',
@@ -100,7 +100,7 @@ describe('SwitchRow, rebuilt on Row, keeps what it had', () => {
 });
 
 describe('Settings: three sections', () => {
-  const src = read('app/(tabs)/settings.tsx');
+  const src = read('app/(tabs)/you.tsx');
   const section = (name: string) => {
     const start = src.indexOf(`<Section title={${name}}>`);
     assert.ok(start >= 0, name);
@@ -137,7 +137,7 @@ describe('Settings: three sections', () => {
   });
 
   test('the sync lines stay directly under the title; the version line stays below the last section', () => {
-    assert.ok(src.indexOf('syncMessages.map') > src.indexOf('{SETTINGS_TITLE}'));
+    assert.ok(src.indexOf('syncMessages.map') > src.indexOf('{YOU_TITLE}'));
     assert.ok(src.indexOf('syncMessages.map') < src.indexOf('<Section title={SECTION_REMINDERS}>'));
     assert.ok(src.lastIndexOf('{VERSION_LINE}') > src.lastIndexOf('</Section>'));
   });
@@ -155,10 +155,10 @@ describe('Settings: three sections', () => {
 describe('the Settings words moved to utils/copy/settings.ts, unchanged', () => {
   test('each moved text is the one the screen had before', () => {
     assert.deepEqual(
-      [copy.SETTINGS_TITLE, copy.CELEBRATIONS_ROW, copy.HABIT_REMINDERS_ROW, copy.EVENING_NUDGE_ROW, copy.NUDGE_TIME_GROUP_LABEL,
+      [copy.YOU_TITLE, copy.CELEBRATIONS_ROW, copy.HABIT_REMINDERS_ROW, copy.EVENING_NUDGE_ROW, copy.NUDGE_TIME_GROUP_LABEL,
         copy.TEST_NOTIFICATION_ROW, copy.TEST_NOTIFICATION_HINT, copy.OPEN_PHONE_SETTINGS_BUTTON, copy.ADMIN_ROW, copy.SIGN_OUT_ROW,
         copy.SIGN_OUT_FAILED_TITLE, copy.SIGN_OUT_FAILED_MESSAGE],
-      ['Settings', 'Celebrations and messages', 'Habit reminders', 'Evening nudge', 'Evening nudge time',
+      ['You.', 'Celebrations and messages', 'Habit reminders', 'Evening nudge', 'Evening nudge time',
         'Send a test notification', 'Arrives in about 10 seconds', 'Open settings', 'Admin', 'Sign Out',
         "Couldn't sign out", 'Please try again.'],
     );

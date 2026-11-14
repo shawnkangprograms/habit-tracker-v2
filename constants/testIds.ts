@@ -14,9 +14,9 @@ export function slug(text: string): string {
 
 export const TEST_IDS = {
   tabs: {
-    home: 'tab-home',
+    today: 'tab-today',
     progress: 'tab-progress',
-    settings: 'tab-settings',
+    you: 'tab-you',
   },
   auth: {
     screen: 'auth-screen',

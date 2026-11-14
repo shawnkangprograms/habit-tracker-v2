@@ -26,7 +26,7 @@ export function areaOf(file: string): string {
   if (file === 'components/startup-trace-panel.tsx') return 'dev';
   if (file === 'app/auth.tsx' || file === 'services/authActions.js') return 'auth';
   if (file === 'app/onboarding.tsx' || file.startsWith('components/onboarding/')) return 'onboarding';
-  if (file === 'app/(tabs)/settings.tsx' || file === 'components/switch-row.tsx') return 'settings';
+  if (file === 'app/(tabs)/you.tsx' || file === 'components/switch-row.tsx') return 'settings';// the You tab (was Settings); the area keeps its name
   if (file === 'app/(tabs)/progress.tsx' || file.startsWith('components/progress/')) return 'progress';// C2 Set 2: Summary and Profile merged
   if (file === 'app/(tabs)/summary.tsx' || file.startsWith('components/summary-')) return 'summary';
   if (file === 'app/(tabs)/profile.tsx' || file === 'components/medal.tsx' || file === 'components/stats-card.tsx') return 'profile';

@@ -86,7 +86,7 @@ describe('S-4: the first-pull check', () => {
     const home = source('app/(tabs)/index.tsx');
     assert.match(home, /const run = await whenRestored\(\(\) => firstPullFor\(userId\), async \(\) => \{\s*const parsed = await packsStore\.read\(userId\);/);
     assert.match(home, /if \(!run\.restored\) \{\s*notice = RESTORING_LINE;\s*return;/);
-    const settings = source('app/(tabs)/settings.tsx');
+    const settings = source('app/(tabs)/you.tsx');
     assert.match(settings, /const result = await firstPullFor\(uid\);\s*if \(result !== 'done'\) \{\s*setPlanNotice\(RESTORING_LINE\);\s*return;\s*\}\s*setPlanNotice\(null\);\s*router\.push\(\{pathname: '\/onboarding', params: \{entry: 'settings'\}\}\);/);
     assert.match(settings, /onPress=\{openPlan\}/);
     const sync = source('sync/syncEngine.js');
