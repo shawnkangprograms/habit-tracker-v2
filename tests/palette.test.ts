@@ -79,7 +79,17 @@ const PAIRS: Pair[] = [
   {name: 'tab label, active (accent on surface)', fg: colors.accent, bg: colors.surface, min: TEXT, drawnBy: [['app/(tabs)/_layout.tsx', /tabBarActiveTintColor: colors\.accent/]]},
   {name: 'streak tab number on the inactive (muted) pill', fg: colors.onAccent, bg: colors.muted, min: TEXT, drawnBy: [['components/streak-tab-icon.tsx', /color: colors\.onAccent/]]},
   {name: 'streak tab number on the active (accent) pill', fg: colors.onAccent, bg: colors.accent, min: TEXT, drawnBy: [['components/streak-tab-icon.tsx', /backgroundColor: color\}/]]},
-  {name: 'locked medal number (muted on the locked metal)', fg: colors.muted, bg: medalTiers.locked.base, min: TEXT, drawnBy: [['components/medal.tsx', /let numberColor: string = colors\.muted;/]]},
+  // award and medal faces (C4 Set 2): the number or glyph in onAccent ink on the solid light face of each tier;
+  // locked, muted ink on the dark locked face. The ink never sits on the gradient.
+  ...(['bronze', 'silver', 'gold', 'emerald', 'ruby', 'blaze'] as const).map((tier): Pair => ({
+    name: `${tier} award face: onAccent ink on the light face`, fg: colors.onAccent, bg: medalTiers[tier].light, min: TEXT,
+    drawnBy: [['components/award-badge.tsx', /const faceFill = earned \? metal\.light : medalTiers\.locked\.dark;/],
+      ['components/award-badge.tsx', /const ink = earned \? colors\.onAccent : colors\.muted;/]],
+  })),
+  {name: 'locked award face: muted ink on the dark locked face', fg: colors.muted, bg: medalTiers.locked.dark, min: TEXT,
+    drawnBy: [['components/award-badge.tsx', /const faceFill = earned \? metal\.light : medalTiers\.locked\.dark;/]]},
+  {name: 'locked award: the muted lock on the locked material (light end)', fg: colors.muted, bg: medalTiers.locked.light, min: UI,
+    drawnBy: [['components/award-badge.tsx', /<MaterialCommunityIcons name="lock" size=\{Math\.round\(size \* 0\.15\)\} color=\{colors\.muted\} \/>/]]},
   // borders, marks and icons
   {name: 'input border on the input fill', fg: colors.inputBorder, bg: colors.inputFill, min: UI, drawnBy: [['app/auth.tsx', /borderColor: colors\.inputBorder/], ['components/time-field.tsx', /borderColor: colors\.inputBorder/]]},
   {name: 'input border on surface', fg: colors.inputBorder, bg: colors.surface, min: UI, drawnBy: [['components/habit-fields.tsx', /borderColor: colors\.inputBorder/]]},
@@ -101,8 +111,8 @@ const PAIRS: Pair[] = [
 ];
 
 // Under 3:1 on purpose: they carry no information on their own (an edge, a track, a faint first step whose meaning is
-// in its label and the dashed "nothing scheduled" outline), or they are on a later list (the blaze medal: C4 redraws
-// the medals). A new pair under the line has to be added here by name.
+// in its label and the dashed "nothing scheduled" outline). The blaze medal's white number left this list in C4 Set 2
+// (every medal number now sits on a solid light face). A new pair under the line has to be added here by name.
 const KNOWN_DECORATIVE: Pair[] = [
   {name: 'card border on surface', fg: colors.border, bg: colors.surface, min: UI, drawnBy: [['components/ui/card.tsx', /borderColor: colors\.border/]]},
   {name: 'card border on raised', fg: colors.border, bg: colors.raised, min: UI, drawnBy: [['components/onboarding/skip-dialog.tsx', /borderColor: colors\.border/]]},
@@ -110,7 +120,6 @@ const KNOWN_DECORATIVE: Pair[] = [
   {name: 'raised against background (a floating card\'s edge)', fg: colors.raised, bg: colors.background, min: UI, drawnBy: [['components/encouragement-toast.tsx', /backgroundColor: colors\.raised/]]},
   {name: 'progress track on surface', fg: colors.track, bg: colors.surface, min: UI, drawnBy: [['components/stats-card.tsx', /colors\.track/]]},
   {name: 'heat strip step 1 (accent 45%) on its card', fg: over(colors.accent, tint('73'), colors.surface), bg: colors.surface, min: UI, drawnBy: [['components/summary-scale.ts', /1: colors\.accent \+ '73'/]]},
-  {name: 'blaze medal number (white on accent): C4 redraws the medals', fg: colors.white, bg: medalTiers.blaze.base, min: TEXT, drawnBy: [['components/medal.tsx', /DARK_TEXT_TIERS\.includes\(tier\) \? metal\.dark : colors\.white/]]},
 ];
 
 describe('palette B: the token values', () => {
@@ -243,19 +252,19 @@ describe('the surface ladder, the input borders and the pressed opacity (C1b Set
   });
 });
 
-// White is used only where it is not on the accent: the switch thumb (D4), the confidence slider's thumb and the medal
-// numbers (the blaze medal's, white on the accent, is on the C4 list). C1b Set 2 moved every label and mark on an accent
-// fill to onAccent, and the Set 2 list that tracked the files still to do is empty and gone.
-const WHITE_KEPT = ['components/medal.tsx', 'components/onboarding/confidence-slider.tsx', 'components/switch-row.tsx'];
+// White is used only where it is not on the accent: the switch thumb (D4) and the confidence slider's thumb. C1b Set 2
+// moved every label and mark on an accent fill to onAccent; C4 Set 2 took white out of the medals (their numbers sit on a
+// solid light face in onAccent ink).
+const WHITE_KEPT = ['components/onboarding/confidence-slider.tsx', 'components/switch-row.tsx'];
 
-describe('white: only the three places it is kept', () => {
-  test('colors.white is used by the switch row, the confidence slider and the medal, and nowhere else', () => {
+describe('white: only the two places it is kept', () => {
+  test('colors.white is used by the switch row and the confidence slider, and nowhere else (not the medals or awards)', () => {
     const users = ['app', 'components', 'hooks', 'services', 'utils'].flatMap(sourceFiles).filter((f) => /colors\.white/.test(read(f))).sort();
     assert.deepEqual(users, WHITE_KEPT);
     assert.match(read('components/switch-row.tsx'), /thumbColor=\{colors\.white\}/);
     assert.match(read('components/onboarding/confidence-slider.tsx'), /backgroundColor: colors\.white,/);
-    assert.match(read('components/medal.tsx'), /\? metal\.dark : colors\.white;/);
     for (const file of WHITE_KEPT) assert.equal((read(file).match(/colors\.white/g) ?? []).length, 1, file);
+    for (const file of ['components/medal.tsx', 'components/award-badge.tsx']) assert.doesNotMatch(read(file), /colors\.white|'white'/, file);
   });
 
   test('the shared Button and Pill draw no white', () => {

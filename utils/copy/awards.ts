@@ -3,6 +3,7 @@
 // One entry per award in utils/awards.ts; tests/awards-set.test.ts checks every id has all of it and keeps the voice
 // rules. Pure: a type import only.
 import type {AwardGroup, AwardId} from '@/utils/awards';
+import type {MedalTier} from '@/utils/medals';
 
 export const AWARD_GROUP_LABELS: Record<AwardGroup, string> = {
   streaks: 'Streaks',
@@ -74,4 +75,17 @@ export function lockedHint(id: AwardId, remaining: number | null): string {
   const copy = AWARD_COPY[id];
   if (copy.unit === null || remaining === null || remaining < 1) return `${LOCKED_PREFIX} ${copy.how}`;
   return `${LOCKED_PREFIX} ${remaining} more ${remaining === 1 ? copy.unit[0] : copy.unit[1]} to go.`;
+}
+
+// The material, as TalkBack says it
+export const TIER_LABELS: Record<MedalTier, string> = {
+  bronze: 'bronze', silver: 'silver', gold: 'gold', emerald: 'emerald', ruby: 'ruby', blaze: 'blaze',
+};
+
+// What a screen reader says for one award (C4 Set 3 tiles): "Perfect week, gold award, earned." or
+// "Perfect week, locked. 3 more perfect days in a row to go." The state is in words, never colour alone.
+export function awardSpokenLabel(id: AwardId, tier: MedalTier, earned: boolean, remaining: number | null): string {
+  const name = AWARD_COPY[id].name;
+  if (earned) return `${name}, ${TIER_LABELS[tier]} award, earned.`;
+  return `${name}, locked. ${lockedHint(id, remaining).slice(LOCKED_PREFIX.length + 1)}`;
 }
