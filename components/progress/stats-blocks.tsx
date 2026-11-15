@@ -76,6 +76,9 @@ function Tile({value, label}: {value: number; label: string}) {
   );
 }
 
+// Progress's section title (Medals, Lifetime, and Awards in components/progress/awards-section.tsx)
+export const sectionTitleStyle = {fontFamily: fonts.title, fontSize: 18, color: colors.text, paddingTop: spacing.sm} as const;
+
 const styles = StyleSheet.create({
   card: {
     borderRadius: radii.largeCard,
@@ -89,7 +92,7 @@ const styles = StyleSheet.create({
   streakCard: {flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md},
   streakText: {fontFamily: fonts.title, fontSize: 20, color: colors.text},
   muted: {fontFamily: fonts.regular, fontSize: 12, color: colors.muted},
-  section: {fontFamily: fonts.title, fontSize: 18, color: colors.text, paddingTop: spacing.sm},
+  section: sectionTitleStyle,
   shelf: {flexDirection: 'row', flexWrap: 'wrap', rowGap: spacing.lg, paddingVertical: spacing.lg},
   medalCell: {width: '33.333%', alignItems: 'center'},
   tiles: {flexDirection: 'row', gap: spacing.sm},

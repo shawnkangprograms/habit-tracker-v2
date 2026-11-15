@@ -78,8 +78,8 @@ describe('the manifest', () => {
     assert.equal(new Set(all).size, all.length);
   });
 
-  test('every id starts with its screen: tab-, auth-, home-, settings-, onboarding-, icon-', () => {
-    const prefix: Record<string, string> = {tabs: 'tab-', auth: 'auth-', home: 'home-', settings: 'settings-', onboarding: 'onboarding-', icon: 'icon-'};
+  test('every id starts with its screen: tab-, auth-, home-, settings-, onboarding-, icon-, awards-', () => {
+    const prefix: Record<string, string> = {tabs: 'tab-', auth: 'auth-', home: 'home-', settings: 'settings-', onboarding: 'onboarding-', icon: 'icon-', awards: 'awards-'};
     for (const [group, entries] of Object.entries(ids.TEST_IDS)) {
       for (const id of Object.values(entries)) assert.ok(id.startsWith(prefix[group]), `${group}: ${id}`);
     }

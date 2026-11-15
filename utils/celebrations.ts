@@ -394,3 +394,17 @@ export function dismissItem(queue: QueueItem[], id: number): QueueItem[] {
 export function dropToasts(queue: QueueItem[]): QueueItem[] {
   return queue.some((item) => item.kind === 'toast') ? queue.filter((item) => item.kind !== 'toast') : queue;
 }
+
+// One tick's items with the award toast (C4): a new award takes the toast slot. Without a celebration it replaces the
+// encouragement toast; with one it follows the celebrations, so it shows once they are closed. At most one per tick.
+export function tickItemsWithAward(
+  celebrations: Celebration[],
+  toastText: string | null,
+  awardText: string | null,
+  vars: MessageVars,
+  picker: Picker,
+  nextId: () => number,
+): QueueItem[] {
+  if (awardText === null) return tickItems(celebrations, toastText, vars, picker, nextId);
+  return [...tickItems(celebrations, null, vars, picker, nextId), {id: nextId(), kind: 'toast', text: awardText}];
+}

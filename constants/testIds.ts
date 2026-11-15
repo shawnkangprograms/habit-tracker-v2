@@ -73,6 +73,11 @@ export const TEST_IDS = {
   icon: {
     search: 'icon-search',
   },
+  awards: {
+    screen: 'awards-screen',
+    seeAll: 'awards-see-all',
+    back: 'awards-back',
+  },
 } as const;
 
 // Home: today's rows and the other-days rows, by habit name
@@ -95,3 +100,8 @@ export const routineTimeId = (time: string) => `onboarding-reminder-time-${time.
 // group tab by its group, both kebab-case (no_sugar -> icon-no-sugar, Health -> icon-tab-health)
 export const iconTileId = (iconId: string) => `icon-${kebab(iconId)}`;
 export const iconTabId = (group: string) => `icon-tab-${kebab(group).replace(/^-/, '')}`;
+
+// The awards (C4): a tile by its award id, a group header by its group (perfect_run_7 -> award-perfect-run-7,
+// streaks -> awards-group-streaks)
+export const awardTileId = (awardId: string) => `award-${kebab(awardId)}`;
+export const awardGroupId = (group: string) => `awards-group-${kebab(group)}`;

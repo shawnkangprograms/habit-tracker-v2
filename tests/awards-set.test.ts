@@ -101,7 +101,9 @@ describe('synced data only, and never to the insight function', () => {
   });
 
   test('the stats load hands it the synced rows only', () => {
-    assert.match(code('services/gamificationStats.ts'), /awards: computeAwards\(rows\.habits, rows\.completions, today\),/);
+    // the synced rows, and the XP code's longest streak and perfect days (neither depends on reflections)
+    assert.match(code('services/gamificationStats.ts'),
+      /awards: computeAwards\(rows\.habits, rows\.completions, today, \{longestStreak: gamification\.longestStreak, perfectDays: gamification\.perfectDays\}\),/);
   });
 
   test('nothing on the insight path imports or names the awards', () => {
@@ -147,6 +149,18 @@ describe('the words (Questy)', () => {
     assert.equal(copy.lockedHint('perfect_7', 1), 'Locked for now. 1 more perfect day to go.');
     assert.equal(copy.lockedHint('steady_week', null), 'Locked for now. Tick at least 80% of your planned habits over 7 days.');
     assert.equal(copy.lockedHint('days_30', null), 'Locked for now. Stay with it for a month.');// no tick yet
+  });
+
+  test('the reviewed edits: a thousands comma, "in a row" for one habit, streak_7\'s line', () => {
+    assert.deepEqual([0, 7, 999, 1000, 12345, 1000000].map(copy.formatCount), ['0', '7', '999', '1,000', '12,345', '1,000,000']);
+    assert.equal(copy.lockedHint('done_1000', 1000), 'Locked for now. 1,000 more ticks to go.');
+    assert.equal(copy.lockedHint('done_1000', 1), 'Locked for now. 1 more tick to go.');
+    for (const id of ['habit_streak_7', 'habit_streak_30', 'habit_streak_66'] as const) {
+      assert.equal(copy.lockedHint(id, 4), 'Locked for now. 4 more in a row to go.', id);
+      assert.equal(copy.lockedHint(id, 1), 'Locked for now. 1 more in a row to go.', id);
+    }
+    assert.equal(copy.AWARD_COPY.streak_7.earned, 'A full week, every day. Nicely kept.');
+    assert.doesNotMatch(code('utils/copy/awards.ts'), /toLocaleString/);// written by hand, not the phone's locale
   });
 
   test('pure: no React, native, Firebase or service imports', () => {

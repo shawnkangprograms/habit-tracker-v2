@@ -10,6 +10,7 @@
 
 import {clampCreatedDates, computeStreaks, countPerfectDays, fromDayNumber, isDateString, requireToday, toDayNumber, weekdayOf,
   type GamiCompletion} from '@/utils/gamification';
+import type {WeekdayKey} from '@/constants/habits';
 import type {MedalTier} from '@/utils/medals';
 import {iconArea} from '@/utils/radar/areas';
 import type {RadarHabit} from '@/utils/radar/score';
@@ -107,7 +108,15 @@ export type AwardMetrics = {
 
 export type AwardState = {id: AwardId; earned: boolean; remaining: number | null};// remaining: how far to go, when it is a count
 
-export function awardMetrics(habitsIn: readonly RadarHabit[], completions: readonly GamiCompletion[], today: string): AwardMetrics {
+// What the XP code already computed in the same stats load (utils/gamification.ts computeGamification), so the awards
+// don't walk the history for them again. Without it the awards compute both themselves (same numbers, slower).
+export type KnownStats = {longestStreak: number; perfectDays: number};
+
+// One pass builds a table of every date from the first created date to today (its date string, weekday, habits
+// scheduled and ticked); every rule then reads the table. tests/awards-speed.test.ts checks the results against the
+// first implementation (tests/helpers/awards-reference.ts) on many random fixtures.
+export function awardMetrics(habitsIn: readonly RadarHabit[], completions: readonly GamiCompletion[], today: string,
+  known?: KnownStats): AwardMetrics {
   requireToday(today);
   const habits = clampCreatedDates([...habitsIn], today);// S-2
   const active = habits.filter((h) => !h.deleted);
@@ -119,18 +128,21 @@ export function awardMetrics(habitsIn: readonly RadarHabit[], completions: reado
   const created = habits.map((h) => h.createdDate).filter(isDateString).sort();
   const firstCreated = created.length > 0 ? toDayNumber(created[0]) : null;
 
-  // per date from the first created date to today: habits scheduled, of those ticked
-  const scheduledOn = (n: number) => {
-    const date = fromDayNumber(n);
-    const weekday = weekdayOf(n);
-    return active.filter((h) => h.createdDate <= date && (h.frequencyType === 'daily' || h.days.includes(weekday)));
-  };
-  const days: {n: number; scheduled: number; ticked: number}[] = [];
+  // the day table: per date from the first created date to today, its string and weekday (computed once), and the
+  // habits scheduled and ticked
+  const days: {n: number; date: string; weekday: WeekdayKey; scheduled: number; ticked: number}[] = [];
   if (firstCreated !== null) {
     for (let n = firstCreated; n <= todayN; n++) {
       const date = fromDayNumber(n);
-      const scheduled = scheduledOn(n);
-      days.push({n, scheduled: scheduled.length, ticked: scheduled.filter((h) => doneKeys.has(`${h.habitId}|${date}`)).length});
+      const weekday = weekdayOf(n);
+      let scheduled = 0;
+      let ticked = 0;
+      for (const h of active) {
+        if (h.createdDate > date || (h.frequencyType !== 'daily' && !h.days.includes(weekday))) continue;
+        scheduled += 1;
+        if (doneKeys.has(h.habitId + '|' + date)) ticked += 1;
+      }
+      days.push({n, date, weekday, scheduled, ticked});
     }
   }
   const isPerfect = (d: {scheduled: number; ticked: number}) => d.scheduled > 0 && d.ticked === d.scheduled;
@@ -175,7 +187,7 @@ export function awardMetrics(habitsIn: readonly RadarHabit[], completions: reado
   // weekend done: a Saturday and the Sunday after it, both perfect
   let weekendDone = false;
   for (let i = 0; i + 1 < days.length && !weekendDone; i++) {
-    weekendDone = weekdayOf(days[i].n) === 'sat' && isPerfect(days[i]) && isPerfect(days[i + 1]);
+    weekendDone = days[i].weekday === 'sat' && isPerfect(days[i]) && isPerfect(days[i + 1]);
   }
 
   // back again: two dates with a tick (any habit, deleted included) at least COMEBACK_GAP_DAYS apart, nothing between
@@ -186,11 +198,11 @@ export function awardMetrics(habitsIn: readonly RadarHabit[], completions: reado
   let bestHabitStreak = 0;
   for (const h of active) {
     let streak = 0;
-    for (let n = toDayNumber(h.createdDate); n <= todayN; n++) {
-      const weekday = weekdayOf(n);
-      if (h.frequencyType !== 'daily' && !h.days.includes(weekday)) continue;
-      if (doneKeys.has(`${h.habitId}|${fromDayNumber(n)}`)) bestHabitStreak = Math.max(bestHabitStreak, ++streak);
-      else if (n < todayN) streak = 0;
+    for (let i = toDayNumber(h.createdDate) - (firstCreated ?? 0); i < days.length; i++) {
+      const d = days[i];
+      if (h.frequencyType !== 'daily' && !h.days.includes(d.weekday)) continue;
+      if (doneKeys.has(h.habitId + '|' + d.date)) bestHabitStreak = Math.max(bestHabitStreak, ++streak);
+      else if (d.n < todayN) streak = 0;
     }
   }
 
@@ -198,8 +210,8 @@ export function awardMetrics(habitsIn: readonly RadarHabit[], completions: reado
   const areas = new Set(active.map((h) => iconArea(h.icon)).filter((a) => a !== 'none')).size;
 
   return {
-    longestStreak: computeStreaks(habits, [...completions], today).longestStreak,
-    perfectDays: countPerfectDays(habits, [...completions], today),
+    longestStreak: known?.longestStreak ?? computeStreaks(habits, [...completions], today).longestStreak,
+    perfectDays: known?.perfectDays ?? countPerfectDays(habits, [...completions], today),
     bestPerfectRun,
     ticks: done.length,
     steady,
@@ -235,8 +247,9 @@ export function evaluateAward(award: AwardDef, m: AwardMetrics): AwardState {
 }
 
 // Every award, in table order
-export function computeAwards(habits: readonly RadarHabit[], completions: readonly GamiCompletion[], today: string): AwardState[] {
-  const m = awardMetrics(habits, completions, today);
+export function computeAwards(habits: readonly RadarHabit[], completions: readonly GamiCompletion[], today: string,
+  known?: KnownStats): AwardState[] {
+  const m = awardMetrics(habits, completions, today, known);
   return AWARDS.map((award) => evaluateAward(award, m));
 }
 
@@ -261,4 +274,42 @@ export function awardToToast(before: readonly AwardId[], after: readonly AwardId
   let show: AwardDef | null = null;
   for (const a of fresh) if (!show || TIER_RANK[a.tier] >= TIER_RANK[show.tier]) show = a;
   return {show: show?.id ?? null, keys: fresh.map((a) => awardKey(a.id))};
+}
+
+// The award toast for one tick: nothing when the awards before the tick are unknown (an entry from before the awards
+// existed, the first stats of an install) or the celebrated keys can't be read, so an award a user already holds is
+// never celebrated (silent backfill); otherwise awardToToast.
+export function awardFromTick(before: readonly AwardState[] | undefined, after: readonly AwardState[] | undefined,
+  celebrated: ReadonlySet<string> | null): {show: AwardId | null; keys: string[]} {
+  if (!before || !after || celebrated === null) return {show: null, keys: []};
+  return awardToToast(earnedAwardIds(before), earnedAwardIds(after), celebrated);
+}
+
+// ---------- What the Awards section and screen show (C4 Set 3) ----------
+
+export type AwardView = AwardDef & {state: AwardState};
+
+export function awardViews(states: readonly AwardState[]): AwardView[] {
+  return AWARDS.map((def) => ({...def, state: states.find((s) => s.id === def.id) ?? {id: def.id, earned: false, remaining: null}}));
+}
+
+// The next ones to earn: locked count awards nearest to done (the largest share already done), then the others in
+// table order. A share is done / target, so 2 of 3 comes before 5 of 10.
+export function nextToEarn(states: readonly AwardState[], count = 3): AwardView[] {
+  const locked = awardViews(states).filter((v) => !v.state.earned);
+  const share = (v: AwardView) => {
+    const n = (v.rule as {n?: number}).n;
+    return v.state.remaining !== null && typeof n === 'number' && n > 0 ? (n - v.state.remaining) / n : -1;
+  };
+  return locked
+    .map((v, i) => ({v, i, s: share(v)}))
+    .sort((a, b) => (b.s !== a.s ? b.s - a.s : a.i - b.i))
+    .slice(0, count)
+    .map(({v}) => v);
+}
+
+// Every award by group, in the groups' order
+export function awardsByGroup(states: readonly AwardState[]): {group: AwardGroup; awards: AwardView[]}[] {
+  const views = awardViews(states);
+  return AWARD_GROUPS.map((group) => ({group, awards: views.filter((v) => v.group === group)}));
 }

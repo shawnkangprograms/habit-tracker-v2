@@ -29,15 +29,17 @@ export async function getGamificationStats(userId: string, today = getLocalDateS
     areasStore.read(userId),// never throws; failed or corrupt is an empty map (icon areas)
     packsStore.peek(userId)?.parsed ?? packsStore.read(userId),// never throws
   ]);
+  const gamification = computeGamification(rows.habits, rows.completions, today, toGamiReflections(reflections));
   return {
-    ...computeGamification(rows.habits, rows.completions, today, toGamiReflections(reflections)),
+    ...gamification,
     vitality: computeVitality(dailyCompletion(rows.habits, rows.completions, today), hasCompletionHistory(rows.completions, today)),
     radar: computeRadar({
       habits: rows.habits, completions: rows.completions, today, areas,
       packs: packs.kind === 'ok' ? packs.record : null,
     }),
-    // C4: from the synced habits and completions only (never the reflections, areas or packs read above)
-    awards: computeAwards(rows.habits, rows.completions, today),
+    // C4: from the synced habits and completions only (never the reflections, areas or packs read above). The longest
+    // streak and the perfect days don't depend on reflections, so the XP code's are reused rather than walked again.
+    awards: computeAwards(rows.habits, rows.completions, today, {longestStreak: gamification.longestStreak, perfectDays: gamification.perfectDays}),
   };
 }
 

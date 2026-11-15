@@ -138,11 +138,11 @@ describe('the medal uses it, and the shelf and the overlay use the medal', () =>
     assert.match(code('components/celebration-overlay.tsx'), /<Medal days=\{item\.days\} tier=\{item\.tier\} earned daysToGo=\{0\} size=\{110\} \/>/);
   });
 
-  test('no Awards section, /awards screen or award toast yet (Set 3)', () => {
-    assert.throws(() => read('app/awards.tsx'));
+  test('the badge is drawn by the medal and the award tile only (Set 3 put the tile on Progress and /awards)', () => {
     for (const file of ['components/progress/stats-blocks.tsx', 'app/(tabs)/progress.tsx', 'app/(tabs)/index.tsx', 'utils/celebrations.ts']) {
-      assert.doesNotMatch(code(file), /AwardBadge|awardToToast|newAwardLine/, file);
+      assert.doesNotMatch(code(file), /AwardBadge/, file);
     }
+    assert.match(code('components/award-tile.tsx'), /<AwardBadge group=\{award\.group\}/);
   });
 });
 

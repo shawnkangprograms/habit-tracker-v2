@@ -7,8 +7,10 @@ import {getCelebrationsEnabled, useCelebrationsEnabled} from '@/services/celebra
 import type {PublishResult} from '@/services/statsStore';
 import {
   celebrationsOrHeld, createMessagePicker, createTickOrder, diffTick, dismissItem, dropToasts, earlyKey, enqueue, messageVars,
-  pickSituation, tickItems, type QueueItem,
+  pickSituation, tickItems, tickItemsWithAward, type QueueItem,
 } from '@/utils/celebrations';
+import {awardFromTick, type AwardState} from '@/utils/awards';
+import {newAwardLine} from '@/utils/copy/awards';
 import {isEarlierThanUsual, sameDaySamples} from '@/utils/completionTime';
 import {SAVED_PLAIN} from '@/utils/reflections/copy';
 import {getLocalDateString} from '@/utils/dates';
@@ -17,7 +19,9 @@ import type {GamificationStats} from '@/utils/gamification';
 const celebratedStore = createCelebratedStore(AsyncStorage);
 
 // What Home's post-tick stats load resolved to (the same load as before; nothing extra is read)
-export type TickStats = {snapshot: {date: string; stats: GamificationStats} | null; published: PublishResult};
+// The stats carry the awards (C4) too; typed optional so an entry from before them reads as "unknown"
+type TickStatsValue = GamificationStats & {awards?: AwardState[]};
+export type TickStats = {snapshot: {date: string; stats: TickStatsValue} | null; published: PublishResult};
 
 export type TickArgs = {
   habitId: string;
@@ -91,23 +95,28 @@ export function useCelebrations(userId: string | undefined) {
     // null: the celebrated keys can't be read, so every celebration is held for this tick (ordinary toasts still show)
     const celebrated = await celebratedStore.known(userId);
     const {celebrations, keys, repeats} = celebrationsOrHeld(diff, today, celebrated);
+    // C4: at most one award toast per tick, for an award this tick newly earned (never one held before it, never a
+    // streak medal, never while the celebrated keys are unknown); every newly earned award is marked now
+    const award = awardFromTick((result.published.previous.stats as TickStatsValue).awards, result.snapshot.stats.awards, celebrated);
+    keys.push(...award.keys);
+    const awardText = award.show ? newAwardLine(award.show) : null;
     // a celebration suppresses the toast and a repeat outranks early praise, so the early read is only needed
     // without either (and only for a toast that can still be shown). Repeats mark nothing. No early praise while held.
-    const readEarly = celebrated !== null && celebrations.length === 0 && repeats.length === 0 && isLatest()
+    const readEarly = celebrated !== null && celebrations.length === 0 && repeats.length === 0 && awardText === null && isLatest()
       && !celebrated.has(earlyKey(today));
     const earlyStartedAt = Date.now();
     const early = readEarly && await isEarlyTick(userId, tick.habitId, tick.tickedAt, today);
     const earlyNote = readEarly ? `early read ${Date.now() - earlyStartedAt} ms` : 'early read skipped';
 
-    if (celebrations.length === 0 && !isLatest()) {
+    if (celebrations.length === 0 && awardText === null && !isLatest()) {
       tickLog(`dropped, a newer tick has started (${Date.now() - tick.tickedAt} ms after the tap)`);
       return;
     }
     const vars = messageVars(diff);
-    const situation = celebrations.length === 0 ? pickSituation(diff, early, repeats) : null;
+    const situation = celebrations.length === 0 && awardText === null ? pickSituation(diff, early, repeats) : null;
     const toast = situation ? picker.pick(situation, vars) : null;
     if (situation === 'early') keys.push(earlyKey(today));
-    const items = tickItems(celebrations, toast, vars, picker, () => ++lastId.current)
+    const items = tickItemsWithAward(celebrations, toast, awardText, vars, picker, () => ++lastId.current)
       .map((item) => (item.kind === 'toast' ? {...item, tappedAt: tick.tickedAt} : item));
 
     if (items.length > 0 && getCelebrationsEnabled()) {

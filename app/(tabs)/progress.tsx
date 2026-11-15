@@ -4,6 +4,7 @@ import {colors, fonts, spacing} from '@/constants/theme';
 import {Screen} from '@/components/ui/screen';
 import {LevelAndStreak, MedalsAndLifetime} from '@/components/progress/stats-blocks';
 import {SummarySection} from '@/components/progress/summary-section';
+import {AwardsSection} from '@/components/progress/awards-section';
 import {PROGRESS_TITLE, STATS_FAILED_LINE} from '@/utils/copy/progress';
 
 // Progress (C2, Set 2): the old Summary and Profile screens as one. Top to bottom: the title; the level and streak
@@ -23,6 +24,7 @@ export default function ProgressScreen() {
       {stats && <LevelAndStreak stats={stats} />}
       <SummarySection />
       {stats && <MedalsAndLifetime stats={stats} />}
+      {stats && <AwardsSection awards={stats.awards} />}
     </Screen>
   );
 }

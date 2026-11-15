@@ -27,10 +27,11 @@ const PERFECT_DAY = ['perfect day', 'perfect days'] as const;
 const PERFECT_IN_A_ROW = ['perfect day in a row', 'perfect days in a row'] as const;
 const HABIT = ['habit', 'habits'] as const;
 const AREA = ['area', 'areas'] as const;
+const IN_A_ROW = ['in a row', 'in a row'] as const;// one habit: "3 more in a row to go"
 
 export const AWARD_COPY: Record<AwardId, Copy> = {
   streak_3: {name: '3-day streak', earned: 'Three days in a row. A real start.', how: 'Keep a streak going for 3 days.', unit: DAY},
-  streak_7: {name: '7-day streak', earned: 'A full week, every day. That takes care.', how: 'Keep a streak going for 7 days.', unit: DAY},
+  streak_7: {name: '7-day streak', earned: 'A full week, every day. Nicely kept.', how: 'Keep a streak going for 7 days.', unit: DAY},
   streak_14: {name: '14-day streak', earned: 'Two weeks straight. This is turning into a habit.', how: 'Keep a streak going for 14 days.', unit: DAY},
   streak_30: {name: '30-day streak', earned: 'A whole month without a break. Well done.', how: 'Keep a streak going for 30 days.', unit: DAY},
   streak_60: {name: '60-day streak', earned: 'Sixty days. You keep showing up.', how: 'Keep a streak going for 60 days.', unit: DAY},
@@ -54,9 +55,9 @@ export const AWARD_COPY: Record<AwardId, Copy> = {
   steady_month: {name: 'Steady month', earned: 'A steady month. That is how habits stick.', how: 'Tick at least 80% of your planned habits over 30 days.', unit: null},
   never_twice: {name: 'Never twice', earned: 'Thirty days and you never missed two in a row.', how: 'Go 30 days without missing two days in a row.', unit: null},
   comeback: {name: 'Back again', earned: 'Back again. That counts for a lot.', how: 'Come back and tick a habit after a few days away.', unit: null},
-  habit_streak_7: {name: 'One habit, 7 days', earned: 'One habit, seven times in a row.', how: 'Do one habit 7 times in a row.', unit: DAY},
-  habit_streak_30: {name: 'One habit, 30 days', earned: 'One habit, thirty times in a row. It is part of you now.', how: 'Do one habit 30 times in a row.', unit: DAY},
-  habit_streak_66: {name: 'One habit, 66 days', earned: 'Sixty-six in a row. This one sticks.', how: 'Do one habit 66 times in a row.', unit: DAY},
+  habit_streak_7: {name: 'One habit, 7 days', earned: 'One habit, seven times in a row.', how: 'Do one habit 7 times in a row.', unit: IN_A_ROW},
+  habit_streak_30: {name: 'One habit, 30 days', earned: 'One habit, thirty times in a row. It is part of you now.', how: 'Do one habit 30 times in a row.', unit: IN_A_ROW},
+  habit_streak_66: {name: 'One habit, 66 days', earned: 'Sixty-six in a row. This one sticks.', how: 'Do one habit 66 times in a row.', unit: IN_A_ROW},
   habits_5: {name: 'Five going', earned: 'Five habits on the go. A full plate, well kept.', how: 'Have 5 habits going at once.', unit: HABIT},
   areas_3: {name: 'Three areas', earned: 'Habits in three parts of your life.', how: 'Have habits in 3 different areas.', unit: AREA},
   areas_6: {name: 'All six', earned: 'Something in every area. A well-rounded week.', how: 'Have habits in all 6 areas.', unit: AREA},
@@ -69,12 +70,19 @@ export const AWARD_COPY: Record<AwardId, Copy> = {
 // The toast when a tick earns a new award (C4 Set 3): "New award: Perfect week. Seven days, nothing missed."
 export const newAwardLine = (id: AwardId) => `New award: ${AWARD_COPY[id].name}. ${AWARD_COPY[id].earned}`;
 
+// A whole number with a comma between thousands ("1,000"), written by hand: toLocaleString depends on the phone's
+// locale and on the JS engine's locale data
+export function formatCount(n: number): string {
+  const digits = String(Math.trunc(Math.abs(n)));
+  return (n < 0 ? '-' : '') + digits.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
 // Under a locked award: "Locked for now. 3 more perfect days to go." for a count, else "Locked for now." and how.
 export const LOCKED_PREFIX = 'Locked for now.';
 export function lockedHint(id: AwardId, remaining: number | null): string {
   const copy = AWARD_COPY[id];
   if (copy.unit === null || remaining === null || remaining < 1) return `${LOCKED_PREFIX} ${copy.how}`;
-  return `${LOCKED_PREFIX} ${remaining} more ${remaining === 1 ? copy.unit[0] : copy.unit[1]} to go.`;
+  return `${LOCKED_PREFIX} ${formatCount(remaining)} more ${remaining === 1 ? copy.unit[0] : copy.unit[1]} to go.`;
 }
 
 // The material, as TalkBack says it
@@ -89,3 +97,13 @@ export function awardSpokenLabel(id: AwardId, tier: MedalTier, earned: boolean, 
   if (earned) return `${name}, ${TIER_LABELS[tier]} award, earned.`;
   return `${name}, locked. ${lockedHint(id, remaining).slice(LOCKED_PREFIX.length + 1)}`;
 }
+
+// The Awards section on Progress and the /awards screen (C4 Set 3)
+export const AWARDS_SECTION_TITLE = 'Awards';
+export const earnedCountLine = (earned: number, total: number) => `${earned} of ${total} earned`;
+export const NEXT_UP_TITLE = 'Next up';
+export const ALL_EARNED_LINE = 'You have earned every award. That is a lot of showing up.';
+export const SEE_ALL_AWARDS = 'See all awards';
+export const AWARDS_SCREEN_TITLE = 'Awards.';
+export const AWARDS_BACK = 'Progress';
+export const AWARDS_FAILED_LINE = "Your awards couldn't be loaded. They'll try again next time you open this screen.";
