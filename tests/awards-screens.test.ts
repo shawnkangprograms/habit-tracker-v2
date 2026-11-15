@@ -200,3 +200,52 @@ describe('test ids and words', () => {
     assert.match(code('app/awards.tsx'), /router\.replace\('\/progress'\)/);
   });
 });
+
+describe('/awards is a virtualised list (the Itel)', () => {
+  test('the groups become sections of two-tile rows: every award once, in order, keys stable and unique', () => {
+    const sections = awards.awardSections(awards.awardsByGroup(states()));
+    assert.deepEqual(sections.map((s) => s.group), [...awards.AWARD_GROUPS]);
+    const flat = sections.flatMap((s) => s.data.flatMap((row) => row.awards.map((a) => a.id)));
+    assert.deepEqual(flat, awards.AWARDS.map((a) => a.id));
+    for (const s of sections) for (const row of s.data) assert.ok(row.awards.length >= 1 && row.awards.length <= awards.AWARDS_PER_ROW);
+    const keys = sections.flatMap((s) => s.data.map((row) => row.key));
+    assert.equal(new Set(keys).size, keys.length);
+    assert.equal(sections.find((s) => s.group === 'comebacks')!.data[0].key, 'comeback');// a group of one: one row of one
+    assert.equal(awards.AWARDS_PER_ROW, 2);// two tiles a row: each tile is 50% wide (components/award-tile.tsx)
+    assert.match(code('components/award-tile.tsx'), /tile: \{width: '50%'/);
+  });
+
+  test('a SectionList inside a non-scrolling Screen, few rows at first, no sticky headers, the header in the list', () => {
+    const screen = code('app/awards.tsx');
+    assert.match(screen, /<Screen testID=\{TEST_IDS\.awards\.screen\} scroll=\{false\}/);
+    assert.doesNotMatch(screen, /<ScrollView/);
+    assert.match(screen, /<SectionList\s/);
+    assert.match(screen, /sections=\{sections\}/);
+    assert.match(screen, /const sections = awards \? awardSections\(awardsByGroup\(awards\)\) : \[\];/);
+    assert.match(screen, /initialNumToRender=\{INITIAL_ROWS\}/);
+    assert.match(screen, /const INITIAL_ROWS = 4;/);
+    assert.match(screen, /maxToRenderPerBatch=\{INITIAL_ROWS\}/);
+    assert.match(screen, /windowSize=\{5\}/);
+    assert.match(screen, /removeClippedSubviews/);
+    assert.match(screen, /stickySectionHeadersEnabled=\{false\}/);
+    assert.match(screen, /keyExtractor=\{\(row\) => row\.key\}/);
+    assert.match(screen, /renderSectionHeader=\{\(\{section\}\) => <GroupHeader group=\{section\.group\} \/>\}/);
+    assert.match(screen, /ListHeaderComponent=\{header\}/);
+  });
+
+  test('rows and tiles are memoised, so a scroll never redraws a badge already drawn', () => {
+    assert.match(code('app/awards.tsx'), /const TileRow = memo\(function TileRow/);
+    assert.match(code('app/awards.tsx'), /renderItem=\{\(\{item\}\) => <TileRow row=\{item\} \/>\}/);
+    assert.match(code('components/award-tile.tsx'), /export const AwardTile = memo\(function AwardTile/);
+    assert.match(code('components/award-badge.tsx'), /export const AwardBadge = memo\(function AwardBadge/);
+  });
+
+  test('the back row, title, count and failure line ride in the list header; the reading of shared stats is unchanged', () => {
+    const screen = code('app/awards.tsx');
+    const header = screen.slice(screen.indexOf('const header = ('), screen.indexOf('return (\n    <Screen'));
+    for (const piece of ['TEST_IDS.awards.back', '{AWARDS_SCREEN_TITLE}', '{AWARDS_FAILED_LINE}', 'earnedCountLine(earned, AWARDS.length)']) {
+      assert.ok(header.includes(piece), piece);
+    }
+    assert.match(screen, /const \{stats, failed\} = useProgressStats\(\);/);
+  });
+});

@@ -313,3 +313,18 @@ export function awardsByGroup(states: readonly AwardState[]): {group: AwardGroup
   const views = awardViews(states);
   return AWARD_GROUPS.map((group) => ({group, awards: views.filter((v) => v.group === group)}));
 }
+
+// The /awards list (a virtualised SectionList): one section per group, its awards cut into rows of `perRow` (two
+// tiles a row, as the grid had them). A row's key is its awards' ids, stable across loads.
+export type AwardRow = {key: string; awards: AwardView[]};
+export const AWARDS_PER_ROW = 2;
+export function awardSections(groups: readonly {group: AwardGroup; awards: AwardView[]}[], perRow = AWARDS_PER_ROW): {group: AwardGroup; data: AwardRow[]}[] {
+  return groups.map(({group, awards}) => {
+    const data: AwardRow[] = [];
+    for (let i = 0; i < awards.length; i += perRow) {
+      const chunk = awards.slice(i, i + perRow);
+      data.push({key: chunk.map((a) => a.id).join('+'), awards: chunk});
+    }
+    return {group, data};
+  });
+}
