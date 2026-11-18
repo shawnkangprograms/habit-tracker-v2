@@ -44,62 +44,67 @@ const CREATE_TABLES_V1 = `
 `;
 
 async function getColumns(db, table) {
-    return db.getAllAsync(`PRAGMA table_info(${table})`); // table name is a constant, never user input
+  return db.getAllAsync(`PRAGMA table_info(${table})`); // table name is a constant, never user input
 }
 
 // The pre-migration schema: habits(habitId INTEGER, habitName, habitNotes), completions(completionId, ...).
 async function hasLegacyMarkers(db, existingTables) {
-    if (existingTables.includes('habits')) {
-        const cols = await getColumns(db, 'habits');
-        if (cols.some((c) => c.name === 'habitNotes')) return true;
-        if (cols.some((c) => c.name === 'habitId' && c.type.toUpperCase() === 'INTEGER')) return true;
-    }
-    if (existingTables.includes('completions')) {
-        const cols = await getColumns(db, 'completions');
-        if (cols.some((c) => c.name === 'completionId')) return true;
-    }
-    return false;
+  if (existingTables.includes("habits")) {
+    const cols = await getColumns(db, "habits");
+    if (cols.some((c) => c.name === "habitNotes")) return true;
+    if (
+      cols.some(
+        (c) => c.name === "habitId" && c.type.toUpperCase() === "INTEGER",
+      )
+    )
+      return true;
+  }
+  if (existingTables.includes("completions")) {
+    const cols = await getColumns(db, "completions");
+    if (cols.some((c) => c.name === "completionId")) return true;
+  }
+  return false;
 }
 
 // `targetVersion` is for tests only (to build an older schema and migrate it); the app always passes nothing.
 export async function migrateDbIfNeeded(db, targetVersion = DATABASE_VERSION) {
-    const result = await db.getFirstAsync('PRAGMA user_version');
-    const version = result?.user_version ?? 0;
-    if (version >= targetVersion) return;
+  const result = await db.getFirstAsync("PRAGMA user_version");
+  const version = result?.user_version ?? 0;
+  if (version >= targetVersion) return;
 
-    if (version < 1) {
-        await db.withTransactionAsync(async () => {
-            const tables = await db.getAllAsync(
-                `SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('habits', 'habitDays', 'completions')`
-            );
-            const existingTables = tables.map((t) => t.name);
+  if (version < 1) {
+    await db.withTransactionAsync(async () => {
+      const tables = await db.getAllAsync(
+        `SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('habits', 'habitDays', 'completions')`,
+      );
+      const existingTables = tables.map((t) => t.name);
 
-            if (existingTables.length > 0) {
-                if (!(await hasLegacyMarkers(db, existingTables))) {
-                    throw new Error('Unrecognised local database (version 0)');
-                }
-                // One-time wipe of the legacy local tables (test data only, approved). Children first.
-                await db.execAsync(`
+      if (existingTables.length > 0) {
+        if (!(await hasLegacyMarkers(db, existingTables))) {
+          throw new Error("Unrecognised local database (version 0)");
+        }
+        // One-time wipe of the legacy local tables (test data only, approved). Children first.
+        await db.execAsync(`
                     DROP TABLE IF EXISTS completions;
                     DROP TABLE IF EXISTS habitDays;
                     DROP TABLE IF EXISTS habits;
                 `);
-                console.log('Legacy local database wiped (test data)');
-            }
+        console.log("Legacy local database wiped (test data)");
+      }
 
-            await db.execAsync(CREATE_TABLES_V1);
-            await db.execAsync('PRAGMA user_version = 1');
-        });
-    }
+      await db.execAsync(CREATE_TABLES_V1);
+      await db.execAsync("PRAGMA user_version = 1");
+    });
+  }
 
-    if (version < 2 && targetVersion >= 2) {
-        await db.withTransactionAsync(async () => {
-            await db.execAsync(ADD_ALARM_AND_LEAD_V2);
-            await db.execAsync('PRAGMA user_version = 2');
-        });
-        console.log('Local database migrated to v2 (alarm, remindBeforeMin)');
-    }
+  if (version < 2 && targetVersion >= 2) {
+    await db.withTransactionAsync(async () => {
+      await db.execAsync(ADD_ALARM_AND_LEAD_V2);
+      await db.execAsync("PRAGMA user_version = 2");
+    });
+    console.log("Local database migrated to v2 (alarm, remindBeforeMin)");
+  }
 
-    const after = await db.getFirstAsync('PRAGMA user_version');
-    console.log('Local database at user_version', after?.user_version);
+  const after = await db.getFirstAsync("PRAGMA user_version");
+  console.log("Local database at user_version", after?.user_version);
 }
